@@ -1,0 +1,294 @@
+/* =============================
+   THEO Design Tokens
+   ============================= */
+
+:root {
+  --theo-blue: #38BDF8;
+  --theo-indigo: #6366F1;
+  --theo-violet: #A855F7;
+
+  --theo-gradient: linear-gradient(
+    90deg,
+    var(--theo-blue) 0%,
+    var(--theo-indigo) 50%,
+    var(--theo-violet) 100%
+  );
+}
+
+/* =============================
+   Primary Action Button (Send)
+   ============================= */
+
+.btn-primary {
+  height: 40px;
+  padding: 0 16px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  border-radius: 6px;
+
+  background: var(--theo-gradient);
+  color: #ffffff;
+
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+
+  cursor: pointer;
+
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.05s ease,
+    opacity 0.15s ease;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =============================
+   Secondary Button (Neutral)
+   ============================= */
+
+.btn-secondary {
+  height: 40px;
+  padding: 0 14px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+  color: #111827;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--theo-blue);
+  background-color: #f9fafb;
+}
+
+/* =============================
+   Danger / Destructive Button
+   ============================= */
+
+.btn-danger {
+  height: 40px;
+  padding: 0 14px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #ef4444;
+  color: #ffffff;
+
+  border: none;
+  border-radius: 6px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: background-color 0.15s ease;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+/* =============================
+   Pill Navigation Buttons
+   ============================= */
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 32px;
+  padding: 0 14px;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+
+  background-color: #f9fafb;
+  color: #374151;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-pill:hover {
+  border-color: var(--theo-indigo);
+  color: #111827;
+}
+
+/* Active / selected pill */
+.btn-pill.active {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    var(--theo-gradient) border-box;
+  border: 1px solid transparent;
+
+  color: #111827;
+  font-weight: 600;
+}
+
+/* ============================
+   Sidebar
+   ============================ */
+
+.sidebar {
+  border-right: 1px solid #e5e7eb;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.new-session {
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.new-session:hover {
+  background: #f3f4f6;
+}
+
+.session-search {
+  margin-bottom: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.session-group {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 6px;
+}
+
+.session-row.active {
+  background: #eef2ff;
+}
+
+.session-item {
+  flex: 1;
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #111827;
+}
+
+.session-item:hover {
+  background: #f3f4f6;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 0.25rem;
+}
+
+.delete-btn:hover {
+  color: #ef4444;
+}
+
+.confirm {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.confirm button {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.confirm .danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  width="800"
+  height="180"
+  viewBox="0 0 800 180"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label="THEO AI Logo">
+
+  <defs>
+    <linearGradient id="theoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Single centered text line -->
+  <text
+    x="400"
+    y="125"
+    text-anchor="middle"
+    font-size="140"
+    font-weight="700"
+    font-family="Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+
+    <tspan fill="url(#theoGradient)">THEO</tspan>
+    <tspan fill="#000000"> AI&gt;</tspan>
+
+  </text>
+
+</svg>
