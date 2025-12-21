@@ -1,0 +1,23 @@
+services:
+  theo-backend:
+    image: theo-backend
+    container_name: theo-backend
+    restart: unless-stopped
+    ports:
+      - "${THEO_BACKEND_PORT:-1066}:1066"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend/data:/app/data
+
+  theo-frontend:
+    image: theo-frontend
+    container_name: theo-frontend
+    restart: unless-stopped
+    depends_on:
+      - theo-backend
+    ports:
+      - "${THEO_FRONTEND_PORT:-8080}:80"
+    environment:
+      - THEO_BACKEND_HOST=theo-backend
+      - THEO_BACKEND_PORT=1066

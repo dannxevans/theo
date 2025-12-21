@@ -209,7 +209,9 @@ import {
   function initSocket() {
     if (socket) return;
 
-    socket = io("http://localhost:1066");
+    socket = io({
+      path: "/socket.io"
+    });
 
     socket.on("chat_token", (data) => {
       streamBuffer += data.token;

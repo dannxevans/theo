@@ -17,16 +17,16 @@ app = Flask(__name__)
 CORS(
     app,
     resources={r"/api/*": {"origins": [
-        "http://localhost:5174",
-        "http://127.0.0.1:5174"
+        "http://localhost:8080",
+        "http://127.0.0.1:8080"
     ]}}
 )
 
 socketio = SocketIO(
     app,
     cors_allowed_origins=[
-        "http://localhost:5174",
-        "http://127.0.0.1:5174"
+        "http://localhost:8080",
+        "http://127.0.0.1:8080"
     ],
     async_mode="threading"
 )
@@ -41,6 +41,10 @@ provider_registry = ProviderRegistry(memory)
 
 # Inject provider registry into router
 set_provider_registry(provider_registry)
+
+@app.route("/api/health")
+def api_health():
+    return {"status": "ok", "service": "THEO"}
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -252,6 +256,8 @@ def debug_log(message):
             logging.info(f"[DEBUG] {message}")
     except Exception as e:
         logging.warning(f"[DEBUG-LOGGING-ERROR] {e}")
+
+        
 
 if __name__ == "__main__":
     print("THEO backend starting on port 1066")
