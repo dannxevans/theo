@@ -9,8 +9,10 @@ node_modules/
 # Env / secrets
 .env
 
-# Local data
-*.db
+# THEO runtime data (persistent on Unraid)
+backend/data/
+*.sqlite
+*.sqlite3
 
 # OS
 .DS_Store
