@@ -24,8 +24,8 @@ FROM nginx:alpine
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Add our nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx template (envsubst-enabled)
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
 # Copy built assets
 COPY --from=build /app/dist /usr/share/nginx/html
