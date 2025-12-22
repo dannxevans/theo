@@ -21,11 +21,24 @@ app.config["PREFERRED_URL_SCHEME"] = "https"
 app.config["SESSION_COOKIE_SECURE"] = True
 
 ALLOWED_ORIGINS = [
+    # Local DEV
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://192.168.10.25:5173",
+    "https://dev.theoai.uk",
+
+    # Primary CloudFront domains
     "https://theoai.uk",
     "https://www.theoai.uk",
+    "https://app.theoai.uk",
+
+    # Secondary CloudFront domain
+    "https://duckyfuzz.uk",
+    "https://app.duckyfuzz.uk",
+    "https://ai.duckyfuzz.uk",
+
+    # (Optional but useful for debugging)
+    "http://theo-alb-306035510.eu-west-2.elb.amazonaws.com"
 ]
 
 CORS(
@@ -47,7 +60,7 @@ socketio = SocketIO(
 
 @app.route("/health")
 def health():
-    return {"status": "ok", "service": "THEO"} , 200
+    return {"status": "ok", "service": "THEO-Backend"} , 200
 
 memory = MemoryStore(Config.DATABASE_URL)
 context_manager = ContextManager(memory)
