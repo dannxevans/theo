@@ -14,20 +14,20 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://192.168.10.25:5173"
+]
+
 CORS(
     app,
-    resources={r"/api/*": {"origins": [
-        "http://localhost:8080",
-        "http://127.0.0.1:8080"
-    ]}}
+    resources={r"/api/*": {"origins": ALLOWED_ORIGINS}}
 )
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins=[
-        "http://localhost:8080",
-        "http://127.0.0.1:8080"
-    ],
+    cors_allowed_origins=ALLOWED_ORIGINS,
     async_mode="threading"
 )
 
