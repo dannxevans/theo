@@ -7,6 +7,7 @@ from core.memory import MemoryStore
 from config import Config
 from core.provider_registry import ProviderRegistry
 from flask_socketio import SocketIO, emit
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,6 +15,8 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
+# Wrap app with ProxyFix to correctly handle X-Forwarded headers from ALB (Application Load Balancer)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 app.config["PREFERRED_URL_SCHEME"] = "https"
 app.config["SESSION_COOKIE_SECURE"] = True
 
@@ -44,7 +47,7 @@ socketio = SocketIO(
 
 @app.route("/health")
 def health():
-    return {"status": "ok", "service": "THEO"}
+    return {"status": "ok", "service": "THEO"} , 200
 
 memory = MemoryStore(Config.DATABASE_URL)
 context_manager = ContextManager(memory)
