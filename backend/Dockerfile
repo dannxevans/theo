@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies   
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -33,4 +33,4 @@ COPY . /app
 EXPOSE 1066
 
 # Default command
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-k", "eventlet", "-w", "1", "--threads", "1000", "--timeout", "0", "--log-level", "info", "--access-logfile", "-", "--error-logfile", "-", "-b", "0.0.0.0:1066", "app:app"]
