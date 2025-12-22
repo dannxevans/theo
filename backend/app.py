@@ -14,22 +14,32 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
+app.config["PREFERRED_URL_SCHEME"] = "https"
+app.config["SESSION_COOKIE_SECURE"] = True
+
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://192.168.10.25:5173"
-    "https://www.theoai.uk"
+    "http://192.168.10.25:5173",
+    "https://theoai.uk",
+    "https://www.theoai.uk",
 ]
 
 CORS(
     app,
-    resources={r"/api/*": {"origins": ALLOWED_ORIGINS}}
+    resources={
+        r"/api/*": {"origins": ALLOWED_ORIGINS},
+        r"/socket.io/*": {"origins": ALLOWED_ORIGINS},
+    },
+    supports_credentials=True,
 )
 
 socketio = SocketIO(
     app,
     cors_allowed_origins=ALLOWED_ORIGINS,
-    async_mode="threading"
+    async_mode="threading",
+    logger=True,
+    engineio_logger=True,
 )
 
 @app.route("/health")
