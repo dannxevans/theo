@@ -22,6 +22,18 @@
 
   let sessionQuery = "";
 
+  function generateUUID() {
+    if (crypto && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    // Fallback RFC4122 v4
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      const v = c === "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
 onMount(async () => {
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -35,7 +47,7 @@ onMount(async () => {
     if (!activeSessionId || !sessions.find(s => s.id === activeSessionId)) {
       activeSessionId = sessions.length
         ? sessions[0].id
-        : crypto.randomUUID();
+        : generateUUID();
     }
 
     localStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
@@ -51,7 +63,7 @@ onMount(async () => {
   }
 
   function newSession() {
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
     // Optimistically add to top of list
@@ -68,7 +80,7 @@ onMount(async () => {
         if (sessions.length) {
           activeSessionId = sessions[0].id;
         } else {
-          activeSessionId = crypto.randomUUID();
+          activeSessionId = generateUUID();
           sessions = [{ id: activeSessionId, title: "New chat", summary: "" }];
         }
         localStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
