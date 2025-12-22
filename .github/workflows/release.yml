@@ -54,7 +54,7 @@ jobs:
       - name: Build & push frontend
         run: |
           docker buildx build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -t $REGISTRY/$OWNER/theo-frontend:${{ steps.version.outputs.version }} \
             -t $REGISTRY/$OWNER/theo-frontend:latest \
             -f frontend/Dockerfile \
@@ -64,7 +64,7 @@ jobs:
       - name: Build & push backend
         run: |
           docker buildx build \
-            --platform linux/amd64
+            --platform linux/amd64 \
             -t $REGISTRY/$OWNER/theo-backend:${{ steps.version.outputs.version }} \
             -t $REGISTRY/$OWNER/theo-backend:latest \
             -f backend/Dockerfile \
