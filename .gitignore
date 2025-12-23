@@ -16,3 +16,4 @@ backend/data/
 
 # OS
 .DS_Store
+data/theo.db
