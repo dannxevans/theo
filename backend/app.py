@@ -10,6 +10,8 @@ from config import Config
 from core.provider_registry import ProviderRegistry
 from flask_socketio import SocketIO, emit
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask import Response, stream_with_context
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,6 +89,47 @@ def chat():
 
     context_manager.update(session_id, text, result["text"])
     return jsonify(result)
+
+@app.route("/api/stream/<session_id>")
+def stream_chat_sse(session_id):
+    text = request.args.get("text", "")
+    forced_provider = request.args.get("forced_provider")
+
+    def event_stream():
+        try:
+            context = context_manager.build_context(session_id, text)
+
+            router_context = dict(context)
+            router_context["text"] = text
+            if forced_provider:
+                router_context["forced_provider"] = forced_provider
+
+            # Route request (non-streaming, we chunk manually)
+            result = route_request(router_context)
+
+            full_text = result.get("text", "")
+            chunk_size = 32
+
+            for i in range(0, len(full_text), chunk_size):
+                chunk = full_text[i:i + chunk_size]
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+
+            yield "event: end\ndata: {}\n\n"
+
+            context_manager.update(session_id, text, full_text)
+
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(event_stream()),
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @socketio.on("chat_stream")
 def chat_stream(payload):

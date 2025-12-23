@@ -2,7 +2,7 @@
   
   import DOMPurify from "dompurify";
 import {
-  sendMessage,
+  streamMessage,
   fetchSessionSummary,
   rememberMemory,
   forgetMemory,
@@ -10,7 +10,6 @@ import {
   getSessionMessages,
   getProviders
 } from "../lib/api.js";
-  import { io } from "socket.io-client";
   import { marked } from "marked";
   import Prism from "prismjs";
   import "prismjs/components/prism-python";
@@ -65,7 +64,6 @@ import {
     sessionId = generateUUID();
   }
 
-  let socket = null;
   let streaming = false;
 
   // Raw token buffer (not rendered directly)
@@ -216,61 +214,6 @@ import {
     window.location.reload();
   }
 
-  function initSocket() {
-    if (socket) return;
-
-    socket = io({
-      path: "/socket.io"
-    });
-
-    socket.on("chat_token", (data) => {
-      streamBuffer += data.token;
-
-      // Flush buffer on safe boundaries for readability
-      if (
-        streamBuffer.includes("\n") ||
-        streamBuffer.includes(". ") ||
-        streamBuffer.includes("! ") ||
-        streamBuffer.includes("? ")
-      ) {
-        streamedText += streamBuffer;
-        streamBuffer = "";
-        scrollToBottom();
-      }
-    });
-
-    socket.on("chat_end", async (data) => {
-      // Flush any remaining buffered text
-      if (streamBuffer) {
-        streamedText += streamBuffer;
-        streamBuffer = "";
-      }
-
-      messages = [
-        ...messages,
-        {
-          role: "assistant",
-          text: streamedText,
-          provider: data.provider,
-          task: data.task,
-          fallback_reason: data.fallback_reason
-        }
-      ];
-
-      streamedText = "";
-      streaming = false;
-      loading = false;
-
-      await tick();
-
-      scrollToBottom();
-
-      enhanceCodeBlocks();
-
-      loadSummary();
-    });
-  }
-
   async function submit() {
     if (!input || loading) return;
 
@@ -280,28 +223,51 @@ import {
 
     messages = [...messages, { role: "user", text: userText }];
     loading = true;
-
-    initSocket();
-
     streaming = true;
     streamedText = "";
+    streamBuffer = "";
 
-    socket.emit("chat_stream", {
-      text: userText,
-      session_id: sessionId,
-      forced_provider: forcedProvider || null
-    });
-  }
+    try {
+      await streamMessage({
+        sessionId,
+        text: userText,
+        forcedProvider,
+        onToken(token) {
+          streamedText += token;
+          scrollToBottom();
+        },
+        async onEnd(meta) {
+          messages = [
+            ...messages,
+            {
+              role: "assistant",
+              text: streamedText,
+              provider: meta?.provider,
+              task: meta?.task,
+              fallback_reason: meta?.fallback_reason
+            }
+          ];
 
-  function stopGeneration() {
-    if (!socket || !streaming) return;
+          streamedText = "";
+          streaming = false;
+          loading = false;
 
-    socket.emit("stop_generation", {
-      session_id: sessionId
-    });
-
-    streaming = false;
-    loading = false;
+          await tick();
+          scrollToBottom();
+          enhanceCodeBlocks();
+          loadSummary();
+        },
+        onError(err) {
+          error = err?.message || "Streaming failed";
+          streaming = false;
+          loading = false;
+        }
+      });
+    } catch (e) {
+      error = e.message || "Streaming failed";
+      streaming = false;
+      loading = false;
+    }
   }
 
   function scrollToBottom() {
@@ -409,8 +375,8 @@ import {
           />
 
           {#if streaming}
-            <button class="btn-danger" on:click={stopGeneration}>
-              Stop
+            <button class="btn-danger" disabled>
+              Streaming…
             </button>
           {:else}
             <button class="btn-primary" on:click={submit} disabled={loading}>

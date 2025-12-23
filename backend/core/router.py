@@ -197,7 +197,7 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
     return mp
 
 
-def route_request(context: dict):
+def route_request(context: dict, stream: bool = False):
     text = context.get("text", "")
     memory = context.get("memory")
 
@@ -256,7 +256,29 @@ def route_request(context: dict):
     raw = provider.chat(
         system=system_prompt,
         messages=messages,
+        stream=stream if "stream" in provider.chat.__code__.co_varnames else False,
     )
+
+    if stream:
+        def stream_generator():
+            full_text = []
+            for chunk in raw:
+                if isinstance(chunk, dict):
+                    token = chunk.get("token") or chunk.get("text")
+                else:
+                    token = chunk
+                if token:
+                    full_text.append(token)
+                    yield {
+                        "token": token,
+                        "provider": meta["provider"],
+                        "model": meta["model"],
+                        "task_type": meta["task_type"],
+                    }
+            # Final memory write after stream completes
+            if memory:
+                memory.append("local", text, "".join(full_text))
+        return stream_generator()
 
     text_out = raw.get("text") if isinstance(raw, dict) else raw
 

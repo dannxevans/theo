@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:1066';
 
 export async function sendMessage({ text, sessionId }) {
   const response = await fetch(`${API_BASE}/api/chat`, {
@@ -250,4 +250,42 @@ export async function setDebugFlag(enabled) {
   }
 
   return response.json();
+}
+
+/**
+ * Stream a chat response via Server-Sent Events (SSE).
+ * This is intentionally separate from sendMessage() so we can
+ * run Socket.IO and SSE side-by-side during migration.
+ */
+export function streamMessage({ text, sessionId, onToken, onEnd, onError }) {
+  const params = new URLSearchParams({ text });
+  const url = `${API_BASE}/api/stream/${sessionId}?${params.toString()}`;
+
+  const source = new EventSource(url);
+
+  source.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.token && onToken) {
+        onToken(data.token);
+      }
+    } catch (err) {
+      console.error("Failed to parse SSE message:", err);
+    }
+  };
+
+  source.addEventListener("end", () => {
+    source.close();
+    if (onEnd) onEnd();
+  });
+
+  source.onerror = (err) => {
+    console.error("SSE error:", err);
+    source.close();
+    if (onError) onError(err);
+  };
+
+  return () => {
+    source.close();
+  };
 }
