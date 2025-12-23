@@ -3,7 +3,6 @@ name: Build & Publish THEO Images
 on:
   push:
     branches:
-      - dev
       - release
     tags:
       - 'v*'
