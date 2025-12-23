@@ -262,22 +262,33 @@ def route_request(context: dict, stream: bool = False):
     if stream:
         def stream_generator():
             full_text = []
+
             for chunk in raw:
                 if isinstance(chunk, dict):
                     token = chunk.get("token") or chunk.get("text")
                 else:
                     token = chunk
+
                 if token:
                     full_text.append(token)
                     yield {
-                        "token": token,
-                        "provider": meta["provider"],
-                        "model": meta["model"],
-                        "task_type": meta["task_type"],
+                        "token": token
                     }
-            # Final memory write after stream completes
+
+            # Persist full response
+            final_text = "".join(full_text)
             if memory:
-                memory.append("local", text, "".join(full_text))
+                memory.append("local", text, final_text)
+
+            # ⬇️ THIS IS THE IMPORTANT PART ⬇️
+            yield {
+                "event": "end",
+                "provider": meta["provider"],
+                "model": meta["model"],
+                "task_type": meta["task_type"],
+                "fallback_reason": meta["fallback_reason"],
+            }
+
         return stream_generator()
 
     text_out = raw.get("text") if isinstance(raw, dict) else raw

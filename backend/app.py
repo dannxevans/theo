@@ -113,8 +113,16 @@ def stream_chat_sse(session_id):
             for i in range(0, len(full_text), chunk_size):
                 chunk = full_text[i:i + chunk_size]
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
-
-            yield "event: end\ndata: {}\n\n"
+            
+            # Send metadata at end of stream
+            end_payload = {
+                "provider": result.get("provider"),
+                "model": result.get("model"),
+                "task_type": result.get("task_type"),
+                "fallback_reason": result.get("fallback_reason"),
+}
+            yield "event: end\n"
+            yield f"data: {json.dumps(end_payload)}\n\n"
 
             context_manager.update(session_id, text, full_text)
 

@@ -243,6 +243,7 @@ import {
               role: "assistant",
               text: streamedText,
               provider: meta?.provider,
+              model: meta?.model,
               task: meta?.task,
               fallback_reason: meta?.fallback_reason
             }
@@ -343,7 +344,15 @@ import {
                   </div>
                 {/if}
                 {#if m.provider}
-                  <small>via {m.provider} ({m.task})</small>
+                  <small>
+                    via {m.provider}
+                    {#if m.model}
+                      · {m.model}
+                    {/if}
+                    {#if m.task}
+                      ({m.task})
+                    {/if}
+                  </small>
                 {/if}
 
                 {#if m.fallback_reason}
