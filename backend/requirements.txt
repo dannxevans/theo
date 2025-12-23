@@ -8,3 +8,4 @@ requests
 openai
 anthropic
 eventlet
+gunicorn

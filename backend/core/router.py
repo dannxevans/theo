@@ -114,6 +114,13 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
 
 
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None):
+    # If forced_provider is actually a model name, resolve it to a provider id
+    if forced_provider and provider_registry:
+        provider_by_id = provider_registry.get(forced_provider)
+        if not provider_by_id:
+            provider_by_model = provider_registry.get_by_model(forced_provider)
+            if provider_by_model:
+                forced_provider = provider_by_model["id"]
     fallback_reason = None
 
     if not forced_provider and memory:
@@ -197,7 +204,7 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
     return mp
 
 
-def route_request(context: dict):
+def route_request(context: dict, stream: bool = False):
     text = context.get("text", "")
     memory = context.get("memory")
 
@@ -254,9 +261,41 @@ def route_request(context: dict):
     _debug(memory, f"Calling provider.chat with model={getattr(provider, 'model', None)}")
 
     raw = provider.chat(
-        system=system_prompt,
-        messages=messages,
-    )
+    system=system_prompt,
+    messages=messages,
+)
+
+    if stream:
+        def stream_generator():
+            full_text = []
+
+            for chunk in raw:
+                if isinstance(chunk, dict):
+                    token = chunk.get("token") or chunk.get("text")
+                else:
+                    token = chunk
+
+                if token:
+                    full_text.append(token)
+                    yield {
+                        "token": token
+                    }
+
+            # Persist full response
+            final_text = "".join(full_text)
+            if memory:
+                memory.append("local", text, final_text)
+
+            # ⬇️ THIS IS THE IMPORTANT PART ⬇️
+            yield {
+                "event": "end",
+                "provider": meta["provider"],
+                "model": meta["model"],
+                "task_type": meta["task_type"],
+                "fallback_reason": meta["fallback_reason"],
+            }
+
+        return stream_generator()
 
     text_out = raw.get("text") if isinstance(raw, dict) else raw
 

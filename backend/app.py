@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+# import eventlet
+# eventlet.monkey_patch()
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -8,8 +8,9 @@ from core.context import ContextManager
 from core.memory import MemoryStore
 from config import Config
 from core.provider_registry import ProviderRegistry
-from flask_socketio import SocketIO, emit
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask import Response, stream_with_context
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,17 +48,8 @@ CORS(
     app,
     resources={
         r"/api/*": {"origins": ALLOWED_ORIGINS},
-        r"/socket.io/*": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=True,
-)
-
-socketio = SocketIO(
-    app,
-    cors_allowed_origins=ALLOWED_ORIGINS,
-    async_mode="eventlet",
-    ping_interval=25,
-    ping_timeout=60,
 )
 
 @app.route("/health")
@@ -87,38 +79,54 @@ def chat():
     context_manager.update(session_id, text, result["text"])
     return jsonify(result)
 
-@socketio.on("chat_stream")
-def chat_stream(payload):
-    session_id = payload.get("session_id", "default")
-    text = payload.get("text", "")
-    debug_log(f"chat_stream called | session_id={session_id} | text={text}")
+@app.route("/api/stream/<session_id>")
+def stream_chat_sse(session_id):
+    text = request.args.get("text", "")
+    forced_provider = request.args.get("forced_provider")
 
-    context = context_manager.build_context(session_id, text)
+    def event_stream():
+        try:
+            context = context_manager.build_context(session_id, text)
 
-    router_context = dict(context)
-    router_context["text"] = text
-    debug_log(f"routing context: {router_context}")
+            router_context = dict(context)
+            router_context["text"] = text
+            if forced_provider:
+                router_context["forced_provider"] = forced_provider
 
-    if "forced_provider" in payload:
-        router_context["forced_provider"] = payload.get("forced_provider")
+            # Route request (non-streaming, we chunk manually)
+            result = route_request(router_context)
 
-    result = route_request(router_context)
-    debug_log(f"route result: {result}")
+            full_text = result.get("text", "")
+            chunk_size = 32
 
-    full_text = result["text"]
-    chunk_size = 32
+            for i in range(0, len(full_text), chunk_size):
+                chunk = full_text[i:i + chunk_size]
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            
+            # Send metadata at end of stream
+            end_payload = {
+                "provider": result.get("provider"),
+                "model": result.get("model"),
+                "task_type": result.get("task_type"),
+                "fallback_reason": result.get("fallback_reason"),
+}
+            yield "event: end\n"
+            yield f"data: {json.dumps(end_payload)}\n\n"
 
-    for i in range(0, len(full_text), chunk_size):
-        emit("chat_token", {"token": full_text[i:i + chunk_size]})
+            context_manager.update(session_id, text, full_text)
 
-    emit("chat_end", {
-        "provider": result["provider"],
-        "model": result.get("model"),
-        "task": result.get("task_type"),
-        "fallback_reason": result.get("fallback_reason"),
-    })
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
-    context_manager.update(session_id, text, full_text)
+    return Response(
+        stream_with_context(event_stream()),
+        headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.route("/api/memory/remember", methods=["POST"])
 def remember():
@@ -290,4 +298,4 @@ def debug_log(message):
 
 if __name__ == "__main__":
     print("THEO backend starting on port 1066")
-    socketio.run(app, host="0.0.0.0", port=1066, debug=True)
+    app.run(host="0.0.0.0", port=1066, debug=True)

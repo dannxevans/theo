@@ -149,4 +149,4 @@ This project is currently private / experimental.
 ## Author
 
 Built by Danny Black.  
-THEO is being developed as both a tool and a learning platform.
+THEO is being developed as both a tool and a learning platform. :

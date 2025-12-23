@@ -33,4 +33,4 @@ COPY . /app
 EXPOSE 1066
 
 # Default command
-CMD ["gunicorn", "-k", "eventlet", "-w", "1", "--threads", "1000", "--timeout", "0", "--log-level", "info", "--access-logfile", "-", "--error-logfile", "-", "-b", "0.0.0.0:1066", "app:app"]
+CMD ["gunicorn", "-w", "1", "-k", "sync", "--timeout", "0", "--graceful-timeout", "0", "--keep-alive", "75", "-b", "0.0.0.0:1066", "app:app"]
