@@ -60,6 +60,15 @@ class ProviderRegistry:
                 return provider
         return None
 
+    def get_by_model(self, model: str):
+        """
+        Return provider config that owns the given model name.
+        """
+        for provider in self._providers.values():
+            if provider.get("model") == model:
+                return provider
+        return None
+
     # =============================
     # Mutations (write-through)
     # =============================

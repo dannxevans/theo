@@ -114,6 +114,13 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
 
 
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None):
+    # If forced_provider is actually a model name, resolve it to a provider id
+    if forced_provider and provider_registry:
+        provider_by_id = provider_registry.get(forced_provider)
+        if not provider_by_id:
+            provider_by_model = provider_registry.get_by_model(forced_provider)
+            if provider_by_model:
+                forced_provider = provider_by_model["id"]
     fallback_reason = None
 
     if not forced_provider and memory:
@@ -254,10 +261,9 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Calling provider.chat with model={getattr(provider, 'model', None)}")
 
     raw = provider.chat(
-        system=system_prompt,
-        messages=messages,
-        stream=stream if "stream" in provider.chat.__code__.co_varnames else False,
-    )
+    system=system_prompt,
+    messages=messages,
+)
 
     if stream:
         def stream_generator():
