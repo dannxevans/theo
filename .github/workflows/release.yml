@@ -19,10 +19,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -40,23 +36,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
-        id: version
+      # -------------------------------
+      # Derive deterministic image tags
+      # -------------------------------
+      - name: Compute image tags
+        id: meta
         run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            VERSION=latest
+            VERSION="dev"
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          echo "sha_tag=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "version_tag=${VERSION}" >> $GITHUB_OUTPUT
 
       # ---------- FRONTEND ----------
       - name: Build & push frontend
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t $REGISTRY/$OWNER/theo-frontend:${{ steps.version.outputs.version }} \
-            -t $REGISTRY/$OWNER/theo-frontend:latest \
+            -t $REGISTRY/$OWNER/theo-frontend:${{ steps.meta.outputs.sha_tag }} \
+            -t $REGISTRY/$OWNER/theo-frontend:${{ steps.meta.outputs.version_tag }} \
             -f frontend/Dockerfile \
             --push frontend
 
@@ -65,7 +68,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t $REGISTRY/$OWNER/theo-backend:${{ steps.version.outputs.version }} \
-            -t $REGISTRY/$OWNER/theo-backend:latest \
+            -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.sha_tag }} \
+            -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.version_tag }} \
             -f backend/Dockerfile \
             --push backend
