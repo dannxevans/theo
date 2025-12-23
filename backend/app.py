@@ -121,10 +121,10 @@ def stream_chat_sse(session_id):
     return Response(
         stream_with_context(event_stream()),
         headers={
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
         },
     )
 
