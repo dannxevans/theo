@@ -3,6 +3,7 @@ name: Build & Publish THEO Images
 on:
   push:
     branches:
+      - dev
       - release
     tags:
       - 'v*'
@@ -37,21 +38,25 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # -------------------------------
-      # Derive deterministic image tags
+      # Determine deterministic tags
       # -------------------------------
       - name: Compute image tags
         id: meta
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
 
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "${GITHUB_REF}" == refs/heads/release ]]; then
+            VERSION_TAG=latest
+          elif [[ "${GITHUB_REF}" == refs/heads/dev ]]; then
+            VERSION_TAG=dev
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION_TAG=${GITHUB_REF#refs/tags/v}
           else
-            VERSION="dev"
+            VERSION_TAG=unknown
           fi
 
           echo "sha_tag=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "version_tag=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
 
       # ---------- FRONTEND ----------
       - name: Build & push frontend
