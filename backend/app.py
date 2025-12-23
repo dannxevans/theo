@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+# import eventlet
+# eventlet.monkey_patch()
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -55,7 +55,8 @@ CORS(
 socketio = SocketIO(
     app,
     cors_allowed_origins=ALLOWED_ORIGINS,
-    async_mode="eventlet",
+    # async_mode="eventlet",
+    async_mode="threading",
     ping_interval=25,
     ping_timeout=60,
 )
