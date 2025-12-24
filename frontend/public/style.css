@@ -14,6 +14,79 @@
     var(--theo-violet) 100%
   );
 }
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================
+   App Root Layout Fix
+   ============================= */
+
+.app-layout {
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* =============================
+   Global Typography Restore
+   ============================= */
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #111827;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.25rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+h3 {
+  font-size: 0.95rem;
+}
 
 /* =============================
    Primary Action Button (Send)
@@ -210,6 +283,7 @@
   font-size: 0.8rem;
   border: 1px solid #d1d5db;
   border-radius: 6px;
+  height: auto;
 }
 
 .session-group {
@@ -228,7 +302,8 @@
 }
 
 .session-row.active {
-  background: #eef2ff;
+  background: #dbeafe;
+  border-radius: 4px;
 }
 
 .session-item {
@@ -250,14 +325,14 @@
 .delete-btn {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: #999;
   cursor: pointer;
   font-size: 0.9rem;
   padding: 0 0.25rem;
 }
 
 .delete-btn:hover {
-  color: #ef4444;
+  color: #c00;
 }
 
 .confirm {
@@ -267,7 +342,7 @@
 
 .confirm button {
   font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 0.35rem;
   border-radius: 4px;
 }
 
@@ -291,4 +366,503 @@
 .btn-secondary:hover {
   background: #e2e8f0;
   border-color: #94a3b8;
+}
+/* ============================
+   Sidebar backdrop
+   ============================ */
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .shell {
+    grid-template-columns: 1fr !important;
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 30;
+  }
+
+  .sidebar.open + .sidebar-backdrop {
+    display: block;
+  }
+}
+
+/* ============================
+   Hamburger button (desktop-first: hidden)
+   ============================ */
+
+.hamburger-btn {
+  display: none;
+}
+
+/* ============================
+   Mobile Layout (≤ 768px)
+   ============================ */
+
+@media (max-width: 768px) {
+
+  /* Allow hamburger only on mobile */
+  .hamburger-btn {
+    display: inline-flex !important;
+    position: relative;
+    top: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* App layout becomes single column */
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Sidebar becomes off-canvas */
+  .sidebar {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+
+    width: 80%;
+    max-width: 280px;
+
+    background: #ffffff;
+    z-index: 40;
+
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Backdrop only when sidebar open */
+  .sidebar.open + .sidebar-backdrop {
+    display: block;
+  }
+
+  /* Header spacing */
+  .app-header {
+    height: 52px;
+    padding: 0 0.75rem;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Chat padding */
+  .chat-container {
+    padding: 0.5rem;
+  }
+}
+
+/* ============================
+   Desktop (≥ 769px)
+   ============================ */
+
+@media (min-width: 769px) {
+
+  /* Ensure hamburger NEVER appears */
+  .hamburger-btn {
+    display: none !important;
+  }
+
+  /* Sidebar behaves normally */
+  .sidebar {
+    position: relative;
+    transform: none;
+    height: auto;
+  }
+
+  .sidebar-backdrop {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .hamburger-btn {
+    display: none !important;
+  }
+}
+
+/* ============================= */
+/* Chat layout (desktop + mobile) */
+/* Step 0.5 – extracted from Chat.svelte */
+/* ============================= */
+
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.chat-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.session-bar,
+.summary {
+  flex-shrink: 0;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input {
+  flex-shrink: 0;
+  background: #fff;
+  padding: 0.75rem;
+  border-top: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input input,
+.input textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Messages */
+
+.message {
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  box-sizing: border-box;
+}
+
+.message user {
+  justify-content: flex-end;
+}
+
+.message.assistant {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 75%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #f4f4f5;
+  word-wrap: break-word;
+  box-sizing: border-box;
+}
+
+.message.user .bubble {
+  background: #e5f0ff;
+  margin-left: auto;
+}
+
+/* Wide desktop comfort */
+
+@media (min-width: 1200px) {
+  .bubble {
+    max-width: 900px;
+  }
+
+  .messages {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 769px) {
+  .main {
+    width: 100%;
+    max-width: none;
+  }
+
+  .chat-container {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.app {
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  flex-shrink: 0;
+  height: 56px;
+  padding: 0 1rem;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.header-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.header button {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  cursor: pointer;
+}
+
+.header button.active {
+  background: #e5e7eb;
+  font-weight: 600;
+}
+
+/* ---------- Shell ---------- */
+
+.shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+/* ---------- Main ---------- */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.session-row.active {
+  background: #dbeafe;
+  border-radius: 4px;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.delete-btn:hover {
+  color: #c00;
+}
+
+.confirm {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.confirm button {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.35rem;
+}
+
+.confirm .danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+  .session-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f5f5f5;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .session-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .session-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .summary {
+    background: #f3f6f9;
+    border-left: 4px solid #4b5563;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .message {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  input {
+    padding: 0.5rem;
+  }
+
+
+  input {
+    height: auto;
+    padding: 0.5rem;
+  }
+
+
+  code {
+    font-size: 0.8rem;
+  }
+
+  .error {
+    color: red;
+  }
+
+  small {
+    display: block;
+    opacity: 0.6;
+  }
+
+  .memory-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .memory-controls input {
+    padding: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .memory-status {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    opacity: 0.8;
+  }
+
+  .message.assistant {
+    justify-content: flex-start;
+  }
+
+  .message.user .bubble {
+    background: #e5f0ff;
+  }
+
+  .message strong {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    opacity: 0.75;
+  }
+
+  .bubble {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .provider-select {
+    padding: 0.45rem;
+    font-size: 0.85rem;
+  }
+
+  .provider-select {
+    height: 44px;
+    border-radius: 6px;
+    padding: 0.45rem;
+    font-size: 0.85rem;
+  }
+
+  .provider-badge {
+    display: inline-block;
+    background: #e5e7eb;
+    color: #374151;
+    border-radius: 6px;
+    font-size: 0.77em;
+    padding: 0.09em 0.6em;
+    margin-left: 0.2em;
+    opacity: 0.8;
+    vertical-align: middle;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+@media (min-width: 769px) {
+  .chat,
+  .chat-inner,
+  .chat-main {
+    width: 100%;
+    max-width: none;
+  }
 }
