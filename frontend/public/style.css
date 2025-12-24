@@ -376,6 +376,9 @@ h3 {
 }
 
 @media (max-width: 768px) {
+  .shell {
+    grid-template-columns: 1fr !important;
+  }
   .sidebar-backdrop {
     display: none;
     position: fixed;
