@@ -1,7 +1,11 @@
+<svelte:head>
+  <link rel="stylesheet" href="/style.css" />
+</svelte:head>
+
 <script>
   
   import DOMPurify from "dompurify";
-import {
+  import {
   streamMessage,
   fetchSessionSummary,
   rememberMemory,
@@ -411,130 +415,6 @@ import {
 
 <style>
 
-  .chat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-    min-height: 0;
-  }
-
-  .chat-inner {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-  }
-
-  .chat-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .session-bar,
-  .summary {
-    flex-shrink: 0;
-  }
-
-  .messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    min-height: 0;
-  }
-
-  .input {
-    flex-shrink: 0;
-    background: #fff;
-    padding: 0.75rem;
-    border-top: 1px solid #ddd;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .session-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem;
-    background: #f5f5f5;
-    padding: 0.5rem;
-    font-size: 0.85rem;
-  }
-
-  .session-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .session-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .summary {
-    background: #f3f6f9;
-    border-left: 4px solid #4b5563;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-    margin-bottom: 1rem;
-  }
-
-  .message {
-    margin-bottom: 1rem;
-    font-size: 0.95rem;
-    line-height: 1.55;
-  }
-
-  input {
-    flex: 1;
-    padding: 0.5rem;
-  }
-
-
-  input {
-    height: auto;
-    padding: 0.5rem;
-  }
-
-
-  code {
-    font-size: 0.8rem;
-  }
-
-  .error {
-    color: red;
-  }
-
-  small {
-    display: block;
-    opacity: 0.6;
-  }
-
-  .memory-controls {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .memory-controls input {
-    flex: 1;
-    padding: 0.4rem;
-    font-size: 0.85rem;
-  }
-
-  .memory-status {
-    margin-top: 0.5rem;
-    font-size: 0.8rem;
-    opacity: 0.8;
-  }
-
   :global(.markdown h1) {
     font-size: 1.5rem;
     margin: 1rem 0 0.5rem;
@@ -582,62 +462,5 @@ import {
 
   :global(.copy-btn:hover) {
     background: #388bfd;
-  }
-
-  .message {
-    display: flex;
-    max-width: 100%;
-  }
-
-  .message.user {
-    justify-content: flex-end;
-  }
-
-  .message.assistant {
-    justify-content: flex-start;
-  }
-
-  .bubble {
-    max-width: 760px;
-    padding: 0.75rem 1rem;
-    border-radius: 12px;
-    background: #f4f4f5;
-  }
-
-  .message.user .bubble {
-    background: #e5f0ff;
-  }
-
-  .message strong {
-    display: block;
-    font-size: 0.8rem;
-    margin-bottom: 0.25rem;
-    opacity: 0.75;
-  }
-
-  .provider-select {
-    padding: 0.45rem;
-    font-size: 0.85rem;
-  }
-
-  .provider-select {
-    height: 44px;
-    border-radius: 6px;
-    padding: 0.45rem;
-    font-size: 0.85rem;
-  }
-
-  .provider-badge {
-    display: inline-block;
-    background: #e5e7eb;
-    color: #374151;
-    border-radius: 6px;
-    font-size: 0.77em;
-    padding: 0.09em 0.6em;
-    margin-left: 0.2em;
-    opacity: 0.8;
-    vertical-align: middle;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
+  }  
 </style>

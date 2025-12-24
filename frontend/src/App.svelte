@@ -12,6 +12,20 @@
   let showProviders = false;
   let showSettings = false;
 
+  // Mobile sidebar toggle state
+  let sidebarOpen = false;
+  $: {
+    if (typeof document !== "undefined") {
+      document.body.classList.toggle("no-scroll", sidebarOpen);
+    }
+  }
+  function openSidebar() {
+    sidebarOpen = true;
+  }
+  function closeSidebar() {
+    sidebarOpen = false;
+  }
+
   let sessions = [];
   let activeSessionId = null;
   const MAX_SESSIONS = 20;
@@ -60,6 +74,7 @@ onMount(async () => {
   function selectSession(id) {
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
+    sidebarOpen = false;
   }
 
   function newSession() {
@@ -133,9 +148,10 @@ onMount(async () => {
   }
 </script>
 
-<main class="app">
+<main class="app-layout app-root">
   <header class="header">
     <div class="header-left">
+      <button class="hamburger" on:click={openSidebar}>☰</button>
       <img
         src="/logo.svg"
         alt="THEO"
@@ -169,10 +185,11 @@ onMount(async () => {
       </button>
     </div>
   </header>
+<div class="app-body">
 
-  <div class="shell">
+  <div class="shell layout-shell">
     <!-- Sidebar placeholder (sessions will move here later) -->
-    <aside class="sidebar">
+    <aside class="sidebar" class:open={sidebarOpen}>
       <div class="sidebar-title">Sessions</div>
       <button class="btn-pill new-session" on:click={newSession}>
         + New chat
@@ -222,126 +239,21 @@ onMount(async () => {
         {/each}
       {/each}
     </aside>
+    {#if sidebarOpen}
+      <div class="sidebar-backdrop" on:click={closeSidebar}></div>
+    {/if}
 
     <section class="main">
-      {#if showProviders}
-        <Providers />
-      {:else if showSettings}
-        <Settings />
-      {:else}
-        <Chat sessionId={activeSessionId} />
-      {/if}
+      <div class="chat-main">
+        {#if showProviders}
+          <Providers />
+        {:else if showSettings}
+          <Settings />
+        {:else}
+          <Chat sessionId={activeSessionId} />
+        {/if}
+      </div>
     </section>
   </div>
+  </div>
 </main>
-
-<style>
-:global(html, body) {
-  height: 100%;
-  margin: 0;
-}
-
-.app {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-/* ---------- Header ---------- */
-
-.header {
-  flex-shrink: 0;
-  height: 56px;
-  padding: 0 1rem;
-  border-bottom: 1px solid #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header h1 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.header-right {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.header button {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
-  cursor: pointer;
-}
-
-.header button.active {
-  background: #e5e7eb;
-  font-weight: 600;
-}
-
-/* ---------- Shell ---------- */
-
-.shell {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 0;
-}
-
-/* ---------- Main ---------- */
-
-.main {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.session-row {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.session-row.active {
-  background: #dbeafe;
-  border-radius: 4px;
-}
-
-.delete-btn {
-  background: transparent;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.delete-btn:hover {
-  color: #c00;
-}
-
-.confirm {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.confirm button {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.35rem;
-}
-
-.confirm .danger {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
-}
-
-.logo {
-  height: 28px;
-  width: auto;
-  display: block;
-}
-</style>
