@@ -410,6 +410,40 @@ class MemoryStore:
                 for r in reversed(rows)
             ]
 
+    def build_context(self, session_id, system_prompt, limit=12):
+        """
+        Build deterministic context for model invocation.
+        Order:
+        1. system prompt
+        2. session summary (if exists)
+        3. most recent conversation turns (bounded)
+        """
+        messages = []
+
+        # Always include system prompt
+        messages.append({
+            "role": "system",
+            "content": system_prompt,
+        })
+
+        # Optional long-term summary
+        summary = self.get_session_summary(session_id)
+        if summary:
+            messages.append({
+                "role": "system",
+                "content": f"Conversation summary so far:\n{summary}",
+            })
+
+        # Recent turns (role + content only)
+        turns = self.get_recent_turns(session_id, limit=limit)
+        for t in turns:
+            messages.append({
+                "role": t["role"],
+                "content": t["content"],
+            })
+
+        return messages
+
     # =============================
     # Providers API
     # =============================

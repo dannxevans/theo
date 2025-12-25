@@ -1,4 +1,5 @@
 from core.memory import MemoryStore
+from core.context import ContextManager
 from typing import Optional, Iterable
 from providers.mock import MockProvider
 from providers.anthropic import AnthropicProvider
@@ -14,7 +15,14 @@ INTENT_TO_PROVIDER_TYPE = {
     "creative": "openai",
 }
 
+PROVIDER_CAPABILITIES = {
+    "openai": {"general", "planning", "creative"},
+    "anthropic": {"coding", "reasoning"},
+    "mock": {"general"},
+}
+
 provider_registry: Optional[ProviderRegistry] = None
+context_manager: Optional[ContextManager] = None
 
 
 def _debug(memory: Optional[MemoryStore], msg: str, **context):
@@ -41,17 +49,58 @@ def set_provider_registry(registry: ProviderRegistry):
     provider_registry = registry
 
 
+def set_context_manager(manager: ContextManager):
+    global context_manager
+    context_manager = manager
+
+
 def classify_intent(text: str) -> str:
+    """
+    Deterministic intent classification.
+    Order matters: more specific intents must win.
+    """
+    if not text:
+        return "general"
+
     text_l = text.lower()
-    if any(k in text_l for k in ["code", "script", "python", "javascript"]):
+
+    # Explicit coding / technical tasks
+    if any(k in text_l for k in [
+        "code", "coding", "script", "function",
+        "python", "javascript", "js", "api", "bug", "error"
+    ]):
         return "coding"
-    if any(k in text_l for k in ["plan", "planning", "schedule", "organize", "design"]):
-        return "planning"
-    if any(k in text_l for k in ["why", "how", "reason", "explain", "analyze"]):
+
+    # Deep explanation / analysis
+    if any(k in text_l for k in [
+        "why", "how does", "explain", "analyze",
+        "analysis", "reasoning", "logic"
+    ]):
         return "reasoning"
-    if any(k in text_l for k in ["write", "story", "poem", "creative", "imagine"]):
+
+    # Planning / structuring work
+    if any(k in text_l for k in [
+        "plan", "planning", "roadmap", "schedule",
+        "organize", "design", "steps", "approach"
+    ]):
+        return "planning"
+
+    # Creative generation
+    if any(k in text_l for k in [
+        "write", "story", "poem", "creative",
+        "imagine", "fiction", "lyrics"
+    ]):
         return "creative"
+
     return "general"
+
+
+def provider_supports_intent(provider_cfg, intent: str) -> bool:
+    ptype = provider_cfg.get("type")
+    allowed = PROVIDER_CAPABILITIES.get(ptype)
+    if not allowed:
+        return False
+    return intent in allowed
 
 
 def extract_explicit_memory(text: str):
@@ -114,94 +163,101 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
 
 
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None):
-    # If forced_provider is actually a model name, resolve it to a provider id
+    fallback_reason = None
+    selected_provider = None
+
     if forced_provider and provider_registry:
         provider_by_id = provider_registry.get(forced_provider)
-        if not provider_by_id:
+        if provider_by_id:
+            selected_provider = provider_by_id
+        else:
             provider_by_model = provider_registry.get_by_model(forced_provider)
             if provider_by_model:
-                forced_provider = provider_by_model["id"]
-    fallback_reason = None
+                selected_provider = provider_by_model
 
-    if not forced_provider and memory:
+    if not selected_provider and memory:
         routed = memory.get_routing_provider("local", intent)
-        if routed:
-            forced_provider = routed
+        if routed and provider_registry:
+            routed_provider = provider_registry.get(routed)
+            if routed_provider:
+                selected_provider = routed_provider
 
-    # Forced provider takes precedence over routing heuristics
-    if forced_provider and provider_registry:
-        p = provider_registry.get(forced_provider)
-        if not p:
-            fallback_reason = f"{forced_provider} skipped: provider not found"
-        elif not p.get("api_key") and p.get("type") != "mock":
-            fallback_reason = f"{forced_provider} skipped: missing api_key"
-        else:
-            try:
-                provider_type = p.get("type")
-
-                if provider_type == "anthropic":
-                    return AnthropicProvider(
-                        api_key=p.get("api_key"),
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-                if provider_type == "openai":
-                    return OpenAIProvider(
-                        api_key=p.get("api_key"),
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-                if provider_type == "mock":
-                    return MockProvider()
-            except Exception as e:
-                fallback_reason = f"{forced_provider} skipped: {str(e)}"
-
-    if provider_registry:
+    if not selected_provider and provider_registry:
         preferred_type = INTENT_TO_PROVIDER_TYPE.get(intent, "openai")
-        # Try preferred provider first
         p = provider_registry.get_by_type(preferred_type)
         if p and p.get("api_key"):
-            try:
-                if preferred_type == "anthropic":
-                    return AnthropicProvider(
-                        api_key=p["api_key"],
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-                if preferred_type == "openai":
-                    return OpenAIProvider(
-                        api_key=p["api_key"],
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-            except Exception as e:
-                fallback_reason = f"{preferred_type} skipped: {str(e)}"
+            selected_provider = p
         else:
             fallback_reason = f"{preferred_type} skipped: missing api_key or provider disabled"
+            other_type = "openai" if preferred_type == "anthropic" else "anthropic"
+            p = provider_registry.get_by_type(other_type)
+            if p and p.get("api_key"):
+                selected_provider = p
+            else:
+                fallback_reason = f"{fallback_reason}; {other_type} skipped: missing api_key or provider disabled"
 
-        # Fallback to the other provider type
-        other_type = "openai" if preferred_type == "anthropic" else "anthropic"
-        p = provider_registry.get_by_type(other_type)
-        if p and p.get("api_key"):
-            try:
-                if other_type == "anthropic":
-                    return AnthropicProvider(
-                        api_key=p["api_key"],
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-                if other_type == "openai":
-                    return OpenAIProvider(
-                        api_key=p["api_key"],
-                        base_url=p.get("base_url"),
-                        model=p.get("model"),
-                    )
-            except Exception as e:
-                fallback_reason = f"{other_type} skipped: {str(e)}"
+    # Enforce provider capability constraints and fallback if needed
+    if selected_provider:
+        if not provider_supports_intent(selected_provider, intent):
+            fallback_reason = "provider does not support intent"
+            if provider_registry:
+                current_type = selected_provider.get("type")
+                other_type = "openai" if current_type == "anthropic" else "anthropic"
+                p = provider_registry.get_by_type(other_type)
+                if p and p.get("api_key") and provider_supports_intent(p, intent):
+                    selected_provider = p
+                    fallback_reason = None
+                else:
+                    # no provider supports intent, fall back to mock
+                    selected_provider = {
+                        "id": "mock",
+                        "type": "mock",
+                        "api_key": None,
+                        "base_url": None,
+                        "model": None,
+                        "fallback_reason": fallback_reason,
+                    }
+        else:
+            selected_provider["fallback_reason"] = fallback_reason
+    else:
+        selected_provider = {
+            "id": "mock",
+            "type": "mock",
+            "api_key": None,
+            "base_url": None,
+            "model": None,
+            "fallback_reason": fallback_reason,
+        }
 
-    mp = MockProvider()
-    mp.fallback_reason = fallback_reason
-    return mp
+    if isinstance(selected_provider, dict):
+        return selected_provider
+    else:
+        # convert to dict if it's a provider object
+        return {
+            "id": selected_provider.get("id"),
+            "type": selected_provider.get("type"),
+            "api_key": selected_provider.get("api_key"),
+            "base_url": selected_provider.get("base_url"),
+            "model": selected_provider.get("model"),
+            "fallback_reason": selected_provider.get("fallback_reason", fallback_reason),
+        }
+
+
+def instantiate_provider(provider_cfg):
+    ptype = provider_cfg["type"]
+    if ptype == "anthropic":
+        return AnthropicProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+        )
+    if ptype == "openai":
+        return OpenAIProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+        )
+    return MockProvider()
 
 
 def route_request(context: dict, stream: bool = False):
@@ -225,6 +281,7 @@ def route_request(context: dict, stream: bool = False):
     intent = classify_intent(text)
     forced = context.get("forced_provider")
 
+    _debug(memory, "Final intent locked", intent=intent)
     _debug(memory, f"Incoming text: {text}")
     _debug(memory, f"Classified intent: {intent}")
     _debug(memory, f"Forced provider: {forced}")
@@ -240,30 +297,59 @@ def route_request(context: dict, stream: bool = False):
 
     _debug(memory, "Selecting provider...")
 
-    provider = select_provider(intent, memory, forced)
+    provider_cfg = select_provider(intent, memory, forced)
 
-    fallback_reason = getattr(provider, "fallback_reason", None)
+    # Step 1.5: Add routing decision audit record
+    import json
+
+    routing_decision = {
+        "intent": intent,
+        "forced_provider": forced,
+        "selected_provider_id": provider_cfg.get("id"),
+        "selected_provider_type": provider_cfg.get("type"),
+        "model": provider_cfg.get("model"),
+        "fallback_reason": provider_cfg.get("fallback_reason"),
+    }
+    if memory:
+        memory.remember(
+            "local",
+            "last_routing_decision",
+            json.dumps(routing_decision),
+        )
+
+    provider = instantiate_provider(provider_cfg)
+
+    fallback_reason = provider_cfg.get("fallback_reason", None)
     if fallback_reason:
         _debug(memory, "Provider fallback", reason=fallback_reason)
 
-    _debug(memory, f"Selected provider: {provider.name}")
+    _debug(memory, f"Selected provider: {provider_cfg['id']}")
 
-    system_prompt = "You are THEO, a professional personal AI assistant."
-    messages = [{"role": "user", "content": text}]
 
     meta = {
-        "provider": provider.name,
-        "model": getattr(provider, "model", None),
+        "provider": provider_cfg["id"],
+        "model": provider_cfg["model"],
         "task_type": intent,
-        "fallback_reason": getattr(provider, "fallback_reason", None),
+        "fallback_reason": fallback_reason,
+        "routing": routing_decision,
     }
 
-    _debug(memory, f"Calling provider.chat with model={getattr(provider, 'model', None)}")
+    _debug(memory, f"Calling provider.chat with model={provider_cfg['model']}")
+
+    if not context_manager:
+        raise RuntimeError("ContextManager not configured")
+
+    context_obj = context_manager.build_context(
+        session_id=context.get("session_id"),
+        user_text=text,
+    )
+    system_prompt = context_obj["system"]
+    messages = context_obj["messages"]
 
     raw = provider.chat(
-    system=system_prompt,
-    messages=messages,
-)
+        system=system_prompt,
+        messages=messages,
+    )
 
     if stream:
         def stream_generator():
@@ -293,6 +379,7 @@ def route_request(context: dict, stream: bool = False):
                 "model": meta["model"],
                 "task_type": meta["task_type"],
                 "fallback_reason": meta["fallback_reason"],
+                "routing": meta["routing"],
             }
 
         return stream_generator()
@@ -307,4 +394,5 @@ def route_request(context: dict, stream: bool = False):
         "model": meta["model"],
         "task_type": meta["task_type"],
         "fallback_reason": meta["fallback_reason"],
+        "routing": meta["routing"],
     }

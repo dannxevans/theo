@@ -43,7 +43,7 @@
   let memoryStatus = null;
   let showMemory = false;
   
-  let forcedProvider = ""; // empty = automatic routing
+  let forcedModel = ""; // empty = automatic routing (model id)
   let providers = [];
 
   import { onMount } from "svelte";
@@ -211,7 +211,7 @@
     messages = [];
     summary = "";
     error = null;
-    forcedProvider = "";
+    forcedModel = "";
 
     // IMPORTANT: App.svelte owns session switching
     // Force a full reload so App.svelte reselects a session cleanly
@@ -235,7 +235,7 @@
       await streamMessage({
         sessionId,
         text: userText,
-        forcedProvider,
+        forcedProvider: forcedModel,
         onToken(token) {
           streamedText += token;
           scrollToBottom();
@@ -248,7 +248,7 @@
               text: streamedText,
               provider: meta?.provider,
               model: meta?.model,
-              task: meta?.task,
+              task_type: meta?.task_type,
               fallback_reason: meta?.fallback_reason
             }
           ];
@@ -288,8 +288,8 @@
       <div class="session-bar">
         <div class="session-title">
           <strong>Chat</strong>
-          {#if forcedProvider}
-            <span class="provider-badge">{forcedProvider}</span>
+          {#if forcedModel}
+            <span class="provider-badge">{forcedModel}</span>
           {/if}
         </div>
 
@@ -338,31 +338,34 @@
             <div class="message {m.role}">
               <div class="bubble">
                 <strong>{m.role === "user" ? "Me" : "Theo"}:</strong>
+
                 {#if m.role === "assistant"}
                   <div class="markdown">
                     {@html renderMarkdown(m.text)}
                   </div>
+
+                  {#if m.provider}
+                    <div class="bubble-footer">
+                      <span class="provider-badge">
+                        via {m.provider}
+                        {#if m.model}
+                          · {m.model}
+                        {/if}
+                        {#if m.task_type}
+                          ({m.task_type})
+                        {/if}
+                      </span>
+                      {#if m.fallback_reason}
+                        <span class="fallback-reason">
+                          {m.fallback_reason}
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
                 {:else}
                   <div style="white-space: pre-wrap;">
                     {m.text}
                   </div>
-                {/if}
-                {#if m.provider}
-                  <small>
-                    via {m.provider}
-                    {#if m.model}
-                      · {m.model}
-                    {/if}
-                    {#if m.task}
-                      ({m.task})
-                    {/if}
-                  </small>
-                {/if}
-
-                {#if m.fallback_reason}
-                  <small style="color:#a33">
-                    {m.fallback_reason}
-                  </small>
                 {/if}
               </div>
             </div>
@@ -399,8 +402,8 @@
 
           <select
             class="provider-select"
-            bind:value={forcedProvider}
-            title="Provider"
+            bind:value={forcedModel}
+            title="Model"
           >
             <option value="">Auto</option>
             <option value="mock">Mock</option>
