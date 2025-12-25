@@ -110,7 +110,9 @@ def stream_chat_sse(session_id):
                 "model": result.get("model"),
                 "task_type": result.get("task_type"),
                 "fallback_reason": result.get("fallback_reason"),
-}
+                "routing": result.get("routing"),
+            }
+
             yield "event: end\n"
             yield f"data: {json.dumps(end_payload)}\n\n"
 

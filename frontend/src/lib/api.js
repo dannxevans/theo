@@ -278,18 +278,18 @@ export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, on
   };
 
   source.addEventListener("end", (event) => {
-    let routing = null;
+    let meta = {};
 
     try {
       if (event.data) {
-        routing = JSON.parse(event.data);
+        meta = JSON.parse(event.data);
       }
     } catch (err) {
       console.warn("Failed to parse end-event metadata:", err);
     }
 
     source.close();
-    if (onEnd) onEnd({ routing });
+    if (onEnd) onEnd(meta);
   });
 
   source.onerror = (err) => {

@@ -338,35 +338,36 @@
             <div class="message {m.role}">
               <div class="bubble">
                 <strong>{m.role === "user" ? "Me" : "Theo"}:</strong>
+
                 {#if m.role === "assistant"}
                   <div class="markdown">
                     {@html renderMarkdown(m.text)}
                   </div>
+
+                  {#if m.provider}
+                    <div class="bubble-footer">
+                      <span class="provider-badge">
+                        via {m.provider}
+                        {#if m.model}
+                          · {m.model}
+                        {/if}
+                        {#if m.task_type}
+                          ({m.task_type})
+                        {/if}
+                      </span>
+                      {#if m.fallback_reason}
+                        <span class="fallback-reason">
+                          {m.fallback_reason}
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
                 {:else}
                   <div style="white-space: pre-wrap;">
                     {m.text}
                   </div>
                 {/if}
               </div>
-
-              {#if m.role === "assistant" && m.provider}
-                <div class="message-meta">
-                  <span class="provider-badge">
-                    via {m.provider}
-                    {#if m.model}
-                      · {m.model}
-                    {/if}
-                    {#if m.task_type}
-                      ({m.task_type})
-                    {/if}
-                  </span>
-                  {#if m.fallback_reason}
-                    <span class="fallback-reason">
-                      {m.fallback_reason}
-                    </span>
-                  {/if}
-                </div>
-              {/if}
             </div>
           {/each}
 
