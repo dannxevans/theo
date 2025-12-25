@@ -3,7 +3,7 @@
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from core.router import route_request, set_provider_registry
+from core.router import route_request, set_provider_registry, set_context_manager
 from core.context import ContextManager
 from core.memory import MemoryStore
 from config import Config
@@ -59,6 +59,7 @@ def health():
 memory = MemoryStore(Config.DATABASE_URL)
 context_manager = ContextManager(memory)
 provider_registry = ProviderRegistry(memory)
+set_context_manager(context_manager)
 
 # Inject provider registry into router
 set_provider_registry(provider_registry)

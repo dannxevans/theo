@@ -12,6 +12,10 @@ class ContextManager:
     """
 
     MAX_RECENT_TURNS = 3
+    MAX_MESSAGE_CHARS = 12000
+    SYSTEM_HEADER = "SYSTEM CONTEXT — AUTHORITATIVE"
+    MAX_HISTORY_TURNS = 6
+    MAX_SYSTEM_CHARS = 4000
 
     def __init__(self, memory):
         self.memory = memory
@@ -27,8 +31,39 @@ class ContextManager:
         session_summary = self._get_session_summary(session_id)
         user_memory = self.memory.get_all("local")
 
+        system_prompt = self._build_system_prompt(user_memory)
+        system_prompt = system_prompt[:self.MAX_SYSTEM_CHARS]
+
+        messages = []
+
+        # Inject recent working turns
+        recent_turns = self.memory.get_recent_turns(session_id, limit=self.MAX_HISTORY_TURNS * 2)
+        for turn in recent_turns:
+            messages.append({
+                "role": turn["role"],
+                "content": turn["content"]
+            })
+
+        # Current user turn
+        messages.append({
+            "role": "user",
+            "content": user_text
+        })
+
+        messages = self._truncate_messages(messages)
+
+        return {
+            "system": system_prompt,
+            "messages": messages,
+            "task_context": {
+                "goal": user_text
+            },
+            "memory": self.memory
+        }
+
+    def _build_system_prompt(self, user_memory):
         system_prompt = (
-            "CRITICAL CONTEXT — MUST BE USED\n"
+            f"{self.SYSTEM_HEADER}\n"
             "The following facts are persistent and authoritative across the entire conversation.\n"
             "You must recall and use them when answering direct questions.\n\n"
         )
@@ -59,31 +94,37 @@ class ContextManager:
             "- Maintain a consistent persona regardless of model\n\n"
         )
 
-        messages = []
+        return system_prompt
 
-        # Inject recent working turns
-        recent_turns = self._get_recent_turns(session_id)
-        for turn in recent_turns:
-            messages.append({
-                "role": turn["role"],
-                "content": turn["content"]
-            })
+    def _truncate_messages(self, messages):
+        total_chars = 0
+        truncated = []
 
-        # Current user turn
-        messages.append({
-            "role": "user",
-            "content": user_text
-        })
+        # Always preserve the most recent user message
+        if not messages:
+            return []
 
-        return {
-            "system": system_prompt,
-            "messages": messages,
-            "task": {
-                "goal": user_text
-            },
-            "usermemory": user_memory,
-            "memory": self.memory
-        }
+        # Start from the newest message and go backwards
+        for message in reversed(messages):
+            content_length = len(message.get("content", ""))
+            if total_chars + content_length > self.MAX_MESSAGE_CHARS:
+                # Stop adding more messages once limit exceeded
+                break
+            truncated.append(message)
+            total_chars += content_length
+
+        # Ensure the most recent user message is preserved if it was excluded
+        most_recent_user = None
+        for message in reversed(messages):
+            if message["role"] == "user":
+                most_recent_user = message
+                break
+        if most_recent_user and most_recent_user not in truncated:
+            truncated.append(most_recent_user)
+
+        # Return in original order
+        truncated.reverse()
+        return truncated
 
     # =============================
     # Context update

@@ -257,10 +257,10 @@ export async function setDebugFlag(enabled) {
  * This is intentionally separate from sendMessage() so we can
  * run Socket.IO and SSE side-by-side during migration.
  */
-export function streamMessage({ text, sessionId, forcedProvider, onToken, onEnd, onError }) {
+export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, onError }) {
   const params = new URLSearchParams({ text });
-  if (forcedProvider) {
-    params.append("forced_provider", forcedProvider);
+  if (forcedModel) {
+    params.append("forced_model", forcedModel);
   }
   const url = `${API_BASE}/api/stream/${sessionId}?${params.toString()}`;
 
@@ -278,18 +278,18 @@ export function streamMessage({ text, sessionId, forcedProvider, onToken, onEnd,
   };
 
   source.addEventListener("end", (event) => {
-    let meta = null;
+    let routing = null;
 
     try {
       if (event.data) {
-        meta = JSON.parse(event.data);
+        routing = JSON.parse(event.data);
       }
     } catch (err) {
       console.warn("Failed to parse end-event metadata:", err);
     }
 
     source.close();
-    if (onEnd) onEnd(meta);
+    if (onEnd) onEnd({ routing });
   });
 
   source.onerror = (err) => {

@@ -600,6 +600,12 @@ h3 {
   margin-left: auto;
 }
 
+.message-meta {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* Wide desktop comfort */
 
 @media (min-width: 1200px) {
