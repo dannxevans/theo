@@ -86,6 +86,41 @@ class MemoryStore:
         )
 
         # =============================
+        # Step 3: Provider Intelligence
+        # =============================
+        self.provider_metadata = Table(
+            "provider_metadata",
+            self.meta,
+            Column("provider_id", String, primary_key=True),
+            Column("cost_per_1k_input_tokens", Integer, default=0),  # in micro-dollars (1/1000000 of $1)
+            Column("cost_per_1k_output_tokens", Integer, default=0),
+            Column("avg_latency_ms", Integer, default=0),
+            Column("total_requests", Integer, default=0),
+            Column("failed_requests", Integer, default=0),
+            Column("last_success_at", DateTime, nullable=True),
+            Column("last_failure_at", DateTime, nullable=True),
+            Column("health_status", String, default="unknown"),  # healthy, degraded, unhealthy, unknown
+            Column("circuit_breaker_open", Boolean, default=False),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        self.request_logs = Table(
+            "request_logs",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("session_id", String, nullable=False),
+            Column("provider_id", String, nullable=False),
+            Column("intent", String, nullable=False),
+            Column("success", Boolean, default=True),
+            Column("latency_ms", Integer, nullable=True),
+            Column("input_tokens", Integer, default=0),
+            Column("output_tokens", Integer, default=0),
+            Column("estimated_cost", Integer, default=0),  # in micro-dollars
+            Column("error_message", Text, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Providers
         # =============================
         self.providers = Table(
@@ -710,6 +745,192 @@ class MemoryStore:
             conn.execute(
                 delete(self.providers)
                 .where(self.providers.c.id == provider_id)
+            )
+
+    # =============================
+    # Step 3: Provider Intelligence API
+    # =============================
+    def init_provider_metadata(self, provider_id, cost_per_1k_input=0, cost_per_1k_output=0):
+        """
+        Initialize provider metadata with cost data.
+        Costs in micro-dollars (1/1,000,000 of $1).
+        """
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.provider_metadata.c.provider_id)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+
+            if not existing:
+                conn.execute(
+                    insert(self.provider_metadata).values(
+                        provider_id=provider_id,
+                        cost_per_1k_input_tokens=cost_per_1k_input,
+                        cost_per_1k_output_tokens=cost_per_1k_output,
+                        avg_latency_ms=0,
+                        total_requests=0,
+                        failed_requests=0,
+                        health_status="unknown",
+                        circuit_breaker_open=False,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+
+    def get_provider_metadata(self, provider_id):
+        """Get metadata for a specific provider."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def get_all_provider_metadata(self):
+        """Get metadata for all providers."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.provider_metadata)).fetchall()
+            return {row.provider_id: dict(row._mapping) for row in rows}
+
+    def log_request(self, session_id, provider_id, intent, success, latency_ms,
+                   input_tokens=0, output_tokens=0, estimated_cost=0, error_message=None):
+        """
+        Log a provider request for analytics and health tracking.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.request_logs).values(
+                    session_id=session_id,
+                    provider_id=provider_id,
+                    intent=intent,
+                    success=success,
+                    latency_ms=latency_ms,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    estimated_cost=estimated_cost,
+                    error_message=error_message,
+                    created_at=datetime.utcnow(),
+                )
+            )
+
+    def update_provider_health(self, provider_id, success, latency_ms=None):
+        """
+        Update provider health metrics based on request outcome.
+        """
+        with self.engine.begin() as conn:
+            # Get current metadata
+            metadata = conn.execute(
+                select(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+
+            if not metadata:
+                # Initialize if doesn't exist
+                self.init_provider_metadata(provider_id)
+                metadata = conn.execute(
+                    select(self.provider_metadata)
+                    .where(self.provider_metadata.c.provider_id == provider_id)
+                ).fetchone()
+
+            now = datetime.utcnow()
+            total = metadata.total_requests + 1
+            failed = metadata.failed_requests + (0 if success else 1)
+
+            # Calculate rolling average latency
+            if latency_ms and success:
+                current_avg = metadata.avg_latency_ms or 0
+                current_count = metadata.total_requests
+                new_avg = ((current_avg * current_count) + latency_ms) / total
+            else:
+                new_avg = metadata.avg_latency_ms
+
+            # Determine health status
+            failure_rate = failed / total if total > 0 else 0
+
+            if total < 5:
+                health_status = "unknown"
+            elif failure_rate > 0.5:
+                health_status = "unhealthy"
+            elif failure_rate > 0.2:
+                health_status = "degraded"
+            else:
+                health_status = "healthy"
+
+            # Circuit breaker logic: open if 5+ consecutive failures
+            recent_failures = conn.execute(
+                select(func.count(self.request_logs.c.id))
+                .where(self.request_logs.c.provider_id == provider_id)
+                .where(self.request_logs.c.success == False)
+                .order_by(self.request_logs.c.created_at.desc())
+                .limit(5)
+            ).scalar()
+
+            circuit_breaker_open = recent_failures >= 5
+
+            conn.execute(
+                update(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+                .values(
+                    total_requests=total,
+                    failed_requests=failed,
+                    avg_latency_ms=int(new_avg),
+                    last_success_at=now if success else metadata.last_success_at,
+                    last_failure_at=now if not success else metadata.last_failure_at,
+                    health_status=health_status,
+                    circuit_breaker_open=circuit_breaker_open,
+                    updated_at=now,
+                )
+            )
+
+    def get_provider_health_summary(self):
+        """
+        Get health summary for all providers.
+        """
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.provider_metadata)).fetchall()
+
+            summary = {}
+            for row in rows:
+                failure_rate = row.failed_requests / row.total_requests if row.total_requests > 0 else 0
+                summary[row.provider_id] = {
+                    "health_status": row.health_status,
+                    "circuit_breaker_open": row.circuit_breaker_open,
+                    "total_requests": row.total_requests,
+                    "failure_rate": round(failure_rate * 100, 2),
+                    "avg_latency_ms": row.avg_latency_ms,
+                    "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,
+                    "last_failure_at": row.last_failure_at.isoformat() if row.last_failure_at else None,
+                }
+
+            return summary
+
+    def estimate_cost(self, provider_id, input_tokens, output_tokens):
+        """
+        Estimate cost for a request in micro-dollars.
+        """
+        metadata = self.get_provider_metadata(provider_id)
+        if not metadata:
+            return 0
+
+        input_cost = (input_tokens / 1000) * metadata["cost_per_1k_input_tokens"]
+        output_cost = (output_tokens / 1000) * metadata["cost_per_1k_output_tokens"]
+
+        return int(input_cost + output_cost)
+
+    def delete_provider_metadata(self, provider_id):
+        """
+        Delete provider metadata and request logs when provider is removed.
+        """
+        with self.engine.begin() as conn:
+            # Delete metadata
+            conn.execute(
+                delete(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            )
+
+            # Delete request logs
+            conn.execute(
+                delete(self.request_logs)
+                .where(self.request_logs.c.provider_id == provider_id)
             )
     def set_last_provider(self, session_id, provider_id):
         with self.engine.begin() as conn:

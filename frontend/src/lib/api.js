@@ -257,10 +257,10 @@ export async function setDebugFlag(enabled) {
  * This is intentionally separate from sendMessage() so we can
  * run Socket.IO and SSE side-by-side during migration.
  */
-export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, onError }) {
+export function streamMessage({ text, sessionId, forcedProvider, onToken, onEnd, onError }) {
   const params = new URLSearchParams({ text });
-  if (forcedModel) {
-    params.append("forced_model", forcedModel);
+  if (forcedProvider) {
+    params.append("forced_provider", forcedProvider);
   }
   const url = `${API_BASE}/api/stream/${sessionId}?${params.toString()}`;
 
@@ -383,6 +383,21 @@ export async function getRelevantMemories(query) {
   if (!response.ok) {
     const err = await response.text();
     throw new Error(err || "Failed to get relevant memories");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Step 3: Provider Intelligence API
+// =============================
+
+export async function getProviderHealth() {
+  const response = await fetch(`${API_BASE}/api/providers/health`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get provider health");
   }
 
   return response.json();

@@ -91,6 +91,8 @@ def stream_chat_sse(session_id):
 
             router_context = dict(context)
             router_context["text"] = text
+            router_context["session_id"] = session_id
+            router_context["memory"] = memory
             if forced_provider:
                 router_context["forced_provider"] = forced_provider
 
@@ -211,6 +213,35 @@ def get_relevant_memories():
     return jsonify(relevant)
 
 # =============================
+# Step 3: Provider Intelligence APIs
+# =============================
+
+@app.route("/api/providers/health", methods=["GET"])
+def get_provider_health():
+    """Get health summary for all providers"""
+    summary = memory.get_provider_health_summary()
+    return jsonify(summary)
+
+@app.route("/api/providers/<provider_id>/metadata", methods=["GET"])
+def get_provider_metadata_endpoint(provider_id):
+    """Get metadata for a specific provider"""
+    metadata = memory.get_provider_metadata(provider_id)
+    if not metadata:
+        return jsonify({"error": "Provider not found"}), 404
+    return jsonify(metadata)
+
+@app.route("/api/providers/<provider_id>/metadata", methods=["POST"])
+def update_provider_metadata_endpoint(provider_id):
+    """Update cost metadata for a provider"""
+    data = request.json
+    memory.init_provider_metadata(
+        provider_id,
+        cost_per_1k_input=data.get("cost_per_1k_input", 0),
+        cost_per_1k_output=data.get("cost_per_1k_output", 0),
+    )
+    return jsonify({"status": "ok"})
+
+# =============================
 # Routing Preferences APIs
 # =============================
 
@@ -312,11 +343,18 @@ def upsert_provider():
         "enabled": data.get("enabled", True),
     })
 
+    # Initialize metadata for new providers
+    memory.init_provider_metadata(data["id"])
+
     return jsonify({"status": "ok"})
 
 @app.route("/api/providers/<provider_id>", methods=["DELETE"])
 def delete_provider(provider_id):
     provider_registry.delete(provider_id)
+
+    # Clean up metadata and request logs for deleted provider
+    memory.delete_provider_metadata(provider_id)
+
     return jsonify({"status": "ok"})
 
 # =============================
