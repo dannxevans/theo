@@ -154,31 +154,47 @@
       </tr>
     </thead>
     <tbody>
-      {#each providers as p}
-        {@const badge = getHealthBadge(p.id)}
-        {@const health = healthSummary[p.id]}
+      {#each providers as p (p.id)}
         <tr>
           <td>{p.id}</td>
           <td>{p.name}</td>
           <td>{p.type}</td>
           <td>
-            <span class="health-badge" style="background-color: {badge.color}">
-              {badge.label}
-            </span>
+            {#if healthSummary[p.id]?.circuit_breaker_open}
+              <span class="health-badge" style="background-color: #ef4444">
+                Circuit Open
+              </span>
+            {:else if healthSummary[p.id]?.health_status === "healthy"}
+              <span class="health-badge" style="background-color: #10b981">
+                Healthy
+              </span>
+            {:else if healthSummary[p.id]?.health_status === "degraded"}
+              <span class="health-badge" style="background-color: #f59e0b">
+                Degraded
+              </span>
+            {:else if healthSummary[p.id]?.health_status === "unhealthy"}
+              <span class="health-badge" style="background-color: #ef4444">
+                Unhealthy
+              </span>
+            {:else}
+              <span class="health-badge" style="background-color: #9ca3af">
+                Unknown
+              </span>
+            {/if}
           </td>
           <td class="stats-cell">
-            {#if health && health.total_requests > 0}
+            {#if healthSummary[p.id] && healthSummary[p.id].total_requests > 0}
               <div class="stat-row">
                 <span class="stat-label">Requests:</span>
-                <span class="stat-value">{health.total_requests}</span>
+                <span class="stat-value">{healthSummary[p.id].total_requests}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">Failures:</span>
-                <span class="stat-value">{health.failure_rate}%</span>
+                <span class="stat-value">{healthSummary[p.id].failure_rate}%</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">Latency:</span>
-                <span class="stat-value">{health.avg_latency_ms}ms</span>
+                <span class="stat-value">{healthSummary[p.id].avg_latency_ms}ms</span>
               </div>
             {:else}
               <span class="no-data">No data</span>
