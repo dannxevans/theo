@@ -26,12 +26,18 @@ class ContextManager:
     def build_context(self, session_id, user_text):
         """
         Build the context package sent to the router / provider layer.
+        Step 2: Use selective memory recall instead of full dump.
         """
 
         session_summary = self._get_session_summary(session_id)
+
+        # Step 2: Get relevant memories only (max 7)
+        relevant_memories = self.memory.get_relevant_memories("local", user_text, max_results=7)
+
+        # Legacy fallback for settings/preferences
         user_memory = self.memory.get_all("local")
 
-        system_prompt = self._build_system_prompt(user_memory)
+        system_prompt = self._build_system_prompt(user_memory, relevant_memories)
         system_prompt = system_prompt[:self.MAX_SYSTEM_CHARS]
 
         messages = []
@@ -58,17 +64,32 @@ class ContextManager:
             "task_context": {
                 "goal": user_text
             },
-            "memory": self.memory
+            "memory": self.memory,
+            "relevant_memories": relevant_memories  # Step 2: Pass through for debugging
         }
 
-    def _build_system_prompt(self, user_memory):
+    def _build_system_prompt(self, user_memory, relevant_memories=None):
         system_prompt = (
             f"{self.SYSTEM_HEADER}\n"
             "The following facts are persistent and authoritative across the entire conversation.\n"
             "You must recall and use them when answering direct questions.\n\n"
         )
 
-        if user_memory:
+        # Step 2: Use structured memory if available, otherwise fall back to legacy
+        if relevant_memories:
+            formatted_memory = "\n".join([
+                f"- {mem['key']}: {mem['value']}"
+                + (f" [pinned]" if mem.get('pinned') else "")
+                + (f" (relevance: {mem.get('computed_relevance', 0)})" if 'computed_relevance' in mem else "")
+                for mem in relevant_memories
+            ])
+            memory_block = (
+                "PERSISTENT USER FACTS (AUTHORITATIVE):\n"
+                f"{formatted_memory}\n\n"
+                "If the user asks about any of these facts, you must answer directly from this list.\n"
+                "Do NOT say you lack context for these facts.\n\n"
+            )
+        elif user_memory:
             formatted_memory = "\n".join(
                 [f"- {k}: {v}" for k, v in user_memory.items()]
             )

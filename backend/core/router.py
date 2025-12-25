@@ -105,13 +105,24 @@ def provider_supports_intent(provider_cfg, intent: str) -> bool:
 
 def extract_explicit_memory(text: str):
     """
-    Detect explicit 'remember that X is Y' style instructions.
-    Returns (key, value) or (None, None).
+    Step 2: Enhanced memory extraction with type detection.
+    Returns (type, key, value) or (None, None, None).
+
+    Types: fact, preference, goal, context
     """
     text_l = text.lower().strip()
 
+    # Detect "remember that X is Y"
     if text_l.startswith("remember that"):
         content = text.strip()[len("remember that"):].strip()
+
+        # Determine memory type
+        memory_type = "fact"  # default
+        if "prefer" in text_l or "like" in text_l:
+            memory_type = "preference"
+        elif "goal" in text_l or "working on" in text_l or "building" in text_l:
+            memory_type = "goal"
+
         # naive split: "<thing> is <value>"
         if " is " in content:
             key, value = content.split(" is ", 1)
@@ -127,29 +138,53 @@ def extract_explicit_memory(text: str):
             if value.lower().startswith("called "):
                 value = value[7:].strip()
 
-            return key, value
+            return memory_type, key, value
 
-    return None, None
+    # Detect "remember X" (store as context)
+    if text_l.startswith("remember "):
+        content = text.strip()[len("remember "):].strip()
+        if content:
+            # Use first few words as key
+            words = content.split()
+            key = " ".join(words[:3])
+            return "context", key, content
+
+    return None, None, None
 
 
 def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[str]:
     """
-    Attempt to directly answer the user's question from stored memory.
+    Step 2: Attempt to directly answer from structured memory.
     Returns an answer string if resolved, otherwise None.
     """
     if not memory or not text:
         return None
 
     text_l = text.lower().strip()
-    facts = memory.get_all("local") or {}
 
-    # Simple generic recall patterns
-    for key, value in facts.items():
-        key_l = key.lower()
+    # Try structured memory first
+    relevant_memories = memory.get_relevant_memories("local", text, max_results=3)
+
+    for mem in relevant_memories:
+        key_l = mem['key'].lower()
 
         # Examples:
         # "what is my project called"
         # "what is my X"
+        if (
+            f"what is my {key_l}" in text_l
+            or f"what's my {key_l}" in text_l
+            or f"what is the {key_l}" in text_l
+            or f"what is my {key_l} called" in text_l
+            or f"what's my {key_l} called" in text_l
+        ):
+            return f"Your {mem['key']} is {mem['value']}."
+
+    # Legacy fallback to preferences table
+    facts = memory.get_all("local") or {}
+    for key, value in facts.items():
+        key_l = key.lower()
+
         if (
             f"what is my {key_l}" in text_l
             or f"what's my {key_l}" in text_l
@@ -287,13 +322,23 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Forced provider: {forced}")
 
     # =============================
-    # Explicit memory write handling
+    # Explicit memory write handling (Step 2)
     # =============================
     if memory:
-        key, value = extract_explicit_memory(text)
+        memory_type, key, value = extract_explicit_memory(text)
         if key and value:
-            memory.remember("local", key, value)
-            _debug(memory, "Explicit memory write", key=key, value=value)
+            # Use structured memory API
+            memory.store_memory("local", memory_type, key, value)
+            _debug(memory, "Explicit memory write", type=memory_type, key=key, value=value)
+
+            # Return immediate confirmation
+            return {
+                "text": f"I'll remember that your {key} is {value}.",
+                "provider": "memory",
+                "model": None,
+                "task_type": "memory_write",
+                "fallback_reason": None,
+            }
 
     _debug(memory, "Selecting provider...")
 

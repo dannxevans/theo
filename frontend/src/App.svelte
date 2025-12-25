@@ -7,10 +7,12 @@
   import Chat from "./components/Chat.svelte";
   import Providers from "./components/Providers.svelte";
   import Settings from "./components/Settings.svelte";
+  import Memory from "./components/Memory.svelte";
   import { getSessions, deleteSessionApi } from "./lib/api.js";
 
   let showProviders = false;
   let showSettings = false;
+  let showMemory = false;
 
   // Mobile sidebar toggle state
   let sidebarOpen = false;
@@ -162,16 +164,24 @@ onMount(async () => {
     <div class="header-right">
       <button
         class="btn-pill"
-        class:active={!showProviders && !showSettings}
-        on:click={() => { showProviders = false; showSettings = false; }}
+        class:active={!showProviders && !showSettings && !showMemory}
+        on:click={() => { showProviders = false; showSettings = false; showMemory = false; }}
       >
         Chat
       </button>
 
       <button
         class="btn-pill"
+        class:active={showMemory}
+        on:click={() => { showMemory = true; showProviders = false; showSettings = false; }}
+      >
+        Memory
+      </button>
+
+      <button
+        class="btn-pill"
         class:active={showProviders}
-        on:click={() => { showProviders = true; showSettings = false; }}
+        on:click={() => { showProviders = true; showSettings = false; showMemory = false; }}
       >
         Providers
       </button>
@@ -179,7 +189,7 @@ onMount(async () => {
       <button
         class="btn-pill"
         class:active={showSettings}
-        on:click={() => { showSettings = true; showProviders = false; }}
+        on:click={() => { showSettings = true; showProviders = false; showMemory = false; }}
       >
         Settings
       </button>
@@ -245,7 +255,9 @@ onMount(async () => {
 
     <section class="main">
       <div class="chat-main">
-        {#if showProviders}
+        {#if showMemory}
+          <Memory />
+        {:else if showProviders}
           <Providers />
         {:else if showSettings}
           <Settings />
