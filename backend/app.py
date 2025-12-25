@@ -133,6 +133,7 @@ def stream_chat_sse(session_id):
 
 @app.route("/api/memory/remember", methods=["POST"])
 def remember():
+    """Legacy memory endpoint (kept for backwards compatibility)"""
     data = request.json
     memory.remember(
         user_id="local",
@@ -143,9 +144,71 @@ def remember():
 
 @app.route("/api/memory/forget", methods=["POST"])
 def forget():
+    """Legacy memory endpoint (kept for backwards compatibility)"""
     data = request.json
     memory.forget("local", data["key"])
     return jsonify({"status": "ok"})
+
+# =============================
+# Step 2: Structured Memory APIs
+# =============================
+
+@app.route("/api/memories", methods=["GET"])
+def list_memories():
+    """
+    Get all structured memories for the user.
+    Optional query params:
+    - type: filter by memory type (fact, preference, goal, context)
+    - limit: max results
+    """
+    memory_type = request.args.get("type")
+    limit = request.args.get("limit", type=int)
+
+    memories = memory.get_memories("local", memory_type=memory_type, limit=limit)
+    return jsonify(memories)
+
+@app.route("/api/memories", methods=["POST"])
+def create_memory():
+    """
+    Store a new structured memory.
+    Body: {type, key, value, pinned}
+    """
+    data = request.json
+    memory.store_memory(
+        user_id="local",
+        memory_type=data.get("type", "fact"),
+        key=data["key"],
+        value=data["value"],
+        pinned=data.get("pinned", False),
+    )
+    return jsonify({"status": "ok"})
+
+@app.route("/api/memories/<int:memory_id>", methods=["DELETE"])
+def delete_memory_endpoint(memory_id):
+    """Delete a memory by ID"""
+    memory.delete_memory("local", memory_id)
+    return jsonify({"status": "ok"})
+
+@app.route("/api/memories/<int:memory_id>/pin", methods=["POST"])
+def pin_memory_endpoint(memory_id):
+    """Pin or unpin a memory"""
+    data = request.json
+    pinned = data.get("pinned", True)
+    memory.pin_memory("local", memory_id, pinned)
+    return jsonify({"status": "ok", "pinned": pinned})
+
+@app.route("/api/memories/relevant", methods=["GET"])
+def get_relevant_memories():
+    """
+    Get memories relevant to a query.
+    Query param: q (query text)
+    """
+    query = request.args.get("q", "")
+    if not query:
+        return jsonify([])
+
+    relevant = memory.get_relevant_memories("local", query, max_results=7)
+    return jsonify(relevant)
 
 # =============================
 # Routing Preferences APIs

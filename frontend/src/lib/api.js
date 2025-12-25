@@ -302,3 +302,88 @@ export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, on
     source.close();
   };
 }
+
+// =============================
+// Step 2: Structured Memory API
+// =============================
+
+export async function getMemories(params = {}) {
+  const queryString = new URLSearchParams();
+  if (params.type) queryString.append("type", params.type);
+  if (params.limit) queryString.append("limit", params.limit);
+
+  const url = `${API_BASE}/api/memories${queryString.toString() ? "?" + queryString.toString() : ""}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load memories");
+  }
+
+  return response.json();
+}
+
+export async function createMemory({ type, key, value, pinned }) {
+  const response = await fetch(`${API_BASE}/api/memories`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      type,
+      key,
+      value,
+      pinned
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to create memory");
+  }
+
+  return response.json();
+}
+
+export async function deleteMemory(memoryId) {
+  const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete memory");
+  }
+
+  return response.json();
+}
+
+export async function pinMemory(memoryId, pinned) {
+  const response = await fetch(`${API_BASE}/api/memories/${memoryId}/pin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      pinned
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to pin memory");
+  }
+
+  return response.json();
+}
+
+export async function getRelevantMemories(query) {
+  const response = await fetch(`${API_BASE}/api/memories/relevant?q=${encodeURIComponent(query)}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get relevant memories");
+  }
+
+  return response.json();
+}
