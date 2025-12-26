@@ -8,8 +8,6 @@
   import {
   streamMessage,
   fetchSessionSummary,
-  rememberMemory,
-  forgetMemory,
   deleteSessionApi,
   getSessionMessages,
   getProviders,
@@ -20,7 +18,7 @@
   import Prism from "prismjs";
   import "prismjs/components/prism-python";
   import "prismjs/themes/prism-tomorrow.css";
-  import { tick } from "svelte";
+  import { tick, afterUpdate } from "svelte";
 
   export let sessionId;
 
@@ -41,10 +39,6 @@
   let error = null;
   let summary = "";
 
-  let memoryKey = "";
-  let memoryStatus = null;
-  let showMemory = false;
-  
   let forcedModel = ""; // empty = automatic routing (model id)
   let providers = [];
 
@@ -77,6 +71,11 @@
 
   // Text actually shown to the user during streaming
   let streamedText = "";
+
+  // Auto-scroll after every update
+  afterUpdate(() => {
+    scrollToBottom();
+  });
 
   function renderMarkdown(text) {
     if (!text) return "";
@@ -209,30 +208,6 @@
     }
   }
 
-  async function rememberSummary() {
-    if (!memoryKey || !summary) return;
-
-    try {
-      await rememberMemory(memoryKey, summary);
-      memoryStatus = `Saved memory under key "${memoryKey}"`;
-      memoryKey = "";
-    } catch (e) {
-      memoryStatus = e.message;
-    }
-  }
-
-  async function forgetSummary() {
-    if (!memoryKey) return;
-
-    try {
-      await forgetMemory(memoryKey);
-      memoryStatus = `Forgot memory "${memoryKey}"`;
-      memoryKey = "";
-    } catch (e) {
-      memoryStatus = e.message;
-    }
-  }
-
   async function deleteSession() {
     const confirmed = confirm("Delete this chat? This cannot be undone.");
     if (!confirmed) return;
@@ -351,9 +326,6 @@
         </div>
 
         <div class="session-actions">
-          <button class="btn-secondary" on:click={() => showMemory = !showMemory}>
-            Memory
-          </button>
           <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
             Export JSON
           </button>
@@ -368,35 +340,6 @@
           </button>
         </div>
       </div>
-
-      {#if showMemory}
-        <div class="summary">
-          <strong>Session summary</strong>
-
-          {#if summary}
-            <p>{summary}</p>
-          {:else}
-            <p style="opacity:0.6">No summary yet for this chat.</p>
-          {/if}
-
-          <div class="memory-controls">
-            <input
-              placeholder="memory key (e.g. preferences.writing)"
-              bind:value={memoryKey}
-            />
-            <button on:click={rememberSummary} disabled={!summary || !memoryKey}>
-              Remember
-            </button>
-            <button on:click={forgetSummary} disabled={!memoryKey}>
-              Forget
-            </button>
-          </div>
-
-          {#if memoryStatus}
-            <div class="memory-status">{memoryStatus}</div>
-          {/if}
-        </div>
-      {/if}
 
       <div class="chat-main">
         <div class="messages">
