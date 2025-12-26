@@ -2,25 +2,34 @@
 
 THEO is a personal, self-hosted AI assistant designed to route user requests to the most appropriate AI model based on intent, while maintaining continuity across models.
 
-The goal is not “one model to rule them all”, but a system that:
+The goal is not "one model to rule them all", but a system that:
 - Uses different models for different tasks
 - Preserves user context when models change
-- Remains fully under the user’s control
+- Remains fully under the user's control
 
 This repository contains both the backend and frontend for THEO.
+
+## 📚 Documentation
+
+- **[Authentication Guide](docs/AUTHENTICATION.md)** - Login, password management, and security settings
+- **[Database Persistence Guide](docs/DATABASE_PERSISTENCE.md)** - S3 backup/restore setup for AWS deployments
+- **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** - Step-by-step ECS configuration for database persistence
 
 ---
 
 ## What THEO Does (Current)
 
+- **Authentication**: Login/logout with password management and session security
 - Chat-based UI similar to ChatGPT
 - Multiple AI providers supported (e.g. Mock, OpenAI, Anthropic)
 - Provider selection via UI
 - Session-based conversations
-- Persistent storage using SQLite
+- Persistent storage using SQLite with S3 backup/restore for AWS deployments
 - Streaming responses over Socket.IO
-- Basic memory capture (“remember X”) stored server-side
-- Settings panel (e.g. debug logging toggle)
+- AI-powered automatic chat title generation
+- Basic memory capture ("remember X") stored server-side
+- Mobile-responsive design with touch-optimized interface
+- Settings panel (system prompt, intents, routing, memory, providers, debug, account)
 
 ---
 
@@ -43,6 +52,7 @@ The project is deliberately evolving in small, testable steps.
 theo/
 ├── backend/
 │   ├── app.py          # Flask app + Socket.IO
+│   ├── db_backup.py    # S3 backup/restore manager
 │   ├── core/
 │   │   ├── router.py   # Intent routing + provider selection
 │   │   ├── context.py  # Context & summary construction
@@ -51,17 +61,26 @@ theo/
 │   │   ├── mock.py
 │   │   ├── openai.py
 │   │   └── anthropic.py
-│   └── theo.db         # Local SQLite database (ignored in git)
+│   └── data/
+│       └── theo.db     # Local SQLite database (ignored in git)
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── App.svelte
-│   │   ├── Chat.svelte
-│   │   ├── Settings.svelte
-│   │   └── api.js
+│   │   ├── components/
+│   │   │   ├── Chat.svelte
+│   │   │   └── Settings.svelte
+│   │   └── lib/
+│   │       └── api.js
 │   └── public/
 │       └── style.css
 │
+├── docs/
+│   ├── DATABASE_PERSISTENCE.md
+│   └── ECS_DATABASE_SETUP.md
+│
+├── ecs-task-definition-backend-UPDATED.json
+├── iam-policy-s3-database-backup.json
 ├── README.md
 └── .gitignore
 ```

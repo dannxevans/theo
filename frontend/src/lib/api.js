@@ -569,3 +569,84 @@ export async function getProviderHealth() {
 
   return response.json();
 }
+
+// =============================
+// Authentication API
+// =============================
+
+function getAuthToken() {
+  return localStorage.getItem("auth_token");
+}
+
+function getAuthHeaders() {
+  const token = getAuthToken();
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
+export async function login(username, password) {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Login failed");
+  }
+
+  return response.json();
+}
+
+export async function logout() {
+  const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Logout failed");
+  }
+
+  return response.json();
+}
+
+export async function verifySession() {
+  const response = await fetch(`${API_BASE}/api/auth/verify`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    return { valid: false };
+  }
+
+  return response.json();
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const response = await fetch(`${API_BASE}/api/auth/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to change password");
+  }
+
+  return response.json();
+}

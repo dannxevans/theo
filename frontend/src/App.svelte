@@ -6,8 +6,11 @@
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
-  import { getSessions, deleteSessionApi } from "./lib/api.js";
+  import Login from "./components/Login.svelte";
+  import { getSessions, deleteSessionApi, verifySession, logout } from "./lib/api.js";
 
+  let isAuthenticated = false;
+  let currentUser = null;
   let showSettings = false;
 
   // Mobile sidebar toggle state
@@ -47,6 +50,33 @@
   }
 
 onMount(async () => {
+  // Check authentication first
+  try {
+    const result = await verifySession();
+    if (result.valid) {
+      isAuthenticated = true;
+      currentUser = result.user;
+      await loadSessions();
+    }
+  } catch (err) {
+    console.error("Session verification failed", err);
+    isAuthenticated = false;
+  }
+
+  // Listen for session title generation events
+  window.addEventListener("sessionTitleGenerated", async (e) => {
+    const { sessionId, title } = e.detail;
+    // Refresh sessions list to show new title
+    try {
+      const updatedSessions = await getSessions();
+      sessions = updatedSessions.filter(hasContent);
+    } catch (err) {
+      console.error("Failed to refresh sessions after title generation:", err);
+    }
+  });
+});
+
+async function loadSessions() {
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
@@ -67,19 +97,27 @@ onMount(async () => {
     console.error("Failed to load sessions", err);
     sessions = [];
   }
+}
 
-  // Listen for session title generation events
-  window.addEventListener("sessionTitleGenerated", async (e) => {
-    const { sessionId, title } = e.detail;
-    // Refresh sessions list to show new title
-    try {
-      const updatedSessions = await getSessions();
-      sessions = updatedSessions.filter(hasContent);
-    } catch (err) {
-      console.error("Failed to refresh sessions after title generation:", err);
-    }
-  });
-});
+function handleLogin(token, user) {
+  isAuthenticated = true;
+  currentUser = user;
+  loadSessions();
+}
+
+async function handleLogout() {
+  try {
+    await logout();
+  } catch (err) {
+    console.error("Logout failed", err);
+  } finally {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    isAuthenticated = false;
+    currentUser = null;
+    sessions = [];
+  }
+}
 
   function selectSession(id) {
     activeSessionId = id;
@@ -159,6 +197,9 @@ onMount(async () => {
 </script>
 
 <main class="app-layout app-root">
+  {#if !isAuthenticated}
+    <Login onLogin={handleLogin} />
+  {:else}
   <header class="header">
     <div class="header-left">
       <button class="hamburger" on:click={openSidebar}>☰</button>
@@ -187,6 +228,10 @@ onMount(async () => {
         on:click={() => { showSettings = true; }}
       >
         Settings
+      </button>
+
+      <button class="btn-pill btn-logout" on:click={handleLogout}>
+        Logout
       </button>
     </div>
   </header>
@@ -259,4 +304,5 @@ onMount(async () => {
     </section>
   </div>
   </div>
+  {/if}
 </main>

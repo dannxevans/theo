@@ -35,6 +35,33 @@ class MemoryStore:
         self.meta = MetaData()
 
         # =============================
+        # Users (Authentication)
+        # =============================
+        self.users = Table(
+            "users",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("username", String, nullable=False, unique=True),
+            Column("password_hash", String, nullable=False),
+            Column("is_admin", Boolean, default=False),
+            Column("is_enabled", Boolean, default=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Sessions (Authentication)
+        # =============================
+        self.auth_sessions = Table(
+            "auth_sessions",
+            self.meta,
+            Column("id", String, primary_key=True),
+            Column("user_id", Integer, nullable=False),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("expires_at", DateTime, nullable=False),
+        )
+
+        # =============================
         # Debug Settings
         # =============================
         self.debug_settings = Table(
@@ -1331,3 +1358,99 @@ class MemoryStore:
                 .where(self.debug_settings.c.user_id == user_id)
             ).fetchone()
             return bool(row.enabled) if row and row.enabled else False
+
+    # =============================
+    # Authentication API
+    # =============================
+    def create_user(self, username, password_hash, is_admin=False):
+        """Create a new user."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.users).values(
+                    username=username,
+                    password_hash=password_hash,
+                    is_admin=is_admin,
+                    is_enabled=True,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+    def get_user_by_username(self, username):
+        """Get user by username."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.users)
+                .where(self.users.c.username == username)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def get_user_by_id(self, user_id):
+        """Get user by ID."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.users)
+                .where(self.users.c.id == user_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def update_user_password(self, user_id, password_hash):
+        """Update user password."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(
+                    password_hash=password_hash,
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+    def disable_user(self, user_id):
+        """Disable a user account."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(
+                    is_enabled=False,
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+    def create_auth_session(self, session_id, user_id, expires_at):
+        """Create an authentication session."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.auth_sessions).values(
+                    id=session_id,
+                    user_id=user_id,
+                    created_at=datetime.utcnow(),
+                    expires_at=expires_at,
+                )
+            )
+
+    def get_auth_session(self, session_id):
+        """Get authentication session."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.auth_sessions)
+                .where(self.auth_sessions.c.id == session_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def delete_auth_session(self, session_id):
+        """Delete authentication session (logout)."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.auth_sessions)
+                .where(self.auth_sessions.c.id == session_id)
+            )
+
+    def cleanup_expired_sessions(self):
+        """Remove expired authentication sessions."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.auth_sessions)
+                .where(self.auth_sessions.c.expires_at < datetime.utcnow())
+            )

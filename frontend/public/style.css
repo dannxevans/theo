@@ -291,6 +291,18 @@ h3 {
   font-weight: 600;
 }
 
+.btn-pill.btn-logout {
+  background-color: transparent;
+  border-color: var(--gray-400);
+  color: var(--gray-600);
+}
+
+.btn-pill.btn-logout:hover {
+  background-color: #fee;
+  border-color: #fcc;
+  color: #c33;
+}
+
 /* ============================
    Sidebar
    ============================ */
