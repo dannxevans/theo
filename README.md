@@ -11,6 +11,7 @@ This repository contains both the backend and frontend for THEO.
 
 ## 📚 Documentation
 
+- **[Authentication Guide](docs/AUTHENTICATION.md)** - Login, password management, and security settings
 - **[Database Persistence Guide](docs/DATABASE_PERSISTENCE.md)** - S3 backup/restore setup for AWS deployments
 - **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** - Step-by-step ECS configuration for database persistence
 
@@ -18,6 +19,7 @@ This repository contains both the backend and frontend for THEO.
 
 ## What THEO Does (Current)
 
+- **Authentication**: Login/logout with password management and session security
 - Chat-based UI similar to ChatGPT
 - Multiple AI providers supported (e.g. Mock, OpenAI, Anthropic)
 - Provider selection via UI
@@ -27,7 +29,7 @@ This repository contains both the backend and frontend for THEO.
 - AI-powered automatic chat title generation
 - Basic memory capture ("remember X") stored server-side
 - Mobile-responsive design with touch-optimized interface
-- Settings panel (e.g. debug logging toggle)
+- Settings panel (system prompt, intents, routing, memory, providers, debug, account)
 
 ---
 

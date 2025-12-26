@@ -1,6 +1,7 @@
 # import eventlet
 # eventlet.monkey_patch()
 import logging
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from core.router import route_request, set_provider_registry, set_context_manager
@@ -70,6 +71,10 @@ set_provider_registry(provider_registry)
 
 # Seed default intents if none exist
 memory.seed_default_intents("local")
+
+# Initialize authentication
+from auth import init_default_user
+init_default_user(memory)
 
 @app.route("/api/health")
 def api_health():
@@ -695,6 +700,190 @@ def update_system_prompt_settings():
         return jsonify({"error": "No valid fields to update"}), 400
 
     memory.update_system_prompt_config("local", **updates)
+    return jsonify({"status": "ok"})
+
+# =============================
+# Authentication API
+# =============================
+
+from auth import hash_password, verify_password, generate_session_token
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    """
+    Login endpoint.
+    Expects: { "username": "...", "password": "..." }
+    Returns: { "token": "..." } on success
+    """
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+
+    # Get user
+    user = memory.get_user_by_username(username)
+    if not user:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    # Check if user is enabled
+    if not user["is_enabled"]:
+        return jsonify({"error": "Account disabled"}), 401
+
+    # Verify password
+    if not verify_password(password, user["password_hash"]):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    # Create session token
+    token = generate_session_token()
+    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 day session
+
+    memory.create_auth_session(token, user["id"], expires_at)
+
+    return jsonify({
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "is_admin": user["is_admin"]
+        }
+    })
+
+@app.route("/api/auth/logout", methods=["POST"])
+def logout():
+    """
+    Logout endpoint.
+    Expects: Authorization: Bearer <token>
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "No token provided"}), 400
+
+    token = auth_header.split(" ")[1]
+    memory.delete_auth_session(token)
+
+    return jsonify({"status": "ok"})
+
+@app.route("/api/auth/verify", methods=["GET"])
+def verify_session():
+    """
+    Verify if current session is valid.
+    Expects: Authorization: Bearer <token>
+    Returns: { "valid": true, "user": {...} } or { "valid": false }
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"valid": False})
+
+    token = auth_header.split(" ")[1]
+
+    # Get session
+    session = memory.get_auth_session(token)
+    if not session:
+        return jsonify({"valid": False})
+
+    # Check expiration
+    if session["expires_at"] < datetime.utcnow():
+        memory.delete_auth_session(token)
+        return jsonify({"valid": False})
+
+    # Get user
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"valid": False})
+
+    return jsonify({
+        "valid": True,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "is_admin": user["is_admin"]
+        }
+    })
+
+@app.route("/api/auth/change-password", methods=["POST"])
+def change_password():
+    """
+    Change password endpoint.
+    Expects: Authorization: Bearer <token>
+    Body: { "current_password": "...", "new_password": "..." }
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Verify session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get passwords from request
+    data = request.json
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    if not current_password or not new_password:
+        return jsonify({"error": "Current and new password required"}), 400
+
+    # Verify current password
+    if not verify_password(current_password, user["password_hash"]):
+        return jsonify({"error": "Current password incorrect"}), 401
+
+    # Validate new password
+    if len(new_password) < 4:
+        return jsonify({"error": "New password must be at least 4 characters"}), 400
+
+    # Update password
+    new_hash = hash_password(new_password)
+    memory.update_user_password(user["id"], new_hash)
+
+    return jsonify({"status": "ok"})
+
+@app.route("/api/auth/disable-admin", methods=["POST"])
+def disable_admin():
+    """
+    Disable the admin account.
+    Expects: Authorization: Bearer <token>
+    Only works if there's another enabled admin user.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Verify session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Only admins can disable admin
+    if not user["is_admin"]:
+        return jsonify({"error": "Only admins can disable admin account"}), 403
+
+    # Find the default admin user
+    admin_user = memory.get_user_by_username("admin")
+    if not admin_user:
+        return jsonify({"error": "Admin user not found"}), 404
+
+    # Disable the admin account
+    memory.disable_user(admin_user["id"])
+
+    # If current user is admin, logout
+    if user["username"] == "admin":
+        memory.delete_auth_session(token)
+
     return jsonify({"status": "ok"})
 
 def debug_log(message):

@@ -20,7 +20,9 @@
     getMemories,
     createMemory,
     deleteMemory,
-    pinMemory
+    pinMemory,
+    changePassword,
+    disableAdminAccount
   } from "../lib/api";
 
   let providers = [];
@@ -84,6 +86,17 @@
     enabled: true
   };
 
+  // Account/Security state
+  let passwordForm = {
+    current: "",
+    new: "",
+    confirm: ""
+  };
+  let passwordError = null;
+  let passwordSuccess = null;
+  let changingPassword = false;
+  let confirmDisableAdmin = false;
+
   async function load() {
     providers = await getProviders();
     intents = await getIntents();
@@ -137,6 +150,52 @@
     localStorage.setItem("theo.advancedMode", value.toString());
     // Dispatch event so Chat component can listen
     window.dispatchEvent(new CustomEvent("advancedModeChanged", { detail: { enabled: value } }));
+  }
+
+  async function handleChangePassword() {
+    passwordError = null;
+    passwordSuccess = null;
+
+    // Validation
+    if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
+      passwordError = "All fields are required";
+      return;
+    }
+
+    if (passwordForm.new !== passwordForm.confirm) {
+      passwordError = "New passwords do not match";
+      return;
+    }
+
+    if (passwordForm.new.length < 4) {
+      passwordError = "Password must be at least 4 characters";
+      return;
+    }
+
+    changingPassword = true;
+
+    try {
+      await changePassword(passwordForm.current, passwordForm.new);
+      passwordSuccess = "Password changed successfully!";
+      passwordForm = { current: "", new: "", confirm: "" };
+    } catch (err) {
+      passwordError = err.message || "Failed to change password";
+    } finally {
+      changingPassword = false;
+    }
+  }
+
+  async function handleDisableAdmin() {
+    try {
+      await disableAdminAccount();
+      confirmDisableAdmin = false;
+      // Show success message and reload (user will be logged out)
+      alert("Admin account disabled successfully. You will be logged out.");
+      window.location.reload();
+    } catch (err) {
+      alert(err.message || "Failed to disable admin account");
+      confirmDisableAdmin = false;
+    }
   }
 
   async function saveSystemPrompt() {
@@ -495,6 +554,13 @@
       on:click={() => activeTab = "debug"}
     >
       Debug
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === "account"}
+      on:click={() => activeTab = "account"}
+    >
+      Account
     </button>
   </div>
 
@@ -1002,6 +1068,98 @@
           <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
             Shows Export and Fork features in chat interface
           </small>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Account Tab -->
+    {#if activeTab === "account"}
+      <div class="tab-panel">
+        <h2>Account & Security</h2>
+        <p class="subtitle">Manage your password and security settings.</p>
+
+        <!-- Change Password Section -->
+        <div class="section">
+          <h3>Change Password</h3>
+
+          {#if passwordError}
+            <div class="error-message">{passwordError}</div>
+          {/if}
+
+          {#if passwordSuccess}
+            <div class="success-message">{passwordSuccess}</div>
+          {/if}
+
+          <div class="form-group">
+            <label for="current-password">Current Password</label>
+            <input
+              id="current-password"
+              type="password"
+              bind:value={passwordForm.current}
+              disabled={changingPassword}
+              placeholder="Enter current password"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="new-password">New Password</label>
+            <input
+              id="new-password"
+              type="password"
+              bind:value={passwordForm.new}
+              disabled={changingPassword}
+              placeholder="Enter new password (min 4 characters)"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="confirm-password">Confirm New Password</label>
+            <input
+              id="confirm-password"
+              type="password"
+              bind:value={passwordForm.confirm}
+              disabled={changingPassword}
+              placeholder="Confirm new password"
+            />
+          </div>
+
+          <button
+            class="btn-primary"
+            on:click={handleChangePassword}
+            disabled={changingPassword}
+          >
+            {changingPassword ? "Changing Password..." : "Change Password"}
+          </button>
+        </div>
+
+        <!-- Disable Admin Account Section -->
+        <div class="section">
+          <h3>Disable Admin Account</h3>
+          <p class="subtitle">
+            For security, you can disable the default admin account after setting up your own credentials.
+            This cannot be undone easily.
+          </p>
+
+          {#if !confirmDisableAdmin}
+            <button
+              class="btn-danger"
+              on:click={() => confirmDisableAdmin = true}
+            >
+              Disable Admin Account
+            </button>
+          {:else}
+            <div class="confirm-box">
+              <p><strong>Are you sure?</strong> This will disable the admin account permanently.</p>
+              <div class="button-group">
+                <button class="btn-danger" on:click={handleDisableAdmin}>
+                  Yes, Disable Admin
+                </button>
+                <button class="btn-secondary" on:click={() => confirmDisableAdmin = false}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
@@ -1541,5 +1699,53 @@
   .provider-actions {
     display: flex;
     gap: var(--space-2);
+  }
+
+  /* Account tab styles */
+  .error-message {
+    padding: var(--space-3);
+    background: var(--error-50);
+    border: 1px solid var(--error-200);
+    border-radius: var(--radius-md);
+    color: var(--error-700);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-4);
+  }
+
+  .success-message {
+    padding: var(--space-3);
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    border-radius: var(--radius-md);
+    color: #065f46;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-4);
+  }
+
+  .confirm-box {
+    padding: var(--space-4);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-3);
+  }
+
+  .confirm-box p {
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .button-group {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .section {
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-6);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .section:last-child {
+    border-bottom: none;
   }
 </style>
