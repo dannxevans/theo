@@ -1,18 +1,84 @@
 /* =============================
-   THEO Design Tokens
+   THEO Design System
+   Design Tokens & Variables
    ============================= */
 
 :root {
+  /* Brand Colors */
   --theo-blue: #38BDF8;
   --theo-indigo: #6366F1;
   --theo-violet: #A855F7;
-
   --theo-gradient: linear-gradient(
     90deg,
     var(--theo-blue) 0%,
     var(--theo-indigo) 50%,
     var(--theo-violet) 100%
   );
+
+  /* Neutral Colors */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Semantic Colors */
+  --success-50: #f0fdf4;
+  --success-500: #10b981;
+  --success-600: #059669;
+  --warning-50: #fffbeb;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --error-50: #fef2f2;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+  --info-50: #eff6ff;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+
+  /* Spacing Scale (based on 4px grid) */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-brand: 0 4px 12px rgba(99, 102, 241, 0.35);
+
+  /* Typography */
+  --font-size-xs: 0.75rem;   /* 12px */
+  --font-size-sm: 0.875rem;  /* 14px */
+  --font-size-base: 1rem;    /* 16px */
+  --font-size-lg: 1.125rem;  /* 18px */
+  --font-size-xl: 1.25rem;   /* 20px */
+  --font-size-2xl: 1.5rem;   /* 24px */
+
+  /* Z-index Scale */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-modal-backdrop: 30;
+  --z-modal: 40;
+  --z-toast: 50;
 }
 html, body {
   height: 100%;
@@ -89,34 +155,33 @@ h3 {
 }
 
 /* =============================
-   Primary Action Button (Send)
+   Button System
    ============================= */
 
-.btn-primary {
-  height: 40px;
-  padding: 0 16px;
-
+/* Base button styles */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-small {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   border: none;
-  border-radius: 6px;
-
-  background: var(--theo-gradient);
-  color: #ffffff;
-
-  font-size: 14px;
   font-weight: 600;
-  line-height: 1;
-
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
 
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
-  transition:
-    box-shadow 0.15s ease,
-    transform 0.05s ease,
-    opacity 0.15s ease;
+/* Primary Action Button */
+.btn-primary {
+  height: 40px;
+  padding: 0 var(--space-4);
+  background: var(--theo-gradient);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-brand);
 }
 
 .btn-primary:hover {
@@ -133,67 +198,64 @@ h3 {
   cursor: not-allowed;
 }
 
-/* =============================
-   Secondary Button (Neutral)
-   ============================= */
-
+/* Secondary/Neutral Button */
 .btn-secondary {
   height: 40px;
-  padding: 0 14px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  background: #ffffff;
-  color: #111827;
-
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-
-  font-size: 14px;
+  padding: 0 var(--space-3);
+  background: white;
+  color: var(--gray-900);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
   font-weight: 500;
-
-  cursor: pointer;
-
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
 }
 
 .btn-secondary:hover {
   border-color: var(--theo-blue);
-  background-color: #f9fafb;
+  background-color: var(--gray-50);
 }
 
-/* =============================
-   Danger / Destructive Button
-   ============================= */
-
+/* Danger/Destructive Button */
 .btn-danger {
   height: 40px;
-  padding: 0 14px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  background: #ef4444;
-  color: #ffffff;
-
-  border: none;
-  border-radius: 6px;
-
-  font-size: 14px;
-  font-weight: 600;
-
-  cursor: pointer;
-
-  transition: background-color 0.15s ease;
+  padding: 0 var(--space-3);
+  background: var(--error-500);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: var(--error-600);
+}
+
+/* Small Button Variant */
+.btn-small {
+  height: 32px;
+  padding: 0 var(--space-3);
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.btn-small:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+.btn-small.btn-danger {
+  background: var(--error-50);
+  color: var(--error-600);
+  border-color: var(--error-200);
+}
+
+.btn-small.btn-danger:hover {
+  background: var(--error-100);
+  border-color: var(--error-300);
+  color: var(--error-700);
 }
 
 /* =============================
@@ -204,40 +266,28 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   height: 32px;
-  padding: 0 14px;
-
-  font-size: 13px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-sm);
   font-weight: 500;
-
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-
-  background-color: #f9fafb;
-  color: #374151;
-
+  border-radius: var(--radius-full);
+  border: 1px solid var(--gray-300);
+  background-color: var(--gray-50);
+  color: var(--gray-700);
   cursor: pointer;
-
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-pill:hover {
   border-color: var(--theo-indigo);
-  color: #111827;
+  color: var(--gray-900);
 }
 
-/* Active / selected pill */
 .btn-pill.active {
-  background:
-    linear-gradient(#ffffff, #ffffff) padding-box,
-    var(--theo-gradient) border-box;
+  background: linear-gradient(white, white) padding-box,
+              var(--theo-gradient) border-box;
   border: 1px solid transparent;
-
-  color: #111827;
+  color: var(--gray-900);
   font-weight: 600;
 }
 
@@ -250,7 +300,7 @@ h3 {
   background: #fafafa;
   display: flex;
   flex-direction: column;
-  padding: 0.75rem;
+  padding: 0;
   overflow-y: auto;
 }
 
@@ -258,13 +308,13 @@ h3 {
   font-size: 0.7rem;
   font-weight: 600;
   color: #6b7280;
-  margin-bottom: 0.5rem;
+  margin: 0.75rem 0.75rem 0.5rem 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .new-session {
-  margin-bottom: 0.5rem;
+  margin: 0 0.75rem 0.5rem 0.75rem;
   padding: 0.45rem 0.6rem;
   font-size: 0.8rem;
   border-radius: 999px;
@@ -278,7 +328,7 @@ h3 {
 }
 
 .session-search {
-  margin-bottom: 0.6rem;
+  margin: 0 0.75rem 0.6rem 0.75rem;
   padding: 0.4rem 0.55rem;
   font-size: 0.8rem;
   border: 1px solid #d1d5db;
@@ -287,7 +337,7 @@ h3 {
 }
 
 .session-group {
-  margin: 0.6rem 0 0.3rem;
+  margin: 0.6rem 0.75rem 0.3rem 0.75rem;
   font-size: 0.65rem;
   font-weight: 600;
   color: #6b7280;
@@ -298,6 +348,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  margin: 0 0.75rem;
   border-radius: 6px;
 }
 
@@ -347,25 +398,9 @@ h3 {
 }
 
 .confirm .danger {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
-}
-
-.btn-secondary {
-  background: #f1f5f9;
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.btn-secondary:hover {
-  background: #e2e8f0;
-  border-color: #94a3b8;
+  background: var(--error-50);
+  color: var(--error-700);
+  border: 1px solid var(--error-300);
 }
 /* ============================
    Sidebar backdrop
@@ -396,6 +431,20 @@ h3 {
    Hamburger button (desktop-first: hidden)
    ============================ */
 
+.hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #374151;
+}
+
+.hamburger:hover {
+  color: #111827;
+}
+
 .hamburger-btn {
   display: none;
 }
@@ -407,6 +456,12 @@ h3 {
 @media (max-width: 768px) {
 
   /* Allow hamburger only on mobile */
+  .hamburger {
+    display: inline-flex !important;
+    position: relative;
+    top: 0;
+  }
+
   .hamburger-btn {
     display: inline-flex !important;
     position: relative;
@@ -416,7 +471,7 @@ h3 {
   .header-left {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   /* App layout becomes single column */
@@ -431,14 +486,15 @@ h3 {
     left: 0;
     bottom: 0;
 
-    width: 80%;
-    max-width: 280px;
+    width: 85%;
+    max-width: 320px;
 
     background: #ffffff;
     z-index: 40;
 
     transform: translateX(-100%);
     transition: transform 0.25s ease;
+    box-shadow: var(--shadow-lg);
   }
 
   .sidebar.open {
@@ -451,16 +507,129 @@ h3 {
   }
 
   /* Header spacing */
-  .app-header {
-    height: 52px;
-    padding: 0 0.75rem;
-    display: flex;
-    align-items: center;
+  .header {
+    height: 56px;
+    padding: 0 var(--space-3);
   }
 
-  /* Chat padding */
-  .chat-container {
-    padding: 0.5rem;
+  .header .logo {
+    height: 28px;
+  }
+
+  /* Pills in header should be touch-friendly */
+  .btn-pill {
+    min-height: 36px;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Message bubbles take more width on mobile */
+  .bubble {
+    max-width: 85%;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Messages container - less padding on mobile */
+  .messages {
+    padding: var(--space-3);
+  }
+
+  /* Input area - better touch targets */
+  .input {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .input textarea {
+    font-size: var(--font-size-base);
+    min-height: 44px;
+  }
+
+  .input button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Session search input */
+  .session-search {
+    font-size: var(--font-size-base);
+    padding: var(--space-3);
+  }
+
+  /* Session items - better touch targets */
+  .session-item {
+    min-height: 48px;
+    padding: var(--space-3);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Session group headers */
+  .session-group {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-xs);
+  }
+
+  /* New session button */
+  .new-session {
+    min-height: 44px;
+    font-size: var(--font-size-base);
+  }
+
+  /* Provider badges in chat header */
+  .provider-badge {
+    font-size: 10px;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* Chat header buttons */
+  .chat-header button {
+    min-height: 36px;
+    font-size: var(--font-size-xs);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Settings adjustments */
+  .settings h1 {
+    font-size: var(--font-size-xl);
+    padding: var(--space-4);
+  }
+
+  .tabs {
+    padding: 0 var(--space-3);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab {
+    white-space: nowrap;
+    font-size: 13px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* Form elements touch-friendly */
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group textarea,
+  .form-row input[type="text"],
+  .form-row input[type="password"],
+  .form-row select,
+  select {
+    min-height: 44px;
+    font-size: var(--font-size-base);
+  }
+
+  /* Buttons touch-friendly */
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    min-height: 44px;
+    font-size: var(--font-size-base);
+  }
+
+  .btn-small {
+    min-height: 36px;
+    font-size: var(--font-size-sm);
   }
 }
 
@@ -879,16 +1048,29 @@ h3 {
 
   .provider-badge {
     display: inline-block;
-    background: #e5e7eb;
-    color: #374151;
-    border-radius: 6px;
-    font-size: 0.77em;
-    padding: 0.09em 0.6em;
-    margin-left: 0.2em;
-    opacity: 0.8;
+    background: var(--gray-200);
+    color: var(--gray-700);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    padding: var(--space-1) var(--space-2);
+    margin-left: var(--space-1);
+    opacity: 0.9;
     vertical-align: middle;
     font-weight: 500;
     letter-spacing: 0.01em;
+  }
+
+  .provider-badge.forced {
+    background: var(--warning-500);
+    color: #78350f;
+    opacity: 1;
+  }
+
+  .providers-used {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
   }
 
 @media (min-width: 769px) {

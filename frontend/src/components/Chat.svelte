@@ -12,7 +12,8 @@
   getSessionMessages,
   getProviders,
   exportSession,
-  forkSession
+  forkSession,
+  generateSessionTitle
 } from "../lib/api.js";
   import { marked } from "marked";
   import Prism from "prismjs";
@@ -41,6 +42,8 @@
 
   let forcedModel = ""; // empty = automatic routing (model id)
   let providers = [];
+  let advancedMode = false;
+  let usedProviders = new Set(); // Track providers used in this session
 
   import { onMount } from "svelte";
   onMount(async () => {
@@ -53,6 +56,15 @@
     } catch (e) {
       // If fails, leave providers empty
     }
+
+    // Load advanced mode from localStorage
+    const storedAdvanced = localStorage.getItem("theo.advancedMode");
+    advancedMode = storedAdvanced === "true";
+
+    // Listen for advanced mode changes
+    window.addEventListener("advancedModeChanged", (e) => {
+      advancedMode = e.detail.enabled;
+    });
   });
 
   // Reload messages whenever session changes
@@ -197,6 +209,13 @@
         created_at: t.created_at
       }));
 
+      // Track unique providers used in this session
+      usedProviders = new Set(
+        messages
+          .filter(m => m.provider)
+          .map(m => m.provider)
+      );
+
       await tick();
       scrollToBottom();
       enhanceCodeBlocks();
@@ -272,6 +291,11 @@
           scrollToBottom();
         },
         async onEnd(meta) {
+          // Add provider to used providers set
+          if (meta?.provider) {
+            usedProviders = new Set([...usedProviders, meta.provider]);
+          }
+
           messages = [
             ...messages,
             {
@@ -293,6 +317,21 @@
           scrollToBottom();
           enhanceCodeBlocks();
           loadSummary();
+
+          // Generate title after first assistant response
+          const assistantMessages = messages.filter(m => m.role === "assistant");
+          if (assistantMessages.length === 1) {
+            // This is the first response, generate a title
+            try {
+              const result = await generateSessionTitle(sessionId);
+              // Dispatch event to App.svelte to refresh sessions list
+              window.dispatchEvent(new CustomEvent("sessionTitleGenerated", {
+                detail: { sessionId, title: result.title }
+              }));
+            } catch (e) {
+              console.warn("Failed to generate session title:", e);
+            }
+          }
         },
         onError(err) {
           error = err?.message || "Streaming failed";
@@ -321,20 +360,28 @@
         <div class="session-title">
           <strong>Chat</strong>
           {#if forcedModel}
-            <span class="provider-badge">{forcedModel}</span>
+            <span class="provider-badge forced">Forced: {forcedModel}</span>
+          {:else if usedProviders.size > 0}
+            <span class="providers-used">
+              {#each [...usedProviders] as provider}
+                <span class="provider-badge">{provider}</span>
+              {/each}
+            </span>
           {/if}
         </div>
 
         <div class="session-actions">
-          <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
-            Export JSON
-          </button>
-          <button class="btn-secondary" on:click={() => handleExport("markdown")} title="Export as Markdown">
-            Export MD
-          </button>
-          <button class="btn-secondary" on:click={handleFork} title="Fork this conversation">
-            Fork
-          </button>
+          {#if advancedMode}
+            <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
+              Export JSON
+            </button>
+            <button class="btn-secondary" on:click={() => handleExport("markdown")} title="Export as Markdown">
+              Export MD
+            </button>
+            <button class="btn-secondary" on:click={handleFork} title="Fork this conversation">
+              Fork
+            </button>
+          {/if}
           <button class="btn-danger" on:click={deleteSession}>
             Delete
           </button>
@@ -343,6 +390,17 @@
 
       <div class="chat-main">
         <div class="messages">
+          {#if messages.length === 0 && !loading && !streaming}
+            <div class="message assistant">
+              <div class="bubble">
+                <div class="message-header">
+                  <strong>Theo</strong>
+                </div>
+                <div>Hello, what do you want to do today?</div>
+              </div>
+            </div>
+          {/if}
+
           {#each messages as m}
             <div class="message {m.role}">
               <div class="bubble">

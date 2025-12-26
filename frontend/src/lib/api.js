@@ -215,6 +215,22 @@ export async function forkSession(sessionId, turnIndex = null, title = null) {
   return response.json();
 }
 
+export async function generateSessionTitle(sessionId) {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/generate-title`,
+    {
+      method: "POST"
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to generate session title");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Intent Management API
 // =============================
