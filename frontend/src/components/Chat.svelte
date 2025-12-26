@@ -102,6 +102,37 @@
     });
   }
 
+  function formatTimestamp(timestamp) {
+    if (!timestamp) return "";
+
+    const msgDate = new Date(timestamp);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const msgDay = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate());
+
+    // Format time as "9:14am"
+    let hours = msgDate.getHours();
+    const minutes = msgDate.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12 || 12;
+    const timeStr = `${hours}:${minutes}${ampm}`;
+
+    // Check if today or yesterday
+    if (msgDay.getTime() === today.getTime()) {
+      return `Today at ${timeStr}`;
+    } else if (msgDay.getTime() === yesterday.getTime()) {
+      return `Yesterday at ${timeStr}`;
+    } else {
+      // Format as DD/MM/YY
+      const day = msgDate.getDate().toString().padStart(2, '0');
+      const month = (msgDate.getMonth() + 1).toString().padStart(2, '0');
+      const year = msgDate.getFullYear().toString().slice(-2);
+      return `${day}/${month}/${year} at ${timeStr}`;
+    }
+  }
+
   function enhanceCodeBlocks() {
     const blocks = document.querySelectorAll(".markdown pre");
 
@@ -163,7 +194,8 @@
         text: t.content,
         provider: t.provider,
         model: t.model,
-        task_type: t.task_type
+        task_type: t.task_type,
+        created_at: t.created_at
       }));
 
       await tick();
@@ -249,7 +281,7 @@
     input = "";
     error = null;
 
-    messages = [...messages, { role: "user", text: userText }];
+    messages = [...messages, { role: "user", text: userText, created_at: new Date().toISOString() }];
     loading = true;
     streaming = true;
     streamedText = "";
@@ -273,7 +305,8 @@
               provider: meta?.provider,
               model: meta?.model,
               task_type: meta?.task_type,
-              fallback_reason: meta?.fallback_reason
+              fallback_reason: meta?.fallback_reason,
+              created_at: new Date().toISOString()
             }
           ];
 
@@ -370,7 +403,12 @@
           {#each messages as m}
             <div class="message {m.role}">
               <div class="bubble">
-                <strong>{m.role === "user" ? "Me" : "Theo"}:</strong>
+                <div class="message-header">
+                  <strong>{m.role === "user" ? "Me" : "Theo"}</strong>
+                  {#if m.created_at}
+                    <span class="timestamp">- {formatTimestamp(m.created_at)}</span>
+                  {/if}
+                </div>
 
                 {#if m.role === "assistant"}
                   <div class="markdown">

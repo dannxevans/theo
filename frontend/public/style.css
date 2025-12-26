@@ -600,6 +600,23 @@ h3 {
   margin-left: auto;
 }
 
+.message-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-header strong {
+  font-weight: 600;
+}
+
+.timestamp {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: normal;
+}
+
 .message-meta {
   margin-top: 0.25rem;
   font-size: 0.75rem;

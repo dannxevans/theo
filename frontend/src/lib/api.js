@@ -371,6 +371,38 @@ export async function setDebugFlag(enabled) {
   return response.json();
 }
 
+// =============================
+// System Prompt Configuration API
+// =============================
+
+export async function getSystemPromptConfig() {
+  const response = await fetch(`${API_BASE}/api/settings/system-prompt`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load system prompt config");
+  }
+
+  return response.json();
+}
+
+export async function updateSystemPromptConfig(config) {
+  const response = await fetch(`${API_BASE}/api/settings/system-prompt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update system prompt config");
+  }
+
+  return response.json();
+}
+
 /**
  * Stream a chat response via Server-Sent Events (SSE).
  * This is intentionally separate from sendMessage() so we can

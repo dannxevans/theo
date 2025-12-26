@@ -58,6 +58,20 @@ class MemoryStore:
         )
 
         # =============================
+        # System Prompt Configuration
+        # =============================
+        self.system_prompt_config = Table(
+            "system_prompt_config",
+            self.meta,
+            Column("user_id", String, nullable=False, primary_key=True),
+            Column("persona_name", String, default="THEO"),
+            Column("tone", String, default="professional, conversational, direct"),
+            Column("style_rules", Text, default="No em dashes\nBe concise first, then detailed\nProvide full working solutions when asked for code\nMaintain a consistent persona regardless of model"),
+            Column("custom_instructions", Text, nullable=True),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Structured Memory (Step 2)
         # =============================
         self.memories = Table(
@@ -435,6 +449,58 @@ class MemoryStore:
                     )
                 )
             )
+
+    # =============================
+    # System Prompt Configuration API
+    # =============================
+    def get_system_prompt_config(self, user_id):
+        """Get system prompt configuration for a user."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.system_prompt_config)
+                .where(self.system_prompt_config.c.user_id == user_id)
+            ).fetchone()
+
+            if row:
+                return {
+                    "persona_name": row.persona_name,
+                    "tone": row.tone,
+                    "style_rules": row.style_rules,
+                    "custom_instructions": row.custom_instructions,
+                }
+            else:
+                # Return defaults if not configured
+                return {
+                    "persona_name": "THEO",
+                    "tone": "professional, conversational, direct",
+                    "style_rules": "No em dashes\nBe concise first, then detailed\nProvide full working solutions when asked for code\nMaintain a consistent persona regardless of model",
+                    "custom_instructions": None,
+                }
+
+    def update_system_prompt_config(self, user_id, **updates):
+        """Update system prompt configuration for a user."""
+        updates["updated_at"] = datetime.utcnow()
+
+        with self.engine.begin() as conn:
+            # Check if config exists
+            exists = conn.execute(
+                select(self.system_prompt_config.c.user_id)
+                .where(self.system_prompt_config.c.user_id == user_id)
+            ).fetchone()
+
+            if exists:
+                # Update existing
+                conn.execute(
+                    update(self.system_prompt_config)
+                    .where(self.system_prompt_config.c.user_id == user_id)
+                    .values(**updates)
+                )
+            else:
+                # Insert new
+                updates["user_id"] = user_id
+                conn.execute(
+                    insert(self.system_prompt_config).values(**updates)
+                )
 
     # =============================
     # Routing Preferences API

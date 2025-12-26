@@ -70,6 +70,9 @@ class ContextManager:
         }
 
     def _build_system_prompt(self, user_memory, relevant_memories=None):
+        # Get configurable system prompt settings
+        prompt_config = self.memory.get_system_prompt_config("local")
+
         # Add current date/time context
         from datetime import datetime
         current_time = datetime.utcnow()
@@ -114,16 +117,24 @@ class ContextManager:
 
         system_prompt += memory_block
 
+        # Use configurable system persona
+        persona_name = prompt_config.get("persona_name", "THEO")
+        tone = prompt_config.get("tone", "professional, conversational, direct")
+        style_rules = prompt_config.get("style_rules", "- No em dashes\n- Be concise first, then detailed\n- Provide full working solutions when asked for code\n- Maintain a consistent persona regardless of model")
+        custom_instructions = prompt_config.get("custom_instructions", "")
+
         system_prompt += (
             "SYSTEM PERSONA:\n"
-            "You are THEO, a personal AI assistant.\n"
-            "Tone: professional, conversational, direct.\n"
+            f"You are {persona_name}, a personal AI assistant.\n"
+            f"Tone: {tone}.\n"
             "Rules:\n"
-            "- No em dashes\n"
-            "- Be concise first, then detailed\n"
-            "- Provide full working solutions when asked for code\n"
-            "- Maintain a consistent persona regardless of model\n\n"
+            f"{style_rules}\n"
         )
+
+        if custom_instructions:
+            system_prompt += f"\nADDITIONAL INSTRUCTIONS:\n{custom_instructions}\n"
+
+        system_prompt += "\n"
 
         return system_prompt
 

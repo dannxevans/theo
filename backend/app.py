@@ -604,6 +604,30 @@ def set_debug_setting():
 
     return jsonify({"status": "ok", "enabled": enabled})
 
+# =============================
+# System Prompt Configuration API
+# =============================
+
+@app.route("/api/settings/system-prompt", methods=["GET"])
+def get_system_prompt_settings():
+    config = memory.get_system_prompt_config("local")
+    return jsonify(config)
+
+
+@app.route("/api/settings/system-prompt", methods=["POST"])
+def update_system_prompt_settings():
+    data = request.json
+
+    # Only allow updating specific fields
+    allowed_fields = ["persona_name", "tone", "style_rules", "custom_instructions"]
+    updates = {k: v for k, v in data.items() if k in allowed_fields}
+
+    if not updates:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    memory.update_system_prompt_config("local", **updates)
+    return jsonify({"status": "ok"})
+
 def debug_log(message):
     try:
         prefs = memory.get_all("local")

@@ -10,7 +10,9 @@
     setRoutingRule,
     deleteRoutingRule,
     getDebugFlag,
-    setDebugFlag
+    setDebugFlag,
+    getSystemPromptConfig,
+    updateSystemPromptConfig
   } from "../lib/api";
 
   let providers = [];
@@ -19,6 +21,16 @@
   let debugEnabled = false;
   let loaded = false;
   let savingDebug = false;
+
+  // System prompt configuration state
+  let systemPromptConfig = {
+    persona_name: "THEO",
+    tone: "professional, conversational, direct",
+    style_rules: "- No em dashes\n- Be concise first, then detailed\n- Provide full working solutions when asked for code\n- Maintain a consistent persona regardless of model",
+    custom_instructions: ""
+  };
+  let savingPrompt = false;
+  let promptSaveStatus = null;
 
   // Intent editor state
   let editingIntent = null;
@@ -38,6 +50,20 @@
     rules = await getRoutingRules();
     const flag = await getDebugFlag();
     debugEnabled = flag === true || flag === "true" || flag?.enabled === true;
+
+    // Load system prompt config
+    try {
+      const config = await getSystemPromptConfig();
+      systemPromptConfig = {
+        persona_name: config.persona_name || "THEO",
+        tone: config.tone || "professional, conversational, direct",
+        style_rules: config.style_rules || "- No em dashes\n- Be concise first, then detailed\n- Provide full working solutions when asked for code\n- Maintain a consistent persona regardless of model",
+        custom_instructions: config.custom_instructions || ""
+      };
+    } catch (e) {
+      console.warn("Failed to load system prompt config:", e);
+    }
+
     loaded = true;
   }
 
@@ -56,6 +82,22 @@
     await setDebugFlag(value);
     debugEnabled = value;
     savingDebug = false;
+  }
+
+  async function saveSystemPrompt() {
+    try {
+      savingPrompt = true;
+      promptSaveStatus = null;
+      await updateSystemPromptConfig(systemPromptConfig);
+      promptSaveStatus = "Settings saved successfully!";
+      setTimeout(() => {
+        promptSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      promptSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingPrompt = false;
+    }
   }
 
   function startNewIntent() {
@@ -170,6 +212,71 @@
       disabled={savingDebug}
       on:change={(e) => toggleDebug(e.target.checked)}
     />
+  </div>
+
+  <h2>System Prompt Configuration</h2>
+  <p class="subtitle">Customize how THEO responds and behaves.</p>
+
+  <div class="system-prompt-form">
+    <div class="form-group">
+      <label for="persona-name">Persona Name</label>
+      <input
+        id="persona-name"
+        type="text"
+        bind:value={systemPromptConfig.persona_name}
+        placeholder="e.g., THEO"
+      />
+      <small>The name your AI assistant will identify as</small>
+    </div>
+
+    <div class="form-group">
+      <label for="tone">Tone</label>
+      <input
+        id="tone"
+        type="text"
+        bind:value={systemPromptConfig.tone}
+        placeholder="e.g., professional, conversational, direct"
+      />
+      <small>The overall tone and style of responses</small>
+    </div>
+
+    <div class="form-group">
+      <label for="style-rules">Style Rules</label>
+      <textarea
+        id="style-rules"
+        bind:value={systemPromptConfig.style_rules}
+        placeholder="- No em dashes&#10;- Be concise first, then detailed&#10;- Provide full working solutions when asked for code"
+        rows="6"
+      />
+      <small>Bullet-pointed list of style guidelines (one per line)</small>
+    </div>
+
+    <div class="form-group">
+      <label for="custom-instructions">Custom Instructions (Optional)</label>
+      <textarea
+        id="custom-instructions"
+        bind:value={systemPromptConfig.custom_instructions}
+        placeholder="Add any additional instructions or context..."
+        rows="4"
+      />
+      <small>Any extra instructions or preferences for your AI assistant</small>
+    </div>
+
+    <div class="form-actions">
+      <button
+        class="btn-primary"
+        on:click={saveSystemPrompt}
+        disabled={savingPrompt}
+      >
+        {savingPrompt ? "Saving..." : "Save Settings"}
+      </button>
+    </div>
+
+    {#if promptSaveStatus}
+      <div class="save-status" class:success={promptSaveStatus.includes("success")} class:error={promptSaveStatus.includes("Error")}>
+        {promptSaveStatus}
+      </div>
+    {/if}
   </div>
 
   <h2>Intents</h2>
@@ -554,5 +661,32 @@
   .intent-actions {
     display: flex;
     gap: 8px;
+  }
+
+  .system-prompt-form {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .save-status {
+    margin-top: 12px;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .save-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .save-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
   }
 </style>
