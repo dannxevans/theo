@@ -21,8 +21,7 @@
     createMemory,
     deleteMemory,
     pinMemory,
-    changePassword,
-    disableAdminAccount
+    changePassword
   } from "../lib/api";
 
   let providers = [];
@@ -95,7 +94,6 @@
   let passwordError = null;
   let passwordSuccess = null;
   let changingPassword = false;
-  let confirmDisableAdmin = false;
 
   async function load() {
     providers = await getProviders();
@@ -182,19 +180,6 @@
       passwordError = err.message || "Failed to change password";
     } finally {
       changingPassword = false;
-    }
-  }
-
-  async function handleDisableAdmin() {
-    try {
-      await disableAdminAccount();
-      confirmDisableAdmin = false;
-      // Show success message and reload (user will be logged out)
-      alert("Admin account disabled successfully. You will be logged out.");
-      window.location.reload();
-    } catch (err) {
-      alert(err.message || "Failed to disable admin account");
-      confirmDisableAdmin = false;
     }
   }
 
@@ -1130,36 +1115,6 @@
           >
             {changingPassword ? "Changing Password..." : "Change Password"}
           </button>
-        </div>
-
-        <!-- Disable Admin Account Section -->
-        <div class="section">
-          <h3>Disable Admin Account</h3>
-          <p class="subtitle">
-            For security, you can disable the default admin account after setting up your own credentials.
-            This cannot be undone easily.
-          </p>
-
-          {#if !confirmDisableAdmin}
-            <button
-              class="btn-danger"
-              on:click={() => confirmDisableAdmin = true}
-            >
-              Disable Admin Account
-            </button>
-          {:else}
-            <div class="confirm-box">
-              <p><strong>Are you sure?</strong> This will disable the admin account permanently.</p>
-              <div class="button-group">
-                <button class="btn-danger" on:click={handleDisableAdmin}>
-                  Yes, Disable Admin
-                </button>
-                <button class="btn-secondary" on:click={() => confirmDisableAdmin = false}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          {/if}
         </div>
       </div>
     {/if}

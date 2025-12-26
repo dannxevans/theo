@@ -846,46 +846,6 @@ def change_password():
 
     return jsonify({"status": "ok"})
 
-@app.route("/api/auth/disable-admin", methods=["POST"])
-def disable_admin():
-    """
-    Disable the admin account.
-    Expects: Authorization: Bearer <token>
-    Only works if there's another enabled admin user.
-    """
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({"error": "Unauthorized"}), 401
-
-    token = auth_header.split(" ")[1]
-
-    # Verify session
-    session = memory.get_auth_session(token)
-    if not session or session["expires_at"] < datetime.utcnow():
-        return jsonify({"error": "Invalid session"}), 401
-
-    user = memory.get_user_by_id(session["user_id"])
-    if not user or not user["is_enabled"]:
-        return jsonify({"error": "User not found"}), 401
-
-    # Only admins can disable admin
-    if not user["is_admin"]:
-        return jsonify({"error": "Only admins can disable admin account"}), 403
-
-    # Find the default admin user
-    admin_user = memory.get_user_by_username("admin")
-    if not admin_user:
-        return jsonify({"error": "Admin user not found"}), 404
-
-    # Disable the admin account
-    memory.disable_user(admin_user["id"])
-
-    # If current user is admin, logout
-    if user["username"] == "admin":
-        memory.delete_auth_session(token)
-
-    return jsonify({"status": "ok"})
-
 def debug_log(message):
     try:
         prefs = memory.get_all("local")

@@ -9,16 +9,18 @@ THEO now includes a simple, secure authentication system designed for single-use
 - **Login/Logout**: Secure session-based authentication
 - **Password Management**: Change password functionality in Settings
 - **Default Admin Account**: Pre-configured `admin` user for first-time setup
-- **Account Security**: Ability to disable the default admin account after creating custom credentials
+- **Password Reset**: Command-line utility for recovering lost passwords
 - **7-Day Sessions**: Authentication tokens valid for 7 days
 - **Secure Password Hashing**: SHA-256 with random salt
 
 ## Default Credentials
 
+On first startup, THEO creates a default admin account:
+
 **Username**: `admin`
 **Password**: `admin`
 
-⚠️ **Important**: Change the default password immediately after first login!
+⚠️ **Important**: Change the default password immediately after first login via Settings → Account!
 
 ## How It Works
 
@@ -173,27 +175,46 @@ Authorization: Bearer <token>
 - 400: Missing fields or password too short (min 4 chars)
 - 401: Current password incorrect or invalid session
 
----
+## Password Reset Utility
 
-### POST /api/auth/disable-admin
-Disable the default admin account.
+If you forget your password and can't log in, use the command-line password reset utility:
 
-**Headers**:
-```
-Authorization: Bearer <token>
-```
+### Usage
 
-**Response** (200 OK):
-```json
-{
-  "status": "ok"
-}
+```bash
+cd backend
+source venv/bin/activate  # If using virtual environment
+python reset_password.py <username> <new_password>
 ```
 
-**Notes**:
-- Only admin users can disable the admin account
-- If the current user IS admin, they will be logged out
-- Cannot be easily reversed (requires database access)
+### Example
+
+```bash
+# Reset admin password to "mynewpassword"
+python reset_password.py admin mynewpassword
+```
+
+### How It Works
+
+The script:
+1. Connects directly to the SQLite database
+2. Looks up the user by username
+3. Hashes the new password with a fresh salt
+4. Updates the user's password_hash in the database
+5. Confirms the reset was successful
+
+### Requirements
+
+- Password must be at least 4 characters
+- You must have access to the backend directory
+- The database file must be accessible
+
+### Output
+
+```
+✅ Password reset successfully for user 'admin'
+   You can now log in with the new password.
+```
 
 ## Frontend Components
 
@@ -205,8 +226,8 @@ Features:
 - Clean, gradient background with centered login box
 - Username/password inputs
 - Error message display
-- Helpful hint showing default credentials
 - Responsive mobile design
+- Auto-stores auth token in localStorage
 
 ### Account Settings Tab
 
@@ -219,11 +240,6 @@ Features:
   - Confirm password field
   - Validation (min 4 chars, passwords must match)
   - Success/error messages
-
-- **Disable Admin Account Section**:
-  - Warning message
-  - Confirmation step
-  - Executes disable operation
 
 ### App Integration
 
@@ -287,15 +303,19 @@ If deploying publicly or for multiple users, consider:
 4. Confirm new password
 5. Click "Change Password"
 
-### Disabling the Admin Account
+### Resetting a Forgotten Password
 
-⚠️ Only do this if you have another admin account or are comfortable with the default admin being disabled.
+If you forget your password:
 
-1. Navigate to **Settings** → **Account**
-2. Scroll to "Disable Admin Account" section
-3. Click "Disable Admin Account"
-4. Confirm the action
-5. Admin account is disabled and you're logged out
+1. SSH into your server (or access the backend directory locally)
+2. Navigate to the backend directory
+3. Run the password reset script:
+   ```bash
+   cd backend
+   source venv/bin/activate  # If using venv
+   python reset_password.py admin YourNewPassword
+   ```
+4. Log in with the new password
 
 ## Deployment Notes
 
@@ -342,19 +362,24 @@ User accounts are stored in the same `theo.db` SQLite database, so they're autom
 
 ### Forgot password
 
-Since this is a single-user application:
+Use the password reset utility:
 
-1. **Option 1**: Access the database directly and reset password hash
-2. **Option 2**: Delete the database and restart (loses all data)
-3. **Option 3**: Use the default admin account if still enabled
+```bash
+cd backend
+source venv/bin/activate
+python reset_password.py admin YourNewPassword
+```
+
+This directly updates the password in the database without needing to log in.
 
 ## Code References
 
 ### Backend
 
 - **Authentication module**: `backend/auth.py`
-- **User database methods**: `backend/core/memory.py` (lines 37-1456)
-- **API endpoints**: `backend/app.py` (lines 704-887)
+- **Password reset utility**: `backend/reset_password.py`
+- **User database methods**: `backend/core/memory.py` (authentication API)
+- **API endpoints**: `backend/app.py` (authentication endpoints)
 
 ### Frontend
 

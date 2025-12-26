@@ -650,19 +650,3 @@ export async function changePassword(currentPassword, newPassword) {
 
   return response.json();
 }
-
-export async function disableAdminAccount() {
-  const response = await fetch(`${API_BASE}/api/auth/disable-admin`, {
-    method: "POST",
-    headers: {
-      ...getAuthHeaders()
-    }
-  });
-
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || "Failed to disable admin account");
-  }
-
-  return response.json();
-}

@@ -82,8 +82,7 @@
     </form>
 
     <div class="login-footer">
-      <p class="hint">Default: username <strong>admin</strong>, password <strong>admin</strong></p>
-      <p class="hint-secondary">Change your password after logging in for the first time</p>
+      <p class="hint-secondary">Secure your personal AI assistant</p>
     </div>
   </div>
 </div>
