@@ -16,9 +16,9 @@ INTENT_TO_PROVIDER_TYPE = {
 }
 
 PROVIDER_CAPABILITIES = {
-    "openai": {"general", "planning", "creative"},
-    "anthropic": {"coding", "reasoning"},
-    "mock": {"general"},
+    "openai": {"general", "planning", "creative", "coding", "reasoning"},
+    "anthropic": {"general", "coding", "reasoning", "planning", "creative"},
+    "mock": {"general", "coding", "reasoning", "planning", "creative"},
 }
 
 provider_registry: Optional[ProviderRegistry] = None
@@ -54,43 +54,51 @@ def set_context_manager(manager: ContextManager):
     context_manager = manager
 
 
-def classify_intent(text: str) -> str:
+def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     """
-    Deterministic intent classification.
-    Order matters: more specific intents must win.
+    Dynamic intent classification based on user-defined intents.
+    Checks intents in priority order (highest first).
     """
     if not text:
         return "general"
 
+    # If no memory provided, fall back to general
+    if not memory:
+        return "general"
+
+    # Get user intents, ordered by priority
+    intents = memory.list_intents("local")
+
+    # Filter to enabled intents only
+    enabled_intents = [i for i in intents if i.get("enabled", True)]
+
+    if not enabled_intents:
+        return "general"  # No intents configured
+
     text_l = text.lower()
 
-    # Explicit coding / technical tasks
-    if any(k in text_l for k in [
-        "code", "coding", "script", "function",
-        "python", "javascript", "js", "api", "bug", "error"
-    ]):
-        return "coding"
+    # Check each intent's keywords in priority order
+    for intent in enabled_intents:
+        keywords = intent.get("keywords", "")
 
-    # Deep explanation / analysis
-    if any(k in text_l for k in [
-        "why", "how does", "explain", "analyze",
-        "analysis", "reasoning", "logic"
-    ]):
-        return "reasoning"
+        # Skip empty keywords (usually the "general" catch-all)
+        if not keywords or not keywords.strip():
+            continue
 
-    # Planning / structuring work
-    if any(k in text_l for k in [
-        "plan", "planning", "roadmap", "schedule",
-        "organize", "design", "steps", "approach"
-    ]):
-        return "planning"
+        # Split keywords by comma and check if any match
+        keyword_list = [k.strip().lower() for k in keywords.split(",") if k.strip()]
 
-    # Creative generation
-    if any(k in text_l for k in [
-        "write", "story", "poem", "creative",
-        "imagine", "fiction", "lyrics"
-    ]):
-        return "creative"
+        for keyword in keyword_list:
+            if keyword in text_l:
+                _debug(memory, f"Matched intent '{intent['id']}' via keyword '{keyword}'")
+                return intent["id"]
+
+    # If no keywords matched, return the lowest priority intent (usually "general")
+    # or fall back to "general" if no intents exist
+    fallback = enabled_intents[-1] if enabled_intents else None
+    if fallback:
+        _debug(memory, f"No keyword match, using fallback intent '{fallback['id']}'")
+        return fallback["id"]
 
     return "general"
 
@@ -200,48 +208,109 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None):
     fallback_reason = None
     selected_provider = None
+    routing_explanation = []
+
+    # Step 3: Check health status and circuit breaker
+    health_summary = memory.get_provider_health_summary() if memory else {}
+
+    def is_provider_healthy(provider_id):
+        health = health_summary.get(provider_id, {})
+        if health.get("circuit_breaker_open"):
+            return False, "circuit breaker open (5+ consecutive failures)"
+        if health.get("health_status") == "unhealthy":
+            return False, f"unhealthy (failure rate: {health.get('failure_rate', 0)}%)"
+        return True, None
 
     if forced_provider and provider_registry:
         provider_by_id = provider_registry.get(forced_provider)
         if provider_by_id:
-            selected_provider = provider_by_id
+            healthy, reason = is_provider_healthy(provider_by_id.get("id"))
+            if healthy:
+                selected_provider = provider_by_id
+                routing_explanation.append(f"User forced provider: {forced_provider}")
+            else:
+                fallback_reason = f"Forced provider {forced_provider} unavailable: {reason}"
+                routing_explanation.append(fallback_reason)
         else:
             provider_by_model = provider_registry.get_by_model(forced_provider)
             if provider_by_model:
-                selected_provider = provider_by_model
+                healthy, reason = is_provider_healthy(provider_by_model.get("id"))
+                if healthy:
+                    selected_provider = provider_by_model
+                    routing_explanation.append(f"User forced model: {forced_provider}")
+                else:
+                    fallback_reason = f"Forced model {forced_provider} unavailable: {reason}"
+                    routing_explanation.append(fallback_reason)
 
     if not selected_provider and memory:
         routed = memory.get_routing_provider("local", intent)
         if routed and provider_registry:
             routed_provider = provider_registry.get(routed)
             if routed_provider:
-                selected_provider = routed_provider
+                healthy, reason = is_provider_healthy(routed)
+                if healthy:
+                    selected_provider = routed_provider
+                    routing_explanation.append(f"User routing rule: {intent} → {routed}")
+                else:
+                    fallback_reason = f"Routing rule provider {routed} unavailable: {reason}"
+                    routing_explanation.append(fallback_reason)
 
     if not selected_provider and provider_registry:
         preferred_type = INTENT_TO_PROVIDER_TYPE.get(intent, "openai")
         p = provider_registry.get_by_type(preferred_type)
         if p and p.get("api_key"):
-            selected_provider = p
+            healthy, reason = is_provider_healthy(p.get("id"))
+            if healthy:
+                selected_provider = p
+                routing_explanation.append(f"Intent match: {intent} → {preferred_type}")
+            else:
+                fallback_reason = f"{preferred_type} unhealthy: {reason}"
+                routing_explanation.append(fallback_reason)
         else:
             fallback_reason = f"{preferred_type} skipped: missing api_key or provider disabled"
+            routing_explanation.append(fallback_reason)
+
+        if not selected_provider:
             other_type = "openai" if preferred_type == "anthropic" else "anthropic"
             p = provider_registry.get_by_type(other_type)
             if p and p.get("api_key"):
-                selected_provider = p
+                healthy, reason = is_provider_healthy(p.get("id"))
+                if healthy:
+                    selected_provider = p
+                    routing_explanation.append(f"Fallback to {other_type}")
+                else:
+                    fallback_reason = f"{fallback_reason}; {other_type} unhealthy: {reason}"
+                    routing_explanation.append(f"{other_type} unhealthy: {reason}")
             else:
                 fallback_reason = f"{fallback_reason}; {other_type} skipped: missing api_key or provider disabled"
+                routing_explanation.append(f"{other_type} unavailable")
 
     # Enforce provider capability constraints and fallback if needed
     if selected_provider:
         if not provider_supports_intent(selected_provider, intent):
             fallback_reason = "provider does not support intent"
+            routing_explanation.append(f"{selected_provider.get('type')} cannot handle {intent}")
             if provider_registry:
                 current_type = selected_provider.get("type")
                 other_type = "openai" if current_type == "anthropic" else "anthropic"
                 p = provider_registry.get_by_type(other_type)
                 if p and p.get("api_key") and provider_supports_intent(p, intent):
-                    selected_provider = p
-                    fallback_reason = None
+                    healthy, reason = is_provider_healthy(p.get("id"))
+                    if healthy:
+                        selected_provider = p
+                        fallback_reason = None
+                        routing_explanation.append(f"Switched to {other_type}")
+                    else:
+                        routing_explanation.append(f"{other_type} unhealthy: {reason}")
+                        selected_provider = {
+                            "id": "mock",
+                            "type": "mock",
+                            "api_key": None,
+                            "base_url": None,
+                            "model": None,
+                            "fallback_reason": fallback_reason,
+                        }
+                        routing_explanation.append("Using mock provider (all providers unavailable)")
                 else:
                     # no provider supports intent, fall back to mock
                     selected_provider = {
@@ -252,6 +321,7 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
                         "model": None,
                         "fallback_reason": fallback_reason,
                     }
+                    routing_explanation.append("Using mock provider (no capable providers)")
         else:
             selected_provider["fallback_reason"] = fallback_reason
     else:
@@ -263,8 +333,10 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
             "model": None,
             "fallback_reason": fallback_reason,
         }
+        routing_explanation.append("Using mock provider (no providers available)")
 
     if isinstance(selected_provider, dict):
+        selected_provider["routing_explanation"] = " → ".join(routing_explanation)
         return selected_provider
     else:
         # convert to dict if it's a provider object
@@ -275,6 +347,7 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
             "base_url": selected_provider.get("base_url"),
             "model": selected_provider.get("model"),
             "fallback_reason": selected_provider.get("fallback_reason", fallback_reason),
+            "routing_explanation": " → ".join(routing_explanation),
         }
 
 
@@ -313,7 +386,7 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
-    intent = classify_intent(text)
+    intent = classify_intent(text, memory)
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)
@@ -391,10 +464,107 @@ def route_request(context: dict, stream: bool = False):
     system_prompt = context_obj["system"]
     messages = context_obj["messages"]
 
-    raw = provider.chat(
-        system=system_prompt,
-        messages=messages,
-    )
+    # Step 3: Add request timing and error handling with fallback
+    import time
+    start_time = time.time()
+    session_id = context.get("session_id", "default")
+
+    try:
+        raw = provider.chat(
+            system=system_prompt,
+            messages=messages,
+        )
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        # Log successful request
+        logging.info(f"[ROUTER] Request successful for provider {provider_cfg['id']}, latency: {latency_ms}ms")
+        if memory:
+            logging.info(f"[ROUTER] Updating health for provider {provider_cfg['id']}")
+            memory.update_provider_health(provider_cfg["id"], success=True, latency_ms=latency_ms)
+            # Estimate tokens (rough approximation based on character count)
+            input_tokens = (len(system_prompt) + sum(len(m.get("content", "")) for m in messages)) // 4
+            output_tokens = 0  # Will be updated after response
+            memory.log_request(
+                session_id=session_id,
+                provider_id=provider_cfg["id"],
+                intent=intent,
+                success=True,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                estimated_cost=0,
+            )
+
+    except Exception as e:
+        latency_ms = int((time.time() - start_time) * 1000)
+        error_msg = str(e)
+
+        # Always log provider failures
+        logging.error(f"[ROUTER] Provider {provider_cfg['id']} failed: {error_msg}")
+        _debug(memory, f"Provider {provider_cfg['id']} failed", error=error_msg)
+
+        # Log failure
+        if memory:
+            memory.update_provider_health(provider_cfg["id"], success=False, latency_ms=latency_ms)
+            memory.log_request(
+                session_id=session_id,
+                provider_id=provider_cfg["id"],
+                intent=intent,
+                success=False,
+                latency_ms=latency_ms,
+                error_message=error_msg,
+            )
+
+        # Step 3: Smart fallback - try alternative provider
+        _debug(memory, "Attempting fallback to alternative provider")
+
+        # Select alternative provider (excluding the failed one)
+        alternative_cfg = select_provider(intent, memory, forced_provider=None)
+
+        if alternative_cfg["id"] != provider_cfg["id"] and alternative_cfg["id"] != "mock":
+            _debug(memory, f"Fallback to {alternative_cfg['id']}")
+            provider = instantiate_provider(alternative_cfg)
+
+            try:
+                raw = provider.chat(
+                    system=system_prompt,
+                    messages=messages,
+                )
+                fallback_latency = int((time.time() - start_time) * 1000)
+
+                if memory:
+                    memory.update_provider_health(alternative_cfg["id"], success=True, latency_ms=fallback_latency)
+
+                # Update metadata to reflect fallback
+                meta["provider"] = alternative_cfg["id"]
+                meta["model"] = alternative_cfg["model"]
+                meta["fallback_reason"] = f"Primary provider failed: {error_msg[:100]}"
+                meta["routing"]["fallback_used"] = True
+
+            except Exception as fallback_error:
+                _debug(memory, f"Fallback also failed", error=str(fallback_error))
+                if memory:
+                    memory.update_provider_health(alternative_cfg["id"], success=False)
+
+                # Return error message instead of raising
+                return {
+                    "text": f"Error: All providers failed. Primary: {error_msg}. Fallback: {str(fallback_error)}",
+                    "provider": "error",
+                    "model": None,
+                    "task_type": intent,
+                    "fallback_reason": "all providers failed",
+                    "routing": routing_decision,
+                }
+        else:
+            # No alternative available
+            return {
+                "text": f"Error: Provider failed and no fallback available. {error_msg}",
+                "provider": "error",
+                "model": None,
+                "task_type": intent,
+                "fallback_reason": "no fallback available",
+                "routing": routing_decision,
+            }
 
     if stream:
         def stream_generator():

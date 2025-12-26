@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 
 class ContextManager:
@@ -69,8 +70,20 @@ class ContextManager:
         }
 
     def _build_system_prompt(self, user_memory, relevant_memories=None):
+        # Get configurable system prompt settings
+        prompt_config = self.memory.get_system_prompt_config("local")
+
+        # Add current date/time context
+        from datetime import datetime
+        current_time = datetime.utcnow()
+        current_date_str = current_time.strftime("%A, %B %d, %Y")
+        current_time_str = current_time.strftime("%H:%M UTC")
+
         system_prompt = (
             f"{self.SYSTEM_HEADER}\n"
+            f"CURRENT DATE AND TIME:\n"
+            f"Today is {current_date_str} at {current_time_str}.\n"
+            f"Use this to understand temporal context in the conversation.\n\n"
             "The following facts are persistent and authoritative across the entire conversation.\n"
             "You must recall and use them when answering direct questions.\n\n"
         )
@@ -104,16 +117,24 @@ class ContextManager:
 
         system_prompt += memory_block
 
+        # Use configurable system persona
+        persona_name = prompt_config.get("persona_name", "THEO")
+        tone = prompt_config.get("tone", "professional, conversational, direct")
+        style_rules = prompt_config.get("style_rules", "- No em dashes\n- Be concise first, then detailed\n- Provide full working solutions when asked for code\n- Maintain a consistent persona regardless of model")
+        custom_instructions = prompt_config.get("custom_instructions", "")
+
         system_prompt += (
             "SYSTEM PERSONA:\n"
-            "You are THEO, a personal AI assistant.\n"
-            "Tone: professional, conversational, direct.\n"
+            f"You are {persona_name}, a personal AI assistant.\n"
+            f"Tone: {tone}.\n"
             "Rules:\n"
-            "- No em dashes\n"
-            "- Be concise first, then detailed\n"
-            "- Provide full working solutions when asked for code\n"
-            "- Maintain a consistent persona regardless of model\n\n"
+            f"{style_rules}\n"
         )
+
+        if custom_instructions:
+            system_prompt += f"\nADDITIONAL INSTRUCTIONS:\n{custom_instructions}\n"
+
+        system_prompt += "\n"
 
         return system_prompt
 
@@ -150,29 +171,75 @@ class ContextManager:
     # =============================
     # Context update
     # =============================
-    def update(self, session_id, user_text, assistant_text):
+    def update(self, session_id, user_text, assistant_text, provider_registry=None):
         """
         Persist the latest turn and update the rolling session summary.
         """
 
-        # Normalise assistant output to plain text
+        # Extract metadata from assistant response if it's a dict
+        provider_id = None
+        model = None
+        intent = None
+
         if isinstance(assistant_text, dict):
-            if "provider" in assistant_text:
-                self.memory.set_last_provider(session_id, assistant_text["provider"])
+            provider_id = assistant_text.get("provider")
+            model = assistant_text.get("model")
+            intent = assistant_text.get("task_type")  # task_type is the intent
+
+            if provider_id:
+                self.memory.set_last_provider(session_id, provider_id)
+
             assistant_text = assistant_text.get("text", "")
 
         # Store recent turns
         self._store_turn(session_id, "user", user_text)
-        self._store_turn(session_id, "assistant", assistant_text)
+        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent)
 
         # Derive and persist session title if supported by memory store
         if hasattr(self.memory, "save_session_title"):
             title = self._derive_title(session_id)
             self.memory.save_session_title(session_id, title)
 
-        # Update summary (simple heuristic for now)
-        new_summary = self._generate_summary(session_id)
-        self._store_session_summary(session_id, new_summary)
+        # Check if auto-summarization is needed
+        if hasattr(self.memory, "should_generate_summary") and self.memory.should_generate_summary(session_id):
+            logging.info(f"[CONTEXT] Auto-summarization triggered for session {session_id}")
+            # Use AI to generate summary if provider_registry is available
+            if provider_registry and hasattr(self.memory, "generate_auto_summary"):
+                try:
+                    # Get a provider to use for summarization (prefer fast ones)
+                    providers = provider_registry.list()
+                    enabled_providers = [p for p in providers if p.get("enabled")]
+
+                    if enabled_providers:
+                        # Create a simple provider call wrapper
+                        def provider_call(messages):
+                            from core.router import route_request
+                            result = route_request(
+                                user_message="",  # Not used, we pass messages directly
+                                session_id=session_id,
+                                memory=self.memory,
+                                provider_registry=provider_registry,
+                                intent="general",  # Use general intent for summarization
+                                context={"messages": messages}  # Pass messages for summarization
+                            )
+                            return result.get("text", "")
+
+                        # Generate AI-powered summary
+                        self.memory.generate_auto_summary(session_id, provider_call)
+                        logging.info(f"[CONTEXT] Auto-summary generated successfully")
+                except Exception as e:
+                    logging.error(f"[CONTEXT] Failed to auto-generate summary: {e}")
+                    # Fall back to simple summary
+                    new_summary = self._generate_summary(session_id)
+                    self._store_session_summary(session_id, new_summary)
+            else:
+                # Fall back to simple heuristic summary
+                new_summary = self._generate_summary(session_id)
+                self._store_session_summary(session_id, new_summary)
+        else:
+            # Update summary using simple heuristic
+            new_summary = self._generate_summary(session_id)
+            self._store_session_summary(session_id, new_summary)
 
     # =============================
     # Internal helpers
@@ -189,12 +256,15 @@ class ContextManager:
             limit=self.MAX_RECENT_TURNS * 2
         )
 
-    def _store_turn(self, session_id, role, content):
+    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None):
         self.memory.save_turn(
             session_id=session_id,
             role=role,
             content=content,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            provider_id=provider_id,
+            model=model,
+            intent=intent
         )
 
     def _generate_summary(self, session_id):

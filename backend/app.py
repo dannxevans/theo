@@ -64,6 +64,9 @@ set_context_manager(context_manager)
 # Inject provider registry into router
 set_provider_registry(provider_registry)
 
+# Seed default intents if none exist
+memory.seed_default_intents("local")
+
 @app.route("/api/health")
 def api_health():
     return {"status": "ok", "service": "THEO"}
@@ -77,7 +80,8 @@ def chat():
     context = context_manager.build_context(session_id, text)
     result = route_request(context)
 
-    context_manager.update(session_id, text, result["text"])
+    # Pass the full result object so metadata can be extracted
+    context_manager.update(session_id, text, result, provider_registry)
     return jsonify(result)
 
 @app.route("/api/stream/<session_id>")
@@ -91,6 +95,8 @@ def stream_chat_sse(session_id):
 
             router_context = dict(context)
             router_context["text"] = text
+            router_context["session_id"] = session_id
+            router_context["memory"] = memory
             if forced_provider:
                 router_context["forced_provider"] = forced_provider
 
@@ -116,7 +122,8 @@ def stream_chat_sse(session_id):
             yield "event: end\n"
             yield f"data: {json.dumps(end_payload)}\n\n"
 
-            context_manager.update(session_id, text, full_text)
+            # Pass the full result object so metadata can be extracted
+            context_manager.update(session_id, text, result, provider_registry)
 
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
@@ -211,6 +218,118 @@ def get_relevant_memories():
     return jsonify(relevant)
 
 # =============================
+# Step 3: Provider Intelligence APIs
+# =============================
+
+@app.route("/api/providers/health", methods=["GET"])
+def get_provider_health():
+    """Get health summary for all providers"""
+    summary = memory.get_provider_health_summary()
+    return jsonify(summary)
+
+@app.route("/api/providers/<provider_id>/metadata", methods=["GET"])
+def get_provider_metadata_endpoint(provider_id):
+    """Get metadata for a specific provider"""
+    metadata = memory.get_provider_metadata(provider_id)
+    if not metadata:
+        return jsonify({"error": "Provider not found"}), 404
+    return jsonify(metadata)
+
+@app.route("/api/providers/<provider_id>/metadata", methods=["POST"])
+def update_provider_metadata_endpoint(provider_id):
+    """Update cost metadata for a provider"""
+    data = request.json
+    memory.init_provider_metadata(
+        provider_id,
+        cost_per_1k_input=data.get("cost_per_1k_input", 0),
+        cost_per_1k_output=data.get("cost_per_1k_output", 0),
+    )
+    return jsonify({"status": "ok"})
+
+# =============================
+# Routing Preferences APIs
+# =============================
+
+# =============================
+# Intent Management APIs
+# =============================
+
+@app.route("/api/intents", methods=["GET"])
+def list_intents():
+    """Get all user-defined intents."""
+    intents = memory.list_intents("local")
+    return jsonify(intents)
+
+@app.route("/api/intents/<intent_id>", methods=["GET"])
+def get_intent(intent_id):
+    """Get a single intent by ID."""
+    intent = memory.get_intent("local", intent_id)
+    if not intent:
+        return jsonify({"error": "Intent not found"}), 404
+    return jsonify(intent)
+
+@app.route("/api/intents", methods=["POST"])
+def create_intent():
+    """Create a new intent."""
+    data = request.json
+    intent_id = data.get("id")
+    name = data.get("name")
+    description = data.get("description", "")
+    keywords = data.get("keywords", "")
+    priority = data.get("priority", 0)
+    enabled = data.get("enabled", True)
+
+    if not intent_id or not name:
+        return jsonify({"error": "id and name are required"}), 400
+
+    try:
+        memory.create_intent(
+            user_id="local",
+            intent_id=intent_id,
+            name=name,
+            description=description,
+            keywords=keywords,
+            priority=priority,
+            enabled=enabled,
+        )
+        return jsonify({"status": "ok", "intent_id": intent_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/intents/<intent_id>", methods=["PUT"])
+def update_intent(intent_id):
+    """Update an existing intent."""
+    data = request.json
+    updates = {}
+
+    # Only include fields that are present in the request
+    if "name" in data:
+        updates["name"] = data["name"]
+    if "description" in data:
+        updates["description"] = data["description"]
+    if "keywords" in data:
+        updates["keywords"] = data["keywords"]
+    if "priority" in data:
+        updates["priority"] = data["priority"]
+    if "enabled" in data:
+        updates["enabled"] = data["enabled"]
+
+    try:
+        memory.update_intent("local", intent_id, **updates)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/intents/<intent_id>", methods=["DELETE"])
+def delete_intent(intent_id):
+    """Delete an intent."""
+    try:
+        memory.delete_intent("local", intent_id)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# =============================
 # Routing Preferences APIs
 # =============================
 
@@ -269,6 +388,9 @@ def get_session_messages(session_id):
             "role": t["role"],
             "content": t["content"],
             "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
+            "provider": t.get("provider_id"),
+            "model": t.get("model"),
+            "task_type": t.get("intent"),
         }
         for t in turns
     ])
@@ -277,6 +399,130 @@ def get_session_messages(session_id):
 def delete_session(session_id):
     memory.delete_session(session_id)
     return jsonify({"status": "ok"})
+
+@app.route("/api/sessions/<session_id>/export", methods=["GET"])
+def export_session(session_id):
+    """
+    Export a conversation in JSON or Markdown format.
+    Query param: format=json|markdown (default: json)
+    """
+    export_format = request.args.get("format", "json").lower()
+
+    # Get session metadata
+    session_data = memory.list_sessions()
+    session = next((s for s in session_data if s["id"] == session_id), None)
+
+    # Get all messages
+    turns = memory.get_recent_turns(session_id, limit=10000)
+
+    if export_format == "markdown":
+        # Generate markdown format
+        lines = []
+        if session:
+            lines.append(f"# {session.get('title', 'Conversation')}")
+            lines.append(f"\n**Session ID:** {session_id}")
+            lines.append(f"**Created:** {session.get('created_at', 'Unknown')}")
+            if session.get('summary'):
+                lines.append(f"\n**Summary:** {session['summary']}")
+            lines.append("\n---\n")
+
+        for turn in turns:
+            role = turn["role"].upper()
+            content = turn["content"]
+            timestamp = turn.get("created_at", "")
+
+            if role == "USER":
+                lines.append(f"## 👤 User")
+            else:
+                lines.append(f"## 🤖 Assistant")
+
+            if timestamp:
+                lines.append(f"*{timestamp}*\n")
+
+            lines.append(content)
+            lines.append("\n---\n")
+
+        markdown_text = "\n".join(lines)
+
+        return Response(
+            markdown_text,
+            mimetype="text/markdown",
+            headers={
+                "Content-Disposition": f"attachment; filename=conversation_{session_id}.md"
+            }
+        )
+    else:
+        # JSON format
+        export_data = {
+            "session_id": session_id,
+            "title": session.get("title") if session else None,
+            "summary": session.get("summary") if session else None,
+            "created_at": session.get("created_at").isoformat() if session and session.get("created_at") else None,
+            "messages": [
+                {
+                    "role": t["role"],
+                    "content": t["content"],
+                    "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
+                }
+                for t in turns
+            ]
+        }
+
+        return Response(
+            json.dumps(export_data, indent=2),
+            mimetype="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename=conversation_{session_id}.json"
+            }
+        )
+
+@app.route("/api/sessions/<session_id>/fork", methods=["POST"])
+def fork_session(session_id):
+    """
+    Create a new session as a fork/branch of the current one.
+    Copies all messages up to an optional turn_index (or all if not specified).
+    Request body (optional): { "turn_index": 5, "title": "Forked conversation" }
+    """
+    data = request.json or {}
+    turn_index = data.get("turn_index")
+    new_title = data.get("title")
+
+    # Generate new session ID
+    import uuid
+    new_session_id = str(uuid.uuid4())
+
+    # Get original messages
+    original_turns = memory.get_recent_turns(session_id, limit=10000)
+
+    # If turn_index specified, only copy up to that point
+    if turn_index is not None:
+        turns_to_copy = original_turns[:turn_index + 1]
+    else:
+        turns_to_copy = original_turns
+
+    # Create new session and copy turns
+    for turn in turns_to_copy:
+        memory.save_turn(
+            new_session_id,
+            turn["role"],
+            turn["content"]
+        )
+
+    # Set title for new session
+    if new_title:
+        memory.save_session_title(new_session_id, new_title)
+    elif len(turns_to_copy) > 0:
+        # Copy title from original session
+        session_data = memory.list_sessions()
+        original = next((s for s in session_data if s["id"] == session_id), None)
+        if original and original.get("title"):
+            memory.save_session_title(new_session_id, f"{original['title']} (fork)")
+
+    return jsonify({
+        "session_id": new_session_id,
+        "status": "ok",
+        "messages_copied": len(turns_to_copy)
+    })
 
 # Provider Management APIs
 
@@ -312,11 +558,18 @@ def upsert_provider():
         "enabled": data.get("enabled", True),
     })
 
+    # Initialize metadata for new providers
+    memory.init_provider_metadata(data["id"])
+
     return jsonify({"status": "ok"})
 
 @app.route("/api/providers/<provider_id>", methods=["DELETE"])
 def delete_provider(provider_id):
     provider_registry.delete(provider_id)
+
+    # Clean up metadata and request logs for deleted provider
+    memory.delete_provider_metadata(provider_id)
+
     return jsonify({"status": "ok"})
 
 # =============================
@@ -350,6 +603,30 @@ def set_debug_setting():
     )
 
     return jsonify({"status": "ok", "enabled": enabled})
+
+# =============================
+# System Prompt Configuration API
+# =============================
+
+@app.route("/api/settings/system-prompt", methods=["GET"])
+def get_system_prompt_settings():
+    config = memory.get_system_prompt_config("local")
+    return jsonify(config)
+
+
+@app.route("/api/settings/system-prompt", methods=["POST"])
+def update_system_prompt_settings():
+    data = request.json
+
+    # Only allow updating specific fields
+    allowed_fields = ["persona_name", "tone", "style_rules", "custom_instructions"]
+    updates = {k: v for k, v in data.items() if k in allowed_fields}
+
+    if not updates:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    memory.update_system_prompt_config("local", **updates)
+    return jsonify({"status": "ok"})
 
 def debug_log(message):
     try:

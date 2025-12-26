@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from sqlalchemy import (
     create_engine,
     Column,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     insert,
     update,
     func,
+    and_,
 )
 from sqlalchemy.orm import sessionmaker
 
@@ -56,6 +58,20 @@ class MemoryStore:
         )
 
         # =============================
+        # System Prompt Configuration
+        # =============================
+        self.system_prompt_config = Table(
+            "system_prompt_config",
+            self.meta,
+            Column("user_id", String, nullable=False, primary_key=True),
+            Column("persona_name", String, default="THEO"),
+            Column("tone", String, default="professional, conversational, direct"),
+            Column("style_rules", Text, default="No em dashes\nBe concise first, then detailed\nProvide full working solutions when asked for code\nMaintain a consistent persona regardless of model"),
+            Column("custom_instructions", Text, nullable=True),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Structured Memory (Step 2)
         # =============================
         self.memories = Table(
@@ -74,6 +90,23 @@ class MemoryStore:
         )
 
         # =============================
+        # User-Defined Intents
+        # =============================
+        self.intents = Table(
+            "intents",
+            self.meta,
+            Column("id", String, primary_key=True),  # e.g., "coding", "creative"
+            Column("user_id", String, nullable=False),
+            Column("name", String, nullable=False),  # Display name
+            Column("description", Text, nullable=True),  # What this intent is for
+            Column("keywords", Text, nullable=False),  # Comma-separated keywords
+            Column("priority", Integer, default=0),  # Higher priority checked first
+            Column("enabled", Boolean, default=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Routing Preferences
         # =============================
         self.routing_preferences = Table(
@@ -83,6 +116,41 @@ class MemoryStore:
             Column("intent", String, nullable=False),
             Column("provider_id", String, nullable=False),
             Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Step 3: Provider Intelligence
+        # =============================
+        self.provider_metadata = Table(
+            "provider_metadata",
+            self.meta,
+            Column("provider_id", String, primary_key=True),
+            Column("cost_per_1k_input_tokens", Integer, default=0),  # in micro-dollars (1/1000000 of $1)
+            Column("cost_per_1k_output_tokens", Integer, default=0),
+            Column("avg_latency_ms", Integer, default=0),
+            Column("total_requests", Integer, default=0),
+            Column("failed_requests", Integer, default=0),
+            Column("last_success_at", DateTime, nullable=True),
+            Column("last_failure_at", DateTime, nullable=True),
+            Column("health_status", String, default="unknown"),  # healthy, degraded, unhealthy, unknown
+            Column("circuit_breaker_open", Boolean, default=False),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        self.request_logs = Table(
+            "request_logs",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("session_id", String, nullable=False),
+            Column("provider_id", String, nullable=False),
+            Column("intent", String, nullable=False),
+            Column("success", Boolean, default=True),
+            Column("latency_ms", Integer, nullable=True),
+            Column("input_tokens", Integer, default=0),
+            Column("output_tokens", Integer, default=0),
+            Column("estimated_cost", Integer, default=0),  # in micro-dollars
+            Column("error_message", Text, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
         )
 
         # =============================
@@ -136,6 +204,10 @@ class MemoryStore:
             Column("role", String, nullable=False),
             Column("content", Text, nullable=False),
             Column("created_at", DateTime, default=datetime.utcnow),
+            # Provider metadata for assistant messages
+            Column("provider_id", String, nullable=True),
+            Column("model", String, nullable=True),
+            Column("intent", String, nullable=True),
         )
 
         # =============================
@@ -379,6 +451,58 @@ class MemoryStore:
             )
 
     # =============================
+    # System Prompt Configuration API
+    # =============================
+    def get_system_prompt_config(self, user_id):
+        """Get system prompt configuration for a user."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.system_prompt_config)
+                .where(self.system_prompt_config.c.user_id == user_id)
+            ).fetchone()
+
+            if row:
+                return {
+                    "persona_name": row.persona_name,
+                    "tone": row.tone,
+                    "style_rules": row.style_rules,
+                    "custom_instructions": row.custom_instructions,
+                }
+            else:
+                # Return defaults if not configured
+                return {
+                    "persona_name": "THEO",
+                    "tone": "professional, conversational, direct",
+                    "style_rules": "No em dashes\nBe concise first, then detailed\nProvide full working solutions when asked for code\nMaintain a consistent persona regardless of model",
+                    "custom_instructions": None,
+                }
+
+    def update_system_prompt_config(self, user_id, **updates):
+        """Update system prompt configuration for a user."""
+        updates["updated_at"] = datetime.utcnow()
+
+        with self.engine.begin() as conn:
+            # Check if config exists
+            exists = conn.execute(
+                select(self.system_prompt_config.c.user_id)
+                .where(self.system_prompt_config.c.user_id == user_id)
+            ).fetchone()
+
+            if exists:
+                # Update existing
+                conn.execute(
+                    update(self.system_prompt_config)
+                    .where(self.system_prompt_config.c.user_id == user_id)
+                    .values(**updates)
+                )
+            else:
+                # Insert new
+                updates["user_id"] = user_id
+                conn.execute(
+                    insert(self.system_prompt_config).values(**updates)
+                )
+
+    # =============================
     # Routing Preferences API
     # =============================
     def set_routing_preference(self, user_id, intent, provider_id):
@@ -430,6 +554,151 @@ class MemoryStore:
         Alias for set_routing_preference to set the provider for a user and intent.
         """
         self.set_routing_preference(user_id, intent, provider_id)
+
+    # =============================
+    # User-Defined Intents API
+    # =============================
+    def list_intents(self, user_id):
+        """Get all intents for a user, ordered by priority (highest first)."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .order_by(self.intents.c.priority.desc(), self.intents.c.name)
+            ).fetchall()
+            return [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "description": r.description,
+                    "keywords": r.keywords,
+                    "priority": r.priority,
+                    "enabled": r.enabled,
+                    "created_at": r.created_at,
+                    "updated_at": r.updated_at,
+                }
+                for r in rows
+            ]
+
+    def get_intent(self, user_id, intent_id):
+        """Get a single intent by ID."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "keywords": row.keywords,
+                "priority": row.priority,
+                "enabled": row.enabled,
+                "created_at": row.created_at,
+                "updated_at": row.updated_at,
+            }
+
+    def create_intent(self, user_id, intent_id, name, description, keywords, priority=0, enabled=True):
+        """Create a new intent."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.intents).values(
+                    id=intent_id,
+                    user_id=user_id,
+                    name=name,
+                    description=description,
+                    keywords=keywords,
+                    priority=priority,
+                    enabled=enabled,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+    def update_intent(self, user_id, intent_id, **updates):
+        """Update an existing intent."""
+        updates["updated_at"] = datetime.utcnow()
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+                .values(**updates)
+            )
+
+    def delete_intent(self, user_id, intent_id):
+        """Delete an intent and its routing preferences."""
+        with self.engine.begin() as conn:
+            # Delete routing preferences first
+            conn.execute(
+                delete(self.routing_preferences)
+                .where(self.routing_preferences.c.user_id == user_id)
+                .where(self.routing_preferences.c.intent == intent_id)
+            )
+            # Delete intent
+            conn.execute(
+                delete(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+            )
+
+    def seed_default_intents(self, user_id):
+        """Seed default intents if none exist for the user."""
+        existing = self.list_intents(user_id)
+        if existing:
+            return  # Already has intents
+
+        default_intents = [
+            {
+                "id": "coding",
+                "name": "Coding",
+                "description": "Programming, debugging, code review, and technical tasks",
+                "keywords": "code,coding,script,function,python,javascript,js,api,bug,error,debug,programming,software,class,method,variable",
+                "priority": 90,
+            },
+            {
+                "id": "reasoning",
+                "name": "Reasoning",
+                "description": "Deep analysis, explanations, and logical thinking",
+                "keywords": "why,how does,explain,analyze,analysis,reasoning,logic,understand,think,consider,evaluate",
+                "priority": 80,
+            },
+            {
+                "id": "planning",
+                "name": "Planning",
+                "description": "Project planning, organization, and structured approaches",
+                "keywords": "plan,planning,roadmap,schedule,organize,design,steps,approach,strategy,structure",
+                "priority": 70,
+            },
+            {
+                "id": "creative",
+                "name": "Creative",
+                "description": "Creative writing, storytelling, and artistic content",
+                "keywords": "write,story,poem,creative,imagine,fiction,lyrics,novel,character,narrative",
+                "priority": 60,
+            },
+            {
+                "id": "general",
+                "name": "General",
+                "description": "General questions and conversations",
+                "keywords": "",  # Empty keywords - catches everything else
+                "priority": 0,  # Lowest priority - fallback
+            },
+        ]
+
+        for intent in default_intents:
+            self.create_intent(
+                user_id=user_id,
+                intent_id=intent["id"],
+                name=intent["name"],
+                description=intent["description"],
+                keywords=intent["keywords"],
+                priority=intent["priority"],
+            )
+        logging.info(f"[MEMORY] Seeded {len(default_intents)} default intents for user {user_id}")
 
     # =============================
     # Sessions API
@@ -562,10 +831,103 @@ class MemoryStore:
             ).fetchone()
             return row.content if row else ""
 
+    def should_generate_summary(self, session_id, threshold=20):
+        """
+        Check if a summary should be generated for this session.
+        Returns True if:
+        - Session has more than threshold turns AND
+        - No summary exists OR summary is outdated (older than 10 turns)
+        """
+        with self.engine.begin() as conn:
+            # Count total turns
+            turn_count = conn.execute(
+                select(func.count())
+                .select_from(self.turns)
+                .where(self.turns.c.session_id == session_id)
+            ).scalar()
+
+            if turn_count < threshold:
+                return False
+
+            # Check if summary exists
+            summary_row = conn.execute(
+                select(self.summaries.c.created_at)
+                .where(self.summaries.c.session_id == session_id)
+                .order_by(self.summaries.c.created_at.desc())
+                .limit(1)
+            ).fetchone()
+
+            if not summary_row:
+                return True
+
+            # Count turns since last summary
+            turns_since_summary = conn.execute(
+                select(func.count())
+                .select_from(self.turns)
+                .where(
+                    and_(
+                        self.turns.c.session_id == session_id,
+                        self.turns.c.created_at > summary_row.created_at
+                    )
+                )
+            ).scalar()
+
+            # Generate new summary if 10+ new turns
+            return turns_since_summary >= 10
+
+    def generate_auto_summary(self, session_id, provider_call):
+        """
+        Generate an automatic summary of the conversation.
+
+        Args:
+            session_id: The session to summarize
+            provider_call: A callable that takes (messages) and returns response text
+                          e.g., lambda msgs: provider.chat(msgs)["text"]
+
+        Returns:
+            The generated summary text, or None if generation failed
+        """
+        # Get all turns for this session
+        turns = self.get_recent_turns(session_id, limit=10000)
+
+        if len(turns) < 5:
+            return None  # Not enough content to summarize
+
+        # Build a prompt to summarize the conversation
+        summary_messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that summarizes conversations concisely. "
+                          "Capture the key topics, decisions, and important information. "
+                          "Keep it to 3-5 sentences."
+            }
+        ]
+
+        # Add conversation turns
+        conversation_text = []
+        for turn in turns:
+            role_label = "User" if turn["role"] == "user" else "Assistant"
+            conversation_text.append(f"{role_label}: {turn['content']}")
+
+        summary_messages.append({
+            "role": "user",
+            "content": f"Please summarize this conversation:\n\n" + "\n\n".join(conversation_text[:100])  # Limit to first 100 turns
+        })
+
+        try:
+            summary = provider_call(summary_messages)
+            if summary:
+                self.save_session_summary(session_id, summary)
+                logging.info(f"[MEMORY] Auto-generated summary for session {session_id}")
+                return summary
+        except Exception as e:
+            logging.error(f"[MEMORY] Failed to generate summary: {e}")
+            return None
+
     # =============================
     # Conversation turns API
     # =============================
-    def save_turn(self, session_id, role, content, created_at=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None):
         self._ensure_session(session_id)
 
         # Set session title from first user message (once)
@@ -588,6 +950,9 @@ class MemoryStore:
                     role=role,
                     content=content,
                     created_at=now,
+                    provider_id=provider_id,
+                    model=model,
+                    intent=intent,
                 )
             )
             conn.execute(
@@ -603,6 +968,9 @@ class MemoryStore:
                     self.turns.c.role,
                     self.turns.c.content,
                     self.turns.c.created_at,
+                    self.turns.c.provider_id,
+                    self.turns.c.model,
+                    self.turns.c.intent,
                 )
                 .where(self.turns.c.session_id == session_id)
                 .order_by(self.turns.c.created_at.desc())
@@ -615,6 +983,9 @@ class MemoryStore:
                     "role": r.role,
                     "content": r.content,
                     "created_at": r.created_at,
+                    "provider_id": r.provider_id,
+                    "model": r.model,
+                    "intent": r.intent,
                 }
                 for r in reversed(rows)
             ]
@@ -643,12 +1014,24 @@ class MemoryStore:
                 "content": f"Conversation summary so far:\n{summary}",
             })
 
-        # Recent turns (role + content only)
+        # Recent turns with timestamps for temporal context
         turns = self.get_recent_turns(session_id, limit=limit)
         for t in turns:
+            content = t["content"]
+
+            # Add timestamp context if available
+            if t.get("created_at"):
+                from datetime import datetime
+                created_at = t["created_at"]
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at)
+
+                time_str = created_at.strftime("%Y-%m-%d %H:%M UTC")
+                content = f"[{time_str}] {content}"
+
             messages.append({
                 "role": t["role"],
-                "content": t["content"],
+                "content": content,
             })
 
         return messages
@@ -710,6 +1093,192 @@ class MemoryStore:
             conn.execute(
                 delete(self.providers)
                 .where(self.providers.c.id == provider_id)
+            )
+
+    # =============================
+    # Step 3: Provider Intelligence API
+    # =============================
+    def init_provider_metadata(self, provider_id, cost_per_1k_input=0, cost_per_1k_output=0):
+        """
+        Initialize provider metadata with cost data.
+        Costs in micro-dollars (1/1,000,000 of $1).
+        """
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.provider_metadata.c.provider_id)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+
+            if not existing:
+                conn.execute(
+                    insert(self.provider_metadata).values(
+                        provider_id=provider_id,
+                        cost_per_1k_input_tokens=cost_per_1k_input,
+                        cost_per_1k_output_tokens=cost_per_1k_output,
+                        avg_latency_ms=0,
+                        total_requests=0,
+                        failed_requests=0,
+                        health_status="unknown",
+                        circuit_breaker_open=False,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+
+    def get_provider_metadata(self, provider_id):
+        """Get metadata for a specific provider."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def get_all_provider_metadata(self):
+        """Get metadata for all providers."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.provider_metadata)).fetchall()
+            return {row.provider_id: dict(row._mapping) for row in rows}
+
+    def log_request(self, session_id, provider_id, intent, success, latency_ms,
+                   input_tokens=0, output_tokens=0, estimated_cost=0, error_message=None):
+        """
+        Log a provider request for analytics and health tracking.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.request_logs).values(
+                    session_id=session_id,
+                    provider_id=provider_id,
+                    intent=intent,
+                    success=success,
+                    latency_ms=latency_ms,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    estimated_cost=estimated_cost,
+                    error_message=error_message,
+                    created_at=datetime.utcnow(),
+                )
+            )
+
+    def update_provider_health(self, provider_id, success, latency_ms=None):
+        """
+        Update provider health metrics based on request outcome.
+        """
+        with self.engine.begin() as conn:
+            # Get current metadata
+            metadata = conn.execute(
+                select(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+
+            if not metadata:
+                # Initialize if doesn't exist
+                self.init_provider_metadata(provider_id)
+                metadata = conn.execute(
+                    select(self.provider_metadata)
+                    .where(self.provider_metadata.c.provider_id == provider_id)
+                ).fetchone()
+
+            now = datetime.utcnow()
+            total = metadata.total_requests + 1
+            failed = metadata.failed_requests + (0 if success else 1)
+
+            # Calculate rolling average latency
+            if latency_ms and success:
+                current_avg = metadata.avg_latency_ms or 0
+                current_count = metadata.total_requests
+                new_avg = ((current_avg * current_count) + latency_ms) / total
+            else:
+                new_avg = metadata.avg_latency_ms
+
+            # Determine health status
+            failure_rate = failed / total if total > 0 else 0
+
+            if total < 5:
+                health_status = "unknown"
+            elif failure_rate > 0.5:
+                health_status = "unhealthy"
+            elif failure_rate > 0.2:
+                health_status = "degraded"
+            else:
+                health_status = "healthy"
+
+            # Circuit breaker logic: open if 5+ consecutive failures
+            recent_failures = conn.execute(
+                select(func.count(self.request_logs.c.id))
+                .where(self.request_logs.c.provider_id == provider_id)
+                .where(self.request_logs.c.success == False)
+                .order_by(self.request_logs.c.created_at.desc())
+                .limit(5)
+            ).scalar()
+
+            circuit_breaker_open = recent_failures >= 5
+
+            conn.execute(
+                update(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+                .values(
+                    total_requests=total,
+                    failed_requests=failed,
+                    avg_latency_ms=int(new_avg),
+                    last_success_at=now if success else metadata.last_success_at,
+                    last_failure_at=now if not success else metadata.last_failure_at,
+                    health_status=health_status,
+                    circuit_breaker_open=circuit_breaker_open,
+                    updated_at=now,
+                )
+            )
+
+    def get_provider_health_summary(self):
+        """
+        Get health summary for all providers.
+        """
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.provider_metadata)).fetchall()
+
+            summary = {}
+            for row in rows:
+                failure_rate = row.failed_requests / row.total_requests if row.total_requests > 0 else 0
+                summary[row.provider_id] = {
+                    "health_status": row.health_status,
+                    "circuit_breaker_open": row.circuit_breaker_open,
+                    "total_requests": row.total_requests,
+                    "failure_rate": round(failure_rate * 100, 2),
+                    "avg_latency_ms": row.avg_latency_ms,
+                    "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,
+                    "last_failure_at": row.last_failure_at.isoformat() if row.last_failure_at else None,
+                }
+
+            return summary
+
+    def estimate_cost(self, provider_id, input_tokens, output_tokens):
+        """
+        Estimate cost for a request in micro-dollars.
+        """
+        metadata = self.get_provider_metadata(provider_id)
+        if not metadata:
+            return 0
+
+        input_cost = (input_tokens / 1000) * metadata["cost_per_1k_input_tokens"]
+        output_cost = (output_tokens / 1000) * metadata["cost_per_1k_output_tokens"]
+
+        return int(input_cost + output_cost)
+
+    def delete_provider_metadata(self, provider_id):
+        """
+        Delete provider metadata and request logs when provider is removed.
+        """
+        with self.engine.begin() as conn:
+            # Delete metadata
+            conn.execute(
+                delete(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            )
+
+            # Delete request logs
+            conn.execute(
+                delete(self.request_logs)
+                .where(self.request_logs.c.provider_id == provider_id)
             )
     def set_last_provider(self, session_id, provider_id):
         with self.engine.begin() as conn:
