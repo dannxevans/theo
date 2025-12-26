@@ -39,8 +39,11 @@
 <div class="login-container">
   <div class="login-box">
     <div class="login-header">
-      <h1>THEO</h1>
-      <p>Personal AI Assistant</p>
+      <img
+        src="/logo.svg"
+        alt="THEO"
+        class="login-logo"
+      />
     </div>
 
     <form on:submit={handleLogin}>
@@ -67,6 +70,7 @@
           disabled={loading}
           autocomplete="current-password"
           required
+          on:keydown={(e) => e.key === 'Enter' && handleLogin(e)}
         />
       </div>
 
@@ -82,7 +86,7 @@
     </form>
 
     <div class="login-footer">
-      <p class="hint-secondary">Secure your personal AI assistant</p>
+      <p class="hint-secondary">Multi-Modal Artificial Intelligence Project</p>
     </div>
   </div>
 </div>
@@ -103,12 +107,18 @@
     box-shadow: var(--shadow-xl);
     padding: var(--space-8);
     width: 100%;
-    max-width: 420px;
+    max-width: 400px;
   }
 
   .login-header {
     text-align: center;
     margin-bottom: var(--space-6);
+  }
+
+  .login-logo {
+    text-align: center;
+    height: 60px;
+    width: auto;
   }
 
   .login-header h1 {
@@ -138,6 +148,7 @@
 
   .form-group input {
     width: 100%;
+    box-sizing: border-box;
     padding: var(--space-3);
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
