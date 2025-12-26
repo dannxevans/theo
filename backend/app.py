@@ -524,6 +524,71 @@ def fork_session(session_id):
         "messages_copied": len(turns_to_copy)
     })
 
+@app.route("/api/sessions/<session_id>/generate-title", methods=["POST"])
+def generate_session_title(session_id):
+    """
+    Generate an AI-powered title for a session based on its first few messages.
+    Returns: { "title": "Generated title" }
+    """
+    # Get first few turns to understand the conversation topic
+    turns = memory.get_recent_turns(session_id, limit=6)
+
+    if not turns or len(turns) == 0:
+        return jsonify({"title": "New chat"}), 200
+
+    # Build a concise summary of the conversation start
+    conversation_text = ""
+    for turn in turns[:4]:  # Use first 2 exchanges (4 turns max)
+        role = "User" if turn["role"] == "user" else "Assistant"
+        content = turn["content"][:200]  # Limit content length
+        conversation_text += f"{role}: {content}\n"
+
+    # Use a provider to generate the title
+    try:
+        # Build minimal context for title generation
+        title_prompt = f"""Based on this conversation, generate a short, descriptive title (maximum 6 words).
+Only respond with the title, nothing else.
+
+Conversation:
+{conversation_text}
+
+Title:"""
+
+        router_context = {
+            "text": title_prompt,
+            "session_id": session_id,
+            "memory": memory,
+            "forced_provider": None  # Let router pick best provider
+        }
+
+        result = route_request(router_context)
+        generated_title = result.get("text", "New chat").strip()
+
+        # Clean up the title
+        # Remove quotes if present
+        generated_title = generated_title.strip('"').strip("'").strip()
+        # Limit length
+        if len(generated_title) > 60:
+            generated_title = generated_title[:57] + "..."
+
+        # Save the title
+        memory.save_session_title(session_id, generated_title)
+
+        return jsonify({"title": generated_title})
+
+    except Exception as e:
+        logging.error(f"Failed to generate title: {e}")
+        # Fallback to first user message as title
+        first_user = next((t for t in turns if t["role"] == "user"), None)
+        if first_user:
+            fallback_title = first_user["content"][:60]
+            if len(first_user["content"]) > 60:
+                fallback_title += "..."
+            memory.save_session_title(session_id, fallback_title)
+            return jsonify({"title": fallback_title})
+
+        return jsonify({"title": "New chat"})
+
 # Provider Management APIs
 
 @app.route("/api/providers", methods=["GET"])

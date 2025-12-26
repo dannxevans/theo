@@ -742,7 +742,7 @@
       <div class="tab-panel">
         <div class="memory-header">
           <h2>Memory</h2>
-          <button class="btn-add" on:click={() => showAddMemoryForm = !showAddMemoryForm}>
+          <button class="{showAddMemoryForm ? 'btn-secondary' : 'btn-primary'}" on:click={() => showAddMemoryForm = !showAddMemoryForm}>
             {showAddMemoryForm ? "Cancel" : "+ Add Memory"}
           </button>
         </div>
@@ -1011,8 +1011,6 @@
 <style>
   .settings {
     padding: 0;
-    max-width: 1200px;
-    margin: 0 auto;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1315,21 +1313,6 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--space-6);
-  }
-
-  .btn-add {
-    padding: var(--space-2) var(--space-4);
-    background: var(--info-500);
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    transition: all 0.15s ease;
-  }
-
-  .btn-add:hover {
-    background: var(--info-600);
   }
 
   .add-form {

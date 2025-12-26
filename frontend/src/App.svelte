@@ -67,6 +67,18 @@ onMount(async () => {
     console.error("Failed to load sessions", err);
     sessions = [];
   }
+
+  // Listen for session title generation events
+  window.addEventListener("sessionTitleGenerated", async (e) => {
+    const { sessionId, title } = e.detail;
+    // Refresh sessions list to show new title
+    try {
+      const updatedSessions = await getSessions();
+      sessions = updatedSessions.filter(hasContent);
+    } catch (err) {
+      console.error("Failed to refresh sessions after title generation:", err);
+    }
+  });
 });
 
   function selectSession(id) {
