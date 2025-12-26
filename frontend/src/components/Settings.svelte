@@ -1338,11 +1338,11 @@
   .form-row input[type="password"],
   .form-row select {
     width: 100%;
+    max-width: 100%;
     padding: var(--space-2);
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
-    min-height: 40px;
   }
 
   .form-row input[type="checkbox"] {
