@@ -56,6 +56,10 @@ CORS(
 def health():
     return {"status": "ok", "service": "THEO-Backend"} , 200
 
+# Initialize database backup/restore (before creating MemoryStore)
+from db_backup import init_database_backup
+backup_manager = init_database_backup()
+
 memory = MemoryStore(Config.DATABASE_URL)
 context_manager = ContextManager(memory)
 provider_registry = ProviderRegistry(memory)
