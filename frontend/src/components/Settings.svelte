@@ -1019,48 +1019,48 @@
   }
 
   h1 {
-    padding: 20px 24px;
+    padding: var(--space-5) var(--space-6);
     margin: 0;
-    border-bottom: 1px solid #dee2e6;
-    background: #f8f9fa;
-    font-size: 24px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    font-size: var(--font-size-2xl);
   }
 
   .tabs {
     display: flex;
-    background: #f8f9fa;
-    border-bottom: 2px solid #dee2e6;
-    padding: 0 24px;
-    gap: 4px;
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+    padding: 0 var(--space-6);
+    gap: var(--space-1);
   }
 
   .tab {
-    padding: 12px 24px;
+    padding: var(--space-3) var(--space-6);
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
-    color: #6c757d;
+    color: var(--gray-500);
     border-bottom: 3px solid transparent;
     transition: all 0.2s;
   }
 
   .tab:hover {
-    color: #495057;
+    color: var(--gray-700);
     background: rgba(0, 0, 0, 0.03);
   }
 
   .tab.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: var(--info-500);
+    border-bottom-color: var(--info-500);
     background: white;
   }
 
   .tab-content {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: var(--space-6);
   }
 
   .tab-panel {
@@ -1070,20 +1070,20 @@
 
   h2 {
     margin-top: 0;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
 
   .subtitle {
-    color: #666;
-    font-size: 14px;
-    margin-bottom: 16px;
+    color: var(--gray-600);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-4);
   }
 
   .rule {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
   }
 
   label {
@@ -1093,9 +1093,9 @@
 
   select {
     flex: 1;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: var(--space-2);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
   }
 
   input[type="checkbox"] {
@@ -1103,79 +1103,42 @@
     cursor: pointer;
   }
 
+  /* Button overrides for Settings context - these buttons already inherit from global styles */
   .btn-primary {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-bottom: 16px;
-  }
-
-  .btn-primary:hover {
-    background: #0056b3;
-  }
-
-  .btn-secondary {
-    background: #6c757d;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-secondary:hover {
-    background: #5a6268;
-  }
-
-  .btn-small {
-    padding: 4px 12px;
-    font-size: 12px;
-    border: 1px solid #ccc;
-    background: white;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  .btn-small:hover {
-    background: #f0f0f0;
+    margin-bottom: var(--space-4);
   }
 
   .btn-small.btn-danger {
-    color: #dc3545;
-    border-color: #dc3545;
+    color: var(--error-500);
+    border-color: var(--error-500);
   }
 
   .btn-small.btn-danger:hover {
-    background: #dc3545;
+    background: var(--error-500);
     color: white;
   }
 
   .intent-form {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
   }
 
   .intent-form h3 {
     margin-top: 0;
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
   }
 
   .form-group {
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
   }
 
   .form-group label {
     display: block;
     width: auto;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     font-weight: 600;
   }
 
@@ -1183,167 +1146,167 @@
   .form-group input[type="number"],
   .form-group textarea {
     width: 100%;
-    padding: 8px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    padding: var(--space-2);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
     font-family: inherit;
   }
 
   .form-group small {
     display: block;
-    color: #6c757d;
-    font-size: 12px;
-    margin-top: 4px;
+    color: var(--gray-500);
+    font-size: var(--font-size-xs);
+    margin-top: var(--space-1);
   }
 
   .form-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 20px;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
   }
 
   .intents-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
   }
 
   .intent-card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 16px;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     background: white;
   }
 
   .intent-card.disabled {
     opacity: 0.6;
-    background: #f8f9fa;
+    background: var(--gray-50);
   }
 
   .intent-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
   }
 
   .intent-info h4 {
-    margin: 0 0 4px 0;
+    margin: 0 0 var(--space-1) 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .intent-id {
-    color: #6c757d;
-    font-size: 14px;
+    color: var(--gray-500);
+    font-size: var(--font-size-sm);
     font-weight: normal;
   }
 
   .badge-disabled {
-    background: #dc3545;
+    background: var(--error-500);
     color: white;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
     font-weight: normal;
   }
 
   .intent-description {
     margin: 0;
-    color: #666;
-    font-size: 14px;
+    color: var(--gray-600);
+    font-size: var(--font-size-sm);
   }
 
   .intent-priority {
-    background: #e9ecef;
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-size: 12px;
+    background: var(--gray-100);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
     font-weight: 600;
-    color: #495057;
+    color: var(--gray-700);
   }
 
   .intent-keywords {
-    background: #f8f9fa;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 13px;
-    margin-bottom: 12px;
+    background: var(--gray-50);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-3);
   }
 
   .intent-keywords.empty {
     font-style: italic;
-    color: #6c757d;
+    color: var(--gray-500);
   }
 
   .intent-keywords strong {
-    color: #495057;
+    color: var(--gray-700);
   }
 
   .intent-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .system-prompt-form {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
   }
 
   .save-status {
-    margin-top: 12px;
-    padding: 10px 16px;
-    border-radius: 4px;
-    font-size: 14px;
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
   }
 
   .save-status.success {
-    background: #d4edda;
+    background: var(--success-50);
     color: #155724;
-    border: 1px solid #c3e6cb;
+    border: 1px solid var(--success-500);
   }
 
   .save-status.error {
-    background: #f8d7da;
+    background: var(--error-50);
     color: #721c24;
-    border: 1px solid #f5c6cb;
+    border: 1px solid var(--error-500);
   }
 
   .memory-form {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
   }
 
   .memory-help {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 8px;
-    padding: 20px;
+    background: var(--warning-50);
+    border: 1px solid var(--warning-500);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
   }
 
   .memory-help h3 {
     margin-top: 0;
-    margin-bottom: 12px;
-    font-size: 16px;
+    margin-bottom: var(--space-3);
+    font-size: var(--font-size-base);
     color: #856404;
   }
 
   .memory-help ul {
     margin: 0;
-    padding-left: 20px;
+    padding-left: var(--space-5);
     color: #856404;
   }
 
   .memory-help li {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
 
   /* Memory component styles */
@@ -1351,206 +1314,207 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
   }
 
   .btn-add {
-    padding: 0.5rem 1rem;
-    background: #3b82f6;
+    padding: var(--space-2) var(--space-4);
+    background: var(--info-500);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
+    transition: all 0.15s ease;
   }
 
   .btn-add:hover {
-    background: #2563eb;
+    background: var(--info-600);
   }
 
   .add-form {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
   }
 
   .form-row {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   .form-row label {
     display: block;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     font-weight: 500;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-1);
   }
 
   .form-row input[type="text"],
   .form-row input[type="password"],
   .form-row select {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 0.875rem;
+    padding: var(--space-2);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
   }
 
   .form-row input[type="checkbox"] {
-    margin-right: 0.5rem;
+    margin-right: var(--space-2);
   }
 
   .filter-bar {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
     flex-wrap: wrap;
   }
 
   .filter-bar button {
-    padding: 0.5rem 1rem;
-    border: 1px solid #d1d5db;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--gray-300);
     background: white;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     transition: all 0.2s;
   }
 
   .filter-bar button:hover {
-    background: #f3f4f6;
+    background: var(--gray-100);
   }
 
   .filter-bar button.active {
-    background: #3b82f6;
+    background: var(--info-500);
     color: white;
-    border-color: #3b82f6;
+    border-color: var(--info-500);
   }
 
   .loading,
   .empty-state {
     text-align: center;
-    padding: 3rem 1rem;
-    color: #6b7280;
+    padding: var(--space-12) var(--space-4);
+    color: var(--gray-500);
   }
 
   .empty-state .hint {
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
+    font-size: var(--font-size-sm);
+    margin-top: var(--space-2);
     opacity: 0.7;
   }
 
   .memory-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .memory-item {
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     background: white;
     transition: box-shadow 0.2s;
   }
 
   .memory-item:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
   }
 
   .memory-item.pinned {
-    border-color: #fbbf24;
-    background: #fffbeb;
+    border-color: var(--warning-500);
+    background: var(--warning-50);
   }
 
   .memory-header-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
     flex-wrap: wrap;
   }
 
   .memory-type {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    font-size: var(--font-size-xs);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
     color: white;
     font-weight: 500;
     text-transform: uppercase;
   }
 
   .pin-badge {
-    font-size: 0.75rem;
-    color: #f59e0b;
+    font-size: var(--font-size-xs);
+    color: var(--warning-500);
     font-weight: 500;
   }
 
   .memory-score {
-    font-size: 0.75rem;
-    color: #6b7280;
+    font-size: var(--font-size-xs);
+    color: var(--gray-500);
     margin-left: auto;
   }
 
   .memory-content {
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-2);
     line-height: 1.5;
   }
 
   .memory-content strong {
-    color: #1f2937;
+    color: var(--gray-900);
   }
 
   .memory-meta {
-    font-size: 0.75rem;
-    color: #9ca3af;
+    font-size: var(--font-size-xs);
+    color: var(--gray-400);
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
     flex-wrap: wrap;
   }
 
   .memory-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .btn-pin,
   .btn-delete {
-    padding: 0.25rem 0.75rem;
-    font-size: 0.75rem;
-    border: 1px solid #d1d5db;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-xs);
+    border: 1px solid var(--gray-300);
     background: white;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .btn-pin:hover {
     background: #fef3c7;
-    border-color: #fbbf24;
+    border-color: var(--warning-500);
   }
 
   .btn-delete:hover {
-    background: #fee2e2;
-    border-color: #f87171;
-    color: #dc2626;
+    background: var(--error-50);
+    border-color: var(--error-500);
+    color: var(--error-600);
   }
 
   /* Provider component styles */
   .providers-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    margin-top: 1.5rem;
+    gap: var(--space-4);
+    margin-top: var(--space-6);
   }
 
   .provider-card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     background: white;
   }
 
@@ -1558,40 +1522,40 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   .provider-header h3 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--font-size-lg);
   }
 
   .health-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
     color: white;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     font-weight: 500;
   }
 
   .provider-details {
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
+    margin-bottom: var(--space-4);
+    font-size: var(--font-size-sm);
   }
 
   .provider-details div {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-2);
   }
 
   .health-stats {
     display: flex;
-    gap: 1rem;
-    margin-top: 0.5rem;
-    color: #6b7280;
+    gap: var(--space-4);
+    margin-top: var(--space-2);
+    color: var(--gray-500);
   }
 
   .provider-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>
