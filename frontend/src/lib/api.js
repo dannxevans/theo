@@ -169,6 +169,125 @@ export async function getSessionMessages(sessionId) {
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 }
+
+export async function exportSession(sessionId, format = "json") {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/export?format=${format}`
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to export session");
+  }
+
+  // Trigger download
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `conversation_${sessionId}.${format === "markdown" ? "md" : "json"}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export async function forkSession(sessionId, turnIndex = null, title = null) {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/fork`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        turn_index: turnIndex,
+        title: title
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to fork session");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Intent Management API
+// =============================
+
+export async function getIntents() {
+  const response = await fetch(`${API_BASE}/api/intents`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load intents");
+  }
+
+  return response.json();
+}
+
+export async function getIntent(intentId) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load intent");
+  }
+
+  return response.json();
+}
+
+export async function createIntent(intent) {
+  const response = await fetch(`${API_BASE}/api/intents`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(intent)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to create intent");
+  }
+
+  return response.json();
+}
+
+export async function updateIntent(intentId, updates) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(updates)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update intent");
+  }
+
+  return response.json();
+}
+
+export async function deleteIntent(intentId) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete intent");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Routing Preferences API
 // =============================

@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from sqlalchemy import (
     create_engine,
     Column,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     insert,
     update,
     func,
+    and_,
 )
 from sqlalchemy.orm import sessionmaker
 
@@ -71,6 +73,23 @@ class MemoryStore:
             Column("created_at", DateTime, default=datetime.utcnow),
             Column("last_accessed_at", DateTime, default=datetime.utcnow),
             Column("access_count", Integer, default=0),
+        )
+
+        # =============================
+        # User-Defined Intents
+        # =============================
+        self.intents = Table(
+            "intents",
+            self.meta,
+            Column("id", String, primary_key=True),  # e.g., "coding", "creative"
+            Column("user_id", String, nullable=False),
+            Column("name", String, nullable=False),  # Display name
+            Column("description", Text, nullable=True),  # What this intent is for
+            Column("keywords", Text, nullable=False),  # Comma-separated keywords
+            Column("priority", Integer, default=0),  # Higher priority checked first
+            Column("enabled", Boolean, default=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
         )
 
         # =============================
@@ -171,6 +190,10 @@ class MemoryStore:
             Column("role", String, nullable=False),
             Column("content", Text, nullable=False),
             Column("created_at", DateTime, default=datetime.utcnow),
+            # Provider metadata for assistant messages
+            Column("provider_id", String, nullable=True),
+            Column("model", String, nullable=True),
+            Column("intent", String, nullable=True),
         )
 
         # =============================
@@ -467,6 +490,151 @@ class MemoryStore:
         self.set_routing_preference(user_id, intent, provider_id)
 
     # =============================
+    # User-Defined Intents API
+    # =============================
+    def list_intents(self, user_id):
+        """Get all intents for a user, ordered by priority (highest first)."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .order_by(self.intents.c.priority.desc(), self.intents.c.name)
+            ).fetchall()
+            return [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "description": r.description,
+                    "keywords": r.keywords,
+                    "priority": r.priority,
+                    "enabled": r.enabled,
+                    "created_at": r.created_at,
+                    "updated_at": r.updated_at,
+                }
+                for r in rows
+            ]
+
+    def get_intent(self, user_id, intent_id):
+        """Get a single intent by ID."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "keywords": row.keywords,
+                "priority": row.priority,
+                "enabled": row.enabled,
+                "created_at": row.created_at,
+                "updated_at": row.updated_at,
+            }
+
+    def create_intent(self, user_id, intent_id, name, description, keywords, priority=0, enabled=True):
+        """Create a new intent."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                insert(self.intents).values(
+                    id=intent_id,
+                    user_id=user_id,
+                    name=name,
+                    description=description,
+                    keywords=keywords,
+                    priority=priority,
+                    enabled=enabled,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+    def update_intent(self, user_id, intent_id, **updates):
+        """Update an existing intent."""
+        updates["updated_at"] = datetime.utcnow()
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+                .values(**updates)
+            )
+
+    def delete_intent(self, user_id, intent_id):
+        """Delete an intent and its routing preferences."""
+        with self.engine.begin() as conn:
+            # Delete routing preferences first
+            conn.execute(
+                delete(self.routing_preferences)
+                .where(self.routing_preferences.c.user_id == user_id)
+                .where(self.routing_preferences.c.intent == intent_id)
+            )
+            # Delete intent
+            conn.execute(
+                delete(self.intents)
+                .where(self.intents.c.user_id == user_id)
+                .where(self.intents.c.id == intent_id)
+            )
+
+    def seed_default_intents(self, user_id):
+        """Seed default intents if none exist for the user."""
+        existing = self.list_intents(user_id)
+        if existing:
+            return  # Already has intents
+
+        default_intents = [
+            {
+                "id": "coding",
+                "name": "Coding",
+                "description": "Programming, debugging, code review, and technical tasks",
+                "keywords": "code,coding,script,function,python,javascript,js,api,bug,error,debug,programming,software,class,method,variable",
+                "priority": 90,
+            },
+            {
+                "id": "reasoning",
+                "name": "Reasoning",
+                "description": "Deep analysis, explanations, and logical thinking",
+                "keywords": "why,how does,explain,analyze,analysis,reasoning,logic,understand,think,consider,evaluate",
+                "priority": 80,
+            },
+            {
+                "id": "planning",
+                "name": "Planning",
+                "description": "Project planning, organization, and structured approaches",
+                "keywords": "plan,planning,roadmap,schedule,organize,design,steps,approach,strategy,structure",
+                "priority": 70,
+            },
+            {
+                "id": "creative",
+                "name": "Creative",
+                "description": "Creative writing, storytelling, and artistic content",
+                "keywords": "write,story,poem,creative,imagine,fiction,lyrics,novel,character,narrative",
+                "priority": 60,
+            },
+            {
+                "id": "general",
+                "name": "General",
+                "description": "General questions and conversations",
+                "keywords": "",  # Empty keywords - catches everything else
+                "priority": 0,  # Lowest priority - fallback
+            },
+        ]
+
+        for intent in default_intents:
+            self.create_intent(
+                user_id=user_id,
+                intent_id=intent["id"],
+                name=intent["name"],
+                description=intent["description"],
+                keywords=intent["keywords"],
+                priority=intent["priority"],
+            )
+        logging.info(f"[MEMORY] Seeded {len(default_intents)} default intents for user {user_id}")
+
+    # =============================
     # Sessions API
     # =============================
     def _ensure_session(self, session_id):
@@ -597,10 +765,103 @@ class MemoryStore:
             ).fetchone()
             return row.content if row else ""
 
+    def should_generate_summary(self, session_id, threshold=20):
+        """
+        Check if a summary should be generated for this session.
+        Returns True if:
+        - Session has more than threshold turns AND
+        - No summary exists OR summary is outdated (older than 10 turns)
+        """
+        with self.engine.begin() as conn:
+            # Count total turns
+            turn_count = conn.execute(
+                select(func.count())
+                .select_from(self.turns)
+                .where(self.turns.c.session_id == session_id)
+            ).scalar()
+
+            if turn_count < threshold:
+                return False
+
+            # Check if summary exists
+            summary_row = conn.execute(
+                select(self.summaries.c.created_at)
+                .where(self.summaries.c.session_id == session_id)
+                .order_by(self.summaries.c.created_at.desc())
+                .limit(1)
+            ).fetchone()
+
+            if not summary_row:
+                return True
+
+            # Count turns since last summary
+            turns_since_summary = conn.execute(
+                select(func.count())
+                .select_from(self.turns)
+                .where(
+                    and_(
+                        self.turns.c.session_id == session_id,
+                        self.turns.c.created_at > summary_row.created_at
+                    )
+                )
+            ).scalar()
+
+            # Generate new summary if 10+ new turns
+            return turns_since_summary >= 10
+
+    def generate_auto_summary(self, session_id, provider_call):
+        """
+        Generate an automatic summary of the conversation.
+
+        Args:
+            session_id: The session to summarize
+            provider_call: A callable that takes (messages) and returns response text
+                          e.g., lambda msgs: provider.chat(msgs)["text"]
+
+        Returns:
+            The generated summary text, or None if generation failed
+        """
+        # Get all turns for this session
+        turns = self.get_recent_turns(session_id, limit=10000)
+
+        if len(turns) < 5:
+            return None  # Not enough content to summarize
+
+        # Build a prompt to summarize the conversation
+        summary_messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that summarizes conversations concisely. "
+                          "Capture the key topics, decisions, and important information. "
+                          "Keep it to 3-5 sentences."
+            }
+        ]
+
+        # Add conversation turns
+        conversation_text = []
+        for turn in turns:
+            role_label = "User" if turn["role"] == "user" else "Assistant"
+            conversation_text.append(f"{role_label}: {turn['content']}")
+
+        summary_messages.append({
+            "role": "user",
+            "content": f"Please summarize this conversation:\n\n" + "\n\n".join(conversation_text[:100])  # Limit to first 100 turns
+        })
+
+        try:
+            summary = provider_call(summary_messages)
+            if summary:
+                self.save_session_summary(session_id, summary)
+                logging.info(f"[MEMORY] Auto-generated summary for session {session_id}")
+                return summary
+        except Exception as e:
+            logging.error(f"[MEMORY] Failed to generate summary: {e}")
+            return None
+
     # =============================
     # Conversation turns API
     # =============================
-    def save_turn(self, session_id, role, content, created_at=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None):
         self._ensure_session(session_id)
 
         # Set session title from first user message (once)
@@ -623,6 +884,9 @@ class MemoryStore:
                     role=role,
                     content=content,
                     created_at=now,
+                    provider_id=provider_id,
+                    model=model,
+                    intent=intent,
                 )
             )
             conn.execute(
@@ -638,6 +902,9 @@ class MemoryStore:
                     self.turns.c.role,
                     self.turns.c.content,
                     self.turns.c.created_at,
+                    self.turns.c.provider_id,
+                    self.turns.c.model,
+                    self.turns.c.intent,
                 )
                 .where(self.turns.c.session_id == session_id)
                 .order_by(self.turns.c.created_at.desc())
@@ -650,6 +917,9 @@ class MemoryStore:
                     "role": r.role,
                     "content": r.content,
                     "created_at": r.created_at,
+                    "provider_id": r.provider_id,
+                    "model": r.model,
+                    "intent": r.intent,
                 }
                 for r in reversed(rows)
             ]
@@ -678,12 +948,24 @@ class MemoryStore:
                 "content": f"Conversation summary so far:\n{summary}",
             })
 
-        # Recent turns (role + content only)
+        # Recent turns with timestamps for temporal context
         turns = self.get_recent_turns(session_id, limit=limit)
         for t in turns:
+            content = t["content"]
+
+            # Add timestamp context if available
+            if t.get("created_at"):
+                from datetime import datetime
+                created_at = t["created_at"]
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at)
+
+                time_str = created_at.strftime("%Y-%m-%d %H:%M UTC")
+                content = f"[{time_str}] {content}"
+
             messages.append({
                 "role": t["role"],
-                "content": t["content"],
+                "content": content,
             })
 
         return messages

@@ -12,7 +12,9 @@
   forgetMemory,
   deleteSessionApi,
   getSessionMessages,
-  getProviders
+  getProviders,
+  exportSession,
+  forkSession
 } from "../lib/api.js";
   import { marked } from "marked";
   import Prism from "prismjs";
@@ -158,7 +160,10 @@
 
       messages = turns.map(t => ({
         role: t.role,
-        text: t.content
+        text: t.content,
+        provider: t.provider,
+        model: t.model,
+        task_type: t.task_type
       }));
 
       await tick();
@@ -216,6 +221,25 @@
     // IMPORTANT: App.svelte owns session switching
     // Force a full reload so App.svelte reselects a session cleanly
     window.location.reload();
+  }
+
+  async function handleExport(format) {
+    try {
+      await exportSession(sessionId, format);
+    } catch (e) {
+      alert(`Failed to export: ${e.message}`);
+    }
+  }
+
+  async function handleFork() {
+    try {
+      const result = await forkSession(sessionId);
+      alert(`Conversation forked! New session ID: ${result.session_id}`);
+      // Reload to show the new session in the sidebar
+      window.location.reload();
+    } catch (e) {
+      alert(`Failed to fork: ${e.message}`);
+    }
   }
 
   async function submit() {
@@ -296,6 +320,15 @@
         <div class="session-actions">
           <button class="btn-secondary" on:click={() => showMemory = !showMemory}>
             Memory
+          </button>
+          <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
+            Export JSON
+          </button>
+          <button class="btn-secondary" on:click={() => handleExport("markdown")} title="Export as Markdown">
+            Export MD
+          </button>
+          <button class="btn-secondary" on:click={handleFork} title="Fork this conversation">
+            Fork
           </button>
           <button class="btn-danger" on:click={deleteSession}>
             Delete

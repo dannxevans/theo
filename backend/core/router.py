@@ -54,43 +54,51 @@ def set_context_manager(manager: ContextManager):
     context_manager = manager
 
 
-def classify_intent(text: str) -> str:
+def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     """
-    Deterministic intent classification.
-    Order matters: more specific intents must win.
+    Dynamic intent classification based on user-defined intents.
+    Checks intents in priority order (highest first).
     """
     if not text:
         return "general"
 
+    # If no memory provided, fall back to general
+    if not memory:
+        return "general"
+
+    # Get user intents, ordered by priority
+    intents = memory.list_intents("local")
+
+    # Filter to enabled intents only
+    enabled_intents = [i for i in intents if i.get("enabled", True)]
+
+    if not enabled_intents:
+        return "general"  # No intents configured
+
     text_l = text.lower()
 
-    # Explicit coding / technical tasks
-    if any(k in text_l for k in [
-        "code", "coding", "script", "function",
-        "python", "javascript", "js", "api", "bug", "error"
-    ]):
-        return "coding"
+    # Check each intent's keywords in priority order
+    for intent in enabled_intents:
+        keywords = intent.get("keywords", "")
 
-    # Deep explanation / analysis
-    if any(k in text_l for k in [
-        "why", "how does", "explain", "analyze",
-        "analysis", "reasoning", "logic"
-    ]):
-        return "reasoning"
+        # Skip empty keywords (usually the "general" catch-all)
+        if not keywords or not keywords.strip():
+            continue
 
-    # Planning / structuring work
-    if any(k in text_l for k in [
-        "plan", "planning", "roadmap", "schedule",
-        "organize", "design", "steps", "approach"
-    ]):
-        return "planning"
+        # Split keywords by comma and check if any match
+        keyword_list = [k.strip().lower() for k in keywords.split(",") if k.strip()]
 
-    # Creative generation
-    if any(k in text_l for k in [
-        "write", "story", "poem", "creative",
-        "imagine", "fiction", "lyrics"
-    ]):
-        return "creative"
+        for keyword in keyword_list:
+            if keyword in text_l:
+                _debug(memory, f"Matched intent '{intent['id']}' via keyword '{keyword}'")
+                return intent["id"]
+
+    # If no keywords matched, return the lowest priority intent (usually "general")
+    # or fall back to "general" if no intents exist
+    fallback = enabled_intents[-1] if enabled_intents else None
+    if fallback:
+        _debug(memory, f"No keyword match, using fallback intent '{fallback['id']}'")
+        return fallback["id"]
 
     return "general"
 
@@ -378,7 +386,7 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
-    intent = classify_intent(text)
+    intent = classify_intent(text, memory)
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)

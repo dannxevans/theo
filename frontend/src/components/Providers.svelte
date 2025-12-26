@@ -133,7 +133,7 @@
   });
 </script>
 
-<div class="providers">
+<div class="providers providers-page">
   <h2>Providers</h2>
 
   {#if error}

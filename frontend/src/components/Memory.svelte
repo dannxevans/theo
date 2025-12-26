@@ -98,7 +98,7 @@
   }
 </script>
 
-<div class="memory-container">
+<div class="memory-container memory-page">
   <div class="memory-header">
     <h2>Memory</h2>
     <button class="btn-add" on:click={() => showAddForm = !showAddForm}>

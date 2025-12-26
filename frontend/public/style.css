@@ -695,6 +695,16 @@ h3 {
   overflow: hidden;
 }
 
+/* Scrollable wrapper for Settings, Providers, Memory pages */
+.settings,
+.providers-page,
+.memory-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  width: 100%;
+}
+
 .session-row {
   display: flex;
   align-items: center;
