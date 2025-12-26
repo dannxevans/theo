@@ -42,6 +42,7 @@
   let forcedModel = ""; // empty = automatic routing (model id)
   let providers = [];
   let advancedMode = false;
+  let usedProviders = new Set(); // Track providers used in this session
 
   import { onMount } from "svelte";
   onMount(async () => {
@@ -207,6 +208,13 @@
         created_at: t.created_at
       }));
 
+      // Track unique providers used in this session
+      usedProviders = new Set(
+        messages
+          .filter(m => m.provider)
+          .map(m => m.provider)
+      );
+
       await tick();
       scrollToBottom();
       enhanceCodeBlocks();
@@ -282,6 +290,11 @@
           scrollToBottom();
         },
         async onEnd(meta) {
+          // Add provider to used providers set
+          if (meta?.provider) {
+            usedProviders = new Set([...usedProviders, meta.provider]);
+          }
+
           messages = [
             ...messages,
             {
@@ -331,7 +344,13 @@
         <div class="session-title">
           <strong>Chat</strong>
           {#if forcedModel}
-            <span class="provider-badge">{forcedModel}</span>
+            <span class="provider-badge forced">Forced: {forcedModel}</span>
+          {:else if usedProviders.size > 0}
+            <span class="providers-used">
+              {#each [...usedProviders] as provider}
+                <span class="provider-badge">{provider}</span>
+              {/each}
+            </span>
           {/if}
         </div>
 

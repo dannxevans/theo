@@ -911,6 +911,19 @@ h3 {
     letter-spacing: 0.01em;
   }
 
+  .provider-badge.forced {
+    background: #fbbf24;
+    color: #78350f;
+    opacity: 1;
+  }
+
+  .providers-used {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+
 @media (min-width: 769px) {
   .chat,
   .chat-inner,
