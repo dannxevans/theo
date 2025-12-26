@@ -154,6 +154,9 @@ onMount(async () => {
         src="/logo.svg"
         alt="THEO"
         class="logo"
+        on:click={() => { showSettings = false; }}
+        style="cursor: pointer;"
+        title="Go to Chat"
       />
     </div>
 

@@ -27,6 +27,7 @@
   let intents = [];
   let rules = {};
   let debugEnabled = false;
+  let advancedMode = false;
   let loaded = false;
   let savingDebug = false;
 
@@ -90,6 +91,10 @@
     const flag = await getDebugFlag();
     debugEnabled = flag === true || flag === "true" || flag?.enabled === true;
 
+    // Load advanced mode from localStorage
+    const storedAdvanced = localStorage.getItem("theo.advancedMode");
+    advancedMode = storedAdvanced === "true";
+
     // Load system prompt config
     try {
       const config = await getSystemPromptConfig();
@@ -125,6 +130,13 @@
     await setDebugFlag(value);
     debugEnabled = value;
     savingDebug = false;
+  }
+
+  function toggleAdvancedMode(value) {
+    advancedMode = value;
+    localStorage.setItem("theo.advancedMode", value.toString());
+    // Dispatch event so Chat component can listen
+    window.dispatchEvent(new CustomEvent("advancedModeChanged", { detail: { enabled: value } }));
   }
 
   async function saveSystemPrompt() {
@@ -968,7 +980,7 @@
     {#if activeTab === "debug"}
       <div class="tab-panel">
         <h2>Debugging</h2>
-        <p class="subtitle">Enable debug logging for troubleshooting.</p>
+        <p class="subtitle">Enable debug logging and advanced features.</p>
 
         <div class="rule">
           <label>Debug logs</label>
@@ -978,6 +990,18 @@
             disabled={savingDebug}
             on:change={(e) => toggleDebug(e.target.checked)}
           />
+        </div>
+
+        <div class="rule">
+          <label>Advanced mode</label>
+          <input
+            type="checkbox"
+            checked={advancedMode}
+            on:change={(e) => toggleAdvancedMode(e.target.checked)}
+          />
+          <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+            Shows Export and Fork features in chat interface
+          </small>
         </div>
       </div>
     {/if}

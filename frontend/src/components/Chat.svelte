@@ -41,6 +41,7 @@
 
   let forcedModel = ""; // empty = automatic routing (model id)
   let providers = [];
+  let advancedMode = false;
 
   import { onMount } from "svelte";
   onMount(async () => {
@@ -53,6 +54,15 @@
     } catch (e) {
       // If fails, leave providers empty
     }
+
+    // Load advanced mode from localStorage
+    const storedAdvanced = localStorage.getItem("theo.advancedMode");
+    advancedMode = storedAdvanced === "true";
+
+    // Listen for advanced mode changes
+    window.addEventListener("advancedModeChanged", (e) => {
+      advancedMode = e.detail.enabled;
+    });
   });
 
   // Reload messages whenever session changes
@@ -326,15 +336,17 @@
         </div>
 
         <div class="session-actions">
-          <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
-            Export JSON
-          </button>
-          <button class="btn-secondary" on:click={() => handleExport("markdown")} title="Export as Markdown">
-            Export MD
-          </button>
-          <button class="btn-secondary" on:click={handleFork} title="Fork this conversation">
-            Fork
-          </button>
+          {#if advancedMode}
+            <button class="btn-secondary" on:click={() => handleExport("json")} title="Export as JSON">
+              Export JSON
+            </button>
+            <button class="btn-secondary" on:click={() => handleExport("markdown")} title="Export as Markdown">
+              Export MD
+            </button>
+            <button class="btn-secondary" on:click={handleFork} title="Fork this conversation">
+              Fork
+            </button>
+          {/if}
           <button class="btn-danger" on:click={deleteSession}>
             Delete
           </button>
@@ -343,6 +355,17 @@
 
       <div class="chat-main">
         <div class="messages">
+          {#if messages.length === 0 && !loading && !streaming}
+            <div class="message assistant">
+              <div class="bubble">
+                <div class="message-header">
+                  <strong>Theo</strong>
+                </div>
+                <div>Hello, what do you want to do today?</div>
+              </div>
+            </div>
+          {/if}
+
           {#each messages as m}
             <div class="message {m.role}">
               <div class="bubble">

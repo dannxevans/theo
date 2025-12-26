@@ -396,6 +396,20 @@ h3 {
    Hamburger button (desktop-first: hidden)
    ============================ */
 
+.hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #374151;
+}
+
+.hamburger:hover {
+  color: #111827;
+}
+
 .hamburger-btn {
   display: none;
 }
@@ -407,6 +421,12 @@ h3 {
 @media (max-width: 768px) {
 
   /* Allow hamburger only on mobile */
+  .hamburger {
+    display: inline-flex !important;
+    position: relative;
+    top: 0;
+  }
+
   .hamburger-btn {
     display: inline-flex !important;
     position: relative;
