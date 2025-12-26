@@ -62,6 +62,30 @@ class MemoryStore:
         )
 
         # =============================
+        # Mode Configuration (Work/Personal)
+        # =============================
+        self.user_mode_config = Table(
+            "user_mode_config",
+            self.meta,
+            Column("user_id", Integer, nullable=False, primary_key=True),
+            Column("active_mode", String, default="personal"),  # "work" or "personal"
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        self.mode_settings = Table(
+            "mode_settings",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False),
+            Column("mode", String, nullable=False),  # "work" or "personal"
+            Column("system_prompt_override", Text, nullable=True),
+            Column("preferred_provider_id", Integer, nullable=True),
+            Column("tone", String, default="neutral"),  # "professional", "casual", "neutral"
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Debug Settings
         # =============================
         self.debug_settings = Table(
@@ -1446,6 +1470,123 @@ class MemoryStore:
                 delete(self.auth_sessions)
                 .where(self.auth_sessions.c.id == session_id)
             )
+
+    # =============================
+    # Mode Management API
+    # =============================
+
+    def get_user_mode(self, user_id):
+        """Get user's active mode."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.user_mode_config)
+                .where(self.user_mode_config.c.user_id == user_id)
+            ).fetchone()
+
+            if row:
+                return dict(row._mapping)
+
+            # Create default if not exists
+            conn.execute(
+                insert(self.user_mode_config).values(
+                    user_id=user_id,
+                    active_mode="personal",
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            return {"user_id": user_id, "active_mode": "personal"}
+
+    def set_user_mode(self, user_id, mode):
+        """Set user's active mode."""
+        with self.engine.begin() as conn:
+            # Check if exists
+            existing = conn.execute(
+                select(self.user_mode_config)
+                .where(self.user_mode_config.c.user_id == user_id)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    update(self.user_mode_config)
+                    .where(self.user_mode_config.c.user_id == user_id)
+                    .values(
+                        active_mode=mode,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+            else:
+                conn.execute(
+                    insert(self.user_mode_config).values(
+                        user_id=user_id,
+                        active_mode=mode,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+
+    def get_mode_settings(self, user_id, mode):
+        """Get settings for a specific mode."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.mode_settings)
+                .where(self.mode_settings.c.user_id == user_id)
+                .where(self.mode_settings.c.mode == mode)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def create_or_update_mode_settings(self, user_id, mode, system_prompt_override=None,
+                                       preferred_provider_id=None, tone=None):
+        """Create or update mode settings."""
+        with self.engine.begin() as conn:
+            # Check if exists
+            existing = conn.execute(
+                select(self.mode_settings)
+                .where(self.mode_settings.c.user_id == user_id)
+                .where(self.mode_settings.c.mode == mode)
+            ).fetchone()
+
+            values = {
+                "updated_at": datetime.utcnow(),
+            }
+
+            if system_prompt_override is not None:
+                values["system_prompt_override"] = system_prompt_override
+            if preferred_provider_id is not None:
+                values["preferred_provider_id"] = preferred_provider_id
+            if tone is not None:
+                values["tone"] = tone
+
+            if existing:
+                conn.execute(
+                    update(self.mode_settings)
+                    .where(self.mode_settings.c.user_id == user_id)
+                    .where(self.mode_settings.c.mode == mode)
+                    .values(**values)
+                )
+            else:
+                values.update({
+                    "user_id": user_id,
+                    "mode": mode,
+                    "created_at": datetime.utcnow(),
+                })
+                if "system_prompt_override" not in values:
+                    values["system_prompt_override"] = None
+                if "preferred_provider_id" not in values:
+                    values["preferred_provider_id"] = None
+                if "tone" not in values:
+                    values["tone"] = "neutral"
+
+                conn.execute(
+                    insert(self.mode_settings).values(**values)
+                )
+
+    def get_all_mode_settings(self, user_id):
+        """Get all mode settings for a user."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.mode_settings)
+                .where(self.mode_settings.c.user_id == user_id)
+            ).fetchall()
+            return [dict(row._mapping) for row in rows]
 
     def cleanup_expired_sessions(self):
         """Remove expired authentication sessions."""

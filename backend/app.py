@@ -100,6 +100,15 @@ def stream_chat_sse(session_id):
 
     def event_stream():
         try:
+            # Get user from auth token
+            auth_header = request.headers.get("Authorization")
+            user_id = None
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                session = memory.get_auth_session(token)
+                if session and session["expires_at"] >= datetime.utcnow():
+                    user_id = session["user_id"]
+
             context = context_manager.build_context(session_id, text)
 
             router_context = dict(context)
@@ -108,6 +117,24 @@ def stream_chat_sse(session_id):
             router_context["memory"] = memory
             if forced_provider:
                 router_context["forced_provider"] = forced_provider
+
+            # Apply mode-specific settings if user is authenticated
+            if user_id:
+                mode_config = memory.get_user_mode(user_id)
+                current_mode = mode_config.get("active_mode", "personal")
+                mode_settings = memory.get_mode_settings(user_id, current_mode)
+
+                if mode_settings:
+                    # Apply system prompt override if configured
+                    if mode_settings.get("system_prompt_override"):
+                        router_context["system_prompt_override"] = mode_settings["system_prompt_override"]
+
+                    # Apply preferred provider if configured
+                    if mode_settings.get("preferred_provider_id") and not forced_provider:
+                        router_context["forced_provider"] = str(mode_settings["preferred_provider_id"])
+
+                    # Store mode for metadata
+                    router_context["active_mode"] = current_mode
 
             # Route request (non-streaming, we chunk manually)
             result = route_request(router_context)
@@ -845,6 +872,157 @@ def change_password():
     memory.update_user_password(user["id"], new_hash)
 
     return jsonify({"status": "ok"})
+
+
+# =============================
+# Mode Management Endpoints
+# =============================
+
+@app.route("/api/mode", methods=["GET"])
+def get_mode():
+    """Get user's current mode."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get mode
+    mode_config = memory.get_user_mode(user["id"])
+    return jsonify(mode_config)
+
+
+@app.route("/api/mode", methods=["POST"])
+def set_mode():
+    """Set user's current mode."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get requested mode
+    data = request.json
+    mode = data.get("mode")
+
+    if mode not in ["work", "personal"]:
+        return jsonify({"error": "Mode must be 'work' or 'personal'"}), 400
+
+    # Set mode
+    memory.set_user_mode(user["id"], mode)
+    return jsonify({"status": "ok", "mode": mode})
+
+
+@app.route("/api/mode/settings", methods=["GET"])
+def get_mode_settings_endpoint():
+    """Get all mode settings for the user."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get all mode settings
+    settings = memory.get_all_mode_settings(user["id"])
+    return jsonify(settings)
+
+
+@app.route("/api/mode/settings/<mode>", methods=["GET"])
+def get_mode_setting(mode):
+    """Get settings for a specific mode."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    if mode not in ["work", "personal"]:
+        return jsonify({"error": "Mode must be 'work' or 'personal'"}), 400
+
+    # Get mode settings
+    settings = memory.get_mode_settings(user["id"], mode)
+    return jsonify(settings if settings else {})
+
+
+@app.route("/api/mode/settings/<mode>", methods=["POST"])
+def update_mode_settings(mode):
+    """Update settings for a specific mode."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    if mode not in ["work", "personal"]:
+        return jsonify({"error": "Mode must be 'work' or 'personal'"}), 400
+
+    # Get settings from request
+    data = request.json
+    system_prompt_override = data.get("system_prompt_override")
+    preferred_provider_id = data.get("preferred_provider_id")
+    tone = data.get("tone")
+
+    # Update settings
+    memory.create_or_update_mode_settings(
+        user["id"],
+        mode,
+        system_prompt_override=system_prompt_override,
+        preferred_provider_id=preferred_provider_id,
+        tone=tone
+    )
+
+    return jsonify({"status": "ok"})
+
 
 def debug_log(message):
     try:

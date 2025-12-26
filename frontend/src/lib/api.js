@@ -650,3 +650,85 @@ export async function changePassword(currentPassword, newPassword) {
 
   return response.json();
 }
+
+// =============================
+// Mode Management
+// =============================
+
+export async function getUserMode() {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get user mode");
+  }
+
+  return response.json();
+}
+
+export async function setUserMode(mode) {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ mode })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to set mode");
+  }
+
+  return response.json();
+}
+
+export async function getAllModeSettings() {
+  const response = await fetch(`${API_BASE}/api/mode/settings`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function getModeSettings(mode) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function updateModeSettings(mode, settings) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(settings)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update mode settings");
+  }
+
+  return response.json();
+}

@@ -21,7 +21,10 @@
     createMemory,
     deleteMemory,
     pinMemory,
-    changePassword
+    changePassword,
+    getAllModeSettings,
+    getModeSettings,
+    updateModeSettings
   } from "../lib/api";
 
   let providers = [];
@@ -44,6 +47,22 @@
 
   // Active tab state
   let activeTab = "system-prompt";
+
+  // Mode configuration state
+  let workModeSettings = {
+    system_prompt_override: "",
+    preferred_provider_id: null,
+    tone: "professional"
+  };
+  let personalModeSettings = {
+    system_prompt_override: "",
+    preferred_provider_id: null,
+    tone: "casual"
+  };
+  let savingWorkMode = false;
+  let savingPersonalMode = false;
+  let workModeSaveStatus = null;
+  let personalModeSaveStatus = null;
 
   // Memory state
   let memories = [];
@@ -123,6 +142,29 @@
     await loadMemories();
     await loadProvidersList();
 
+    // Load mode settings
+    try {
+      const workSettings = await getModeSettings("work");
+      if (workSettings && Object.keys(workSettings).length > 0) {
+        workModeSettings = {
+          system_prompt_override: workSettings.system_prompt_override || "",
+          preferred_provider_id: workSettings.preferred_provider_id || null,
+          tone: workSettings.tone || "professional"
+        };
+      }
+
+      const personalSettings = await getModeSettings("personal");
+      if (personalSettings && Object.keys(personalSettings).length > 0) {
+        personalModeSettings = {
+          system_prompt_override: personalSettings.system_prompt_override || "",
+          preferred_provider_id: personalSettings.preferred_provider_id || null,
+          tone: personalSettings.tone || "casual"
+        };
+      }
+    } catch (e) {
+      console.warn("Failed to load mode settings:", e);
+    }
+
     loaded = true;
   }
 
@@ -196,6 +238,38 @@
       promptSaveStatus = `Error: ${e.message}`;
     } finally {
       savingPrompt = false;
+    }
+  }
+
+  async function saveWorkMode() {
+    try {
+      savingWorkMode = true;
+      workModeSaveStatus = null;
+      await updateModeSettings("work", workModeSettings);
+      workModeSaveStatus = "Work mode settings saved!";
+      setTimeout(() => {
+        workModeSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      workModeSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingWorkMode = false;
+    }
+  }
+
+  async function savePersonalMode() {
+    try {
+      savingPersonalMode = true;
+      personalModeSaveStatus = null;
+      await updateModeSettings("personal", personalModeSettings);
+      personalModeSaveStatus = "Personal mode settings saved!";
+      setTimeout(() => {
+        personalModeSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      personalModeSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingPersonalMode = false;
     }
   }
 
@@ -539,6 +613,13 @@
       on:click={() => activeTab = "debug"}
     >
       Debug
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === "modes"}
+      on:click={() => activeTab = "modes"}
+    >
+      Modes
     </button>
     <button
       class="tab"
@@ -1053,6 +1134,120 @@
           <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
             Shows Export and Fork features in chat interface
           </small>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Modes Tab -->
+    {#if activeTab === "modes"}
+      <div class="tab-panel">
+        <h2>Work & Personal Modes</h2>
+        <p class="subtitle">Configure different behavior and preferences for work and personal contexts.</p>
+
+        <!-- Work Mode Section -->
+        <div class="section">
+          <h3>💼 Work Mode</h3>
+          <p class="hint">Professional tone and optimized for productivity tasks</p>
+
+          <div class="form-group">
+            <label for="work-tone">Tone</label>
+            <select id="work-tone" bind:value={workModeSettings.tone}>
+              <option value="professional">Professional</option>
+              <option value="neutral">Neutral</option>
+              <option value="casual">Casual</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="work-provider">Preferred Provider (optional)</label>
+            <select id="work-provider" bind:value={workModeSettings.preferred_provider_id}>
+              <option value={null}>Auto-select based on intent</option>
+              {#each providers as provider}
+                {#if provider.enabled}
+                  <option value={provider.id}>{provider.name} ({provider.type})</option>
+                {/if}
+              {/each}
+            </select>
+            <p class="hint">Override automatic provider selection for this mode</p>
+          </div>
+
+          <div class="form-group">
+            <label for="work-prompt">Custom System Prompt Override (optional)</label>
+            <textarea
+              id="work-prompt"
+              bind:value={workModeSettings.system_prompt_override}
+              placeholder="Leave empty to use default system prompt. Add custom instructions specific to work mode here."
+              rows="6"
+            ></textarea>
+            <p class="hint">
+              This will replace the default system prompt when in work mode. Leave empty to use the standard configuration.
+            </p>
+          </div>
+
+          {#if workModeSaveStatus}
+            <div class="success-message">{workModeSaveStatus}</div>
+          {/if}
+
+          <button
+            class="btn-primary"
+            on:click={saveWorkMode}
+            disabled={savingWorkMode}
+          >
+            {savingWorkMode ? "Saving..." : "Save Work Mode Settings"}
+          </button>
+        </div>
+
+        <!-- Personal Mode Section -->
+        <div class="section">
+          <h3>🏠 Personal Mode</h3>
+          <p class="hint">Casual tone and optimized for general conversation</p>
+
+          <div class="form-group">
+            <label for="personal-tone">Tone</label>
+            <select id="personal-tone" bind:value={personalModeSettings.tone}>
+              <option value="casual">Casual</option>
+              <option value="neutral">Neutral</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="personal-provider">Preferred Provider (optional)</label>
+            <select id="personal-provider" bind:value={personalModeSettings.preferred_provider_id}>
+              <option value={null}>Auto-select based on intent</option>
+              {#each providers as provider}
+                {#if provider.enabled}
+                  <option value={provider.id}>{provider.name} ({provider.type})</option>
+                {/if}
+              {/each}
+            </select>
+            <p class="hint">Override automatic provider selection for this mode</p>
+          </div>
+
+          <div class="form-group">
+            <label for="personal-prompt">Custom System Prompt Override (optional)</label>
+            <textarea
+              id="personal-prompt"
+              bind:value={personalModeSettings.system_prompt_override}
+              placeholder="Leave empty to use default system prompt. Add custom instructions specific to personal mode here."
+              rows="6"
+            ></textarea>
+            <p class="hint">
+              This will replace the default system prompt when in personal mode. Leave empty to use the standard configuration.
+            </p>
+          </div>
+
+          {#if personalModeSaveStatus}
+            <div class="success-message">{personalModeSaveStatus}</div>
+          {/if}
+
+          <button
+            class="btn-primary"
+            on:click={savePersonalMode}
+            disabled={savingPersonalMode}
+          >
+            {savingPersonalMode ? "Saving..." : "Save Personal Mode Settings"}
+          </button>
         </div>
       </div>
     {/if}

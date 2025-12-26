@@ -7,11 +7,12 @@
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
   import Login from "./components/Login.svelte";
-  import { getSessions, deleteSessionApi, verifySession, logout } from "./lib/api.js";
+  import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode } from "./lib/api.js";
 
   let isAuthenticated = false;
   let currentUser = null;
   let showSettings = false;
+  let currentMode = "personal"; // "work" or "personal"
 
   // Mobile sidebar toggle state
   let sidebarOpen = false;
@@ -57,6 +58,7 @@ onMount(async () => {
       isAuthenticated = true;
       currentUser = result.user;
       await loadSessions();
+      await loadUserMode();
     }
   } catch (err) {
     console.error("Session verification failed", err);
@@ -99,10 +101,31 @@ async function loadSessions() {
   }
 }
 
+async function loadUserMode() {
+  try {
+    const modeConfig = await getUserMode();
+    currentMode = modeConfig.active_mode || "personal";
+  } catch (err) {
+    console.error("Failed to load user mode", err);
+    currentMode = "personal";
+  }
+}
+
+async function toggleMode() {
+  const newMode = currentMode === "work" ? "personal" : "work";
+  try {
+    await setUserMode(newMode);
+    currentMode = newMode;
+  } catch (err) {
+    console.error("Failed to switch mode", err);
+  }
+}
+
 function handleLogin(token, user) {
   isAuthenticated = true;
   currentUser = user;
   loadSessions();
+  loadUserMode();
 }
 
 async function handleLogout() {
@@ -214,6 +237,16 @@ async function handleLogout() {
     </div>
 
     <div class="header-right">
+      <button
+        class="btn-pill btn-mode"
+        class:mode-work={currentMode === "work"}
+        class:mode-personal={currentMode === "personal"}
+        on:click={toggleMode}
+        title={currentMode === "work" ? "Switch to Personal Mode" : "Switch to Work Mode"}
+      >
+        {currentMode === "work" ? "💼 Work" : "🏠 Personal"}
+      </button>
+
       <button
         class="btn-pill"
         class:active={!showSettings}
