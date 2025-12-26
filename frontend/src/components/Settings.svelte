@@ -68,6 +68,7 @@
     enabled: true
   };
   let showAddProviderForm = false;
+  let editingProvider = null;
   let providerError = null;
 
   // Intent editor state
@@ -378,16 +379,7 @@
 
     try {
       await upsertProvider(providerForm);
-      providerForm = {
-        id: "",
-        name: "",
-        type: "",
-        base_url: "",
-        model: "",
-        api_key: "",
-        enabled: true
-      };
-      showAddProviderForm = false;
+      cancelProviderForm();
       await loadProvidersList();
     } catch (e) {
       providerError = e.message;
@@ -405,6 +397,35 @@
     } catch (e) {
       alert(`Failed to delete provider: ${e.message}`);
     }
+  }
+
+  function editProvider(p) {
+    editingProvider = p.id;
+    providerForm = {
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      base_url: p.base_url || "",
+      model: p.model || "",
+      api_key: "", // never prefill secrets
+      enabled: p.enabled
+    };
+    showAddProviderForm = true;
+  }
+
+  function cancelProviderForm() {
+    showAddProviderForm = false;
+    editingProvider = null;
+    providerForm = {
+      id: "",
+      name: "",
+      type: "",
+      base_url: "",
+      model: "",
+      api_key: "",
+      enabled: true
+    };
+    providerError = null;
   }
 
   $: {
@@ -849,14 +870,22 @@
         <h2>Providers</h2>
         <p class="subtitle">Manage AI provider configurations and health status.</p>
 
-        <button class="btn-primary" on:click={() => {showAddProviderForm = !showAddProviderForm; loadProvidersList();}}>
+        <button class="btn-primary" on:click={() => {
+          if (showAddProviderForm) {
+            cancelProviderForm();
+          } else {
+            showAddProviderForm = true;
+            loadProvidersList();
+          }
+        }}>
           {showAddProviderForm ? "Cancel" : "+ Add Provider"}
         </button>
 
         {#if showAddProviderForm}
           <div class="add-form">
+            <h3>{editingProvider ? "Edit Provider" : "New Provider"}</h3>
             <div class="form-row">
-              <label>ID <input type="text" bind:value={providerForm.id} placeholder="e.g., anthropic-claude"/></label>
+              <label>ID <input type="text" bind:value={providerForm.id} placeholder="e.g., anthropic-claude" disabled={!!editingProvider}/></label>
             </div>
             <div class="form-row">
               <label>Name <input type="text" bind:value={providerForm.name} placeholder="e.g., Anthropic Claude"/></label>
@@ -885,8 +914,8 @@
               <label><input type="checkbox" bind:checked={providerForm.enabled}/> Enabled</label>
             </div>
             <div class="form-actions">
-              <button class="btn-primary" on:click={saveProvider}>Save</button>
-              <button class="btn-secondary" on:click={() => showAddProviderForm = false}>Cancel</button>
+              <button class="btn-primary" on:click={saveProvider}>{editingProvider ? "Update" : "Save"}</button>
+              <button class="btn-secondary" on:click={cancelProviderForm}>Cancel</button>
             </div>
             {#if providerError}
               <div class="save-status error">{providerError}</div>
@@ -920,6 +949,7 @@
                   {/if}
                 </div>
                 <div class="provider-actions">
+                  <button class="btn-small" on:click={() => editProvider(p)}>Edit</button>
                   <button class="btn-small btn-danger" on:click={() => handleDeleteProvider(p.id)}>Delete</button>
                 </div>
               </div>
