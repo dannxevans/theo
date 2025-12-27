@@ -273,6 +273,7 @@ class MemoryStore:
             Column("provider_id", String, nullable=True),
             Column("model", String, nullable=True),
             Column("intent", String, nullable=True),
+            Column("metadata", Text, nullable=True),  # JSON metadata for confirmations, etc.
         )
 
         # =============================
@@ -1117,7 +1118,9 @@ class MemoryStore:
     # =============================
     # Conversation turns API
     # =============================
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None):
+        import json
+        logging.info(f"[MEMORY] save_turn() called: session={session_id}, role={role}, has_metadata={metadata is not None}")
         self._ensure_session(session_id)
 
         # Set session title from first user message (once)
@@ -1132,8 +1135,20 @@ class MemoryStore:
                     title = content.strip().splitlines()[0][:60]
                     self.save_session_title(session_id, title)
 
+        # Serialize metadata to JSON if it's a dict
+        metadata_json = None
+        if metadata:
+            try:
+                metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else metadata
+                logging.info(f"[MEMORY] Serialized metadata to JSON, length={len(metadata_json)}")
+            except (TypeError, ValueError) as e:
+                logging.error(f"[MEMORY] Failed to serialize metadata to JSON: {e}")
+                logging.error(f"[MEMORY] Metadata content: {metadata}")
+                metadata_json = None
+
         now = created_at or datetime.utcnow()
         with self.engine.begin() as conn:
+            logging.info(f"[MEMORY] Inserting turn into database...")
             conn.execute(
                 insert(self.turns).values(
                     session_id=session_id,
@@ -1143,8 +1158,10 @@ class MemoryStore:
                     provider_id=provider_id,
                     model=model,
                     intent=intent,
+                    metadata=metadata_json,
                 )
             )
+            logging.info(f"[MEMORY] Turn inserted successfully")
             conn.execute(
                 update(self.sessions)
                 .where(self.sessions.c.id == session_id)
@@ -1152,6 +1169,7 @@ class MemoryStore:
             )
 
     def get_recent_turns(self, session_id, limit=6):
+        import json
         with self.engine.begin() as conn:
             rows = conn.execute(
                 select(
@@ -1161,6 +1179,7 @@ class MemoryStore:
                     self.turns.c.provider_id,
                     self.turns.c.model,
                     self.turns.c.intent,
+                    self.turns.c.metadata,
                 )
                 .where(self.turns.c.session_id == session_id)
                 .order_by(self.turns.c.created_at.desc())
@@ -1176,6 +1195,7 @@ class MemoryStore:
                     "provider_id": r.provider_id,
                     "model": r.model,
                     "intent": r.intent,
+                    "metadata": json.loads(r.metadata) if r.metadata else None,
                 }
                 for r in reversed(rows)
             ]
@@ -2127,3 +2147,45 @@ class MemoryStore:
     def get_action_by_id(self, action_id):
         """Get an action by ID (alias for get_action)."""
         return self.get_action(action_id)
+
+    def update_turn_metadata(self, session_id: str, confirmation_id: int, approved: bool):
+        """
+        Update the metadata of a turn to reflect approval/rejection status.
+
+        Args:
+            session_id: Session ID
+            confirmation_id: Confirmation ID to find the turn
+            approved: True if approved, False if rejected
+        """
+        import json
+
+        with self.engine.begin() as conn:
+            # Find the turn with this confirmation_id in metadata
+            rows = conn.execute(
+                select(
+                    self.turns.c.id,
+                    self.turns.c.metadata
+                )
+                .where(self.turns.c.session_id == session_id)
+                .where(self.turns.c.metadata.isnot(None))
+            ).fetchall()
+
+            for row in rows:
+                try:
+                    metadata = json.loads(row.metadata) if row.metadata else None
+                    if metadata and metadata.get('confirmation_id') == confirmation_id:
+                        # Update the metadata
+                        metadata['approved'] = approved
+                        metadata['rejected'] = not approved
+
+                        # Update the turn
+                        conn.execute(
+                            update(self.turns)
+                            .where(self.turns.c.id == row.id)
+                            .values(metadata=json.dumps(metadata))
+                        )
+                        logging.info(f"[MEMORY] Updated turn metadata for confirmation {confirmation_id}: approved={approved}")
+                        break
+                except (json.JSONDecodeError, KeyError) as e:
+                    logging.warning(f"[MEMORY] Failed to parse turn metadata: {e}")
+                    continue

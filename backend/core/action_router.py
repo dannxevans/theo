@@ -293,14 +293,23 @@ class ActionRouter:
                 expires_in_hours=24
             )
 
+            # Convert expires_at datetime to ISO string for JSON serialization
+            expires_at = confirmation.get("expires_at")
+            if expires_at and hasattr(expires_at, 'isoformat'):
+                expires_at = expires_at.isoformat()
+
             return {
-                "text": f"{confirmation_message}\n\nI've created a confirmation request. Please approve it in Settings → Integrations.",
+                "text": f"{confirmation_message}\n\nI've created a confirmation request.",
                 "provider": "action_router",
                 "task_type": "book_appointment",
                 "metadata": {
                     "confirmation_id": confirmation["confirmation_id"],
                     "action_id": confirmation["action_id"],
-                    "requires_confirmation": True
+                    "requires_confirmation": True,
+                    "confirmation_message": confirmation_message,
+                    "expires_at": expires_at,
+                    "action_type": "create_calendar_event",
+                    "action_category": "calendar"
                 }
             }
 

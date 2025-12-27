@@ -520,6 +520,7 @@ def get_session_messages(session_id):
             "provider": t.get("provider_id"),
             "model": t.get("model"),
             "task_type": t.get("intent"),
+            "metadata": t.get("metadata"),
         }
         for t in turns
     ])
@@ -687,7 +688,8 @@ Title:"""
             "text": title_prompt,
             "session_id": session_id,
             "memory": memory,
-            "forced_provider": None  # Let router pick best provider
+            "forced_provider": None,  # Let router pick best provider
+            "force_intent": "general"  # Force general intent to avoid action routing
         }
 
         result = route_request(router_context)
