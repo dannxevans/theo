@@ -333,6 +333,18 @@ class ConfirmationManager:
             confirmation_id, "rejected", responded_at=datetime.utcnow()
         )
 
+        # If this is a draft email, delete it
+        if action["action_type"] == "send_draft_email" and "draft_id" in action.get("action_params", {}):
+            try:
+                provider_id = action["provider_id"]
+                provider = self.action_registry.get_provider(provider_id)
+                if provider:
+                    draft_id = action["action_params"]["draft_id"]
+                    provider.delete_draft_email(draft_id=draft_id)
+                    logging.info(f"[CONFIRMATION] Deleted draft email {draft_id} after rejection")
+            except Exception as e:
+                logging.warning(f"[CONFIRMATION] Failed to delete draft email: {e}")
+
         # Cancel the action
         cancel_reason = f"User rejected: {reason}" if reason else "User rejected"
         self.memory.update_action_status(
@@ -424,6 +436,10 @@ class ConfirmationManager:
             result = provider.reply_email(**params)
         elif action_type == "draft_email":
             result = provider.draft_email(**params)
+        elif action_type == "send_draft_email":
+            result = provider.send_draft_email(**params)
+        elif action_type == "delete_draft_email":
+            result = provider.delete_draft_email(**params)
         else:
             raise Exception(f"Unsupported action type: {action_type}")
 
