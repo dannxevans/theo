@@ -748,22 +748,30 @@ class ActionRouter:
 
         logging.info(f"[ACTION_ROUTER] Searching for specific email with keywords: '{search_text}'")
 
-        # Search for matching email by subject or sender
+        # Search for matching email by subject, sender, or preview
         matching_email = None
         for email in emails:
             subject = email.get("subject", "").lower()
             sender = email.get("from", "").lower()
+            preview = email.get("preview", "").lower()
 
-            # Check if search terms appear in subject or sender
-            if search_text in subject or search_text in sender:
+            # Check if search terms appear in subject, sender, or preview
+            if search_text in subject or search_text in sender or search_text in preview:
                 matching_email = email
                 break
 
-            # Also check if individual words match
-            search_words = search_text.split()
-            if search_words and any(word in subject or word in sender for word in search_words if len(word) > 3):
-                matching_email = email
-                break
+            # Also check if individual words match (require at least 2 words to match)
+            search_words = [w for w in search_text.split() if len(w) > 3]
+            if len(search_words) >= 2:
+                matches = sum(1 for word in search_words if word in subject or word in sender or word in preview)
+                if matches >= 2:
+                    matching_email = email
+                    break
+            elif search_words:
+                # Single significant word - still check
+                if any(word in subject or word in sender or word in preview for word in search_words):
+                    matching_email = email
+                    break
 
         if not matching_email:
             return {

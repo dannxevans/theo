@@ -586,13 +586,15 @@ class M365Provider(ActionProvider):
             # Strip HTML tags if content type is HTML
             content_type = body_data.get("contentType", "")
             if content_type == "html":
-                # Simple HTML tag removal (could use a library like BeautifulSoup for more robust parsing)
                 import re
                 body_content = re.sub('<[^<]+?>', '', body_content)
                 body_content = body_content.replace('&nbsp;', ' ')
                 body_content = body_content.replace('&amp;', '&')
                 body_content = body_content.replace('&lt;', '<')
                 body_content = body_content.replace('&gt;', '>')
+
+            # Strip email signature/footer noise
+            body_content = self._strip_email_signature(body_content)
 
             logging.info(f"[M365] Fetched full body for email: {email_id}")
             return body_content.strip()
@@ -611,6 +613,59 @@ class M365Provider(ActionProvider):
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
         }
+
+    def _strip_email_signature(self, email_body: str) -> str:
+        """
+        Strip email signature and footer noise from email body.
+
+        Removes content after common signature markers like:
+        - Kind regards, / Best regards, / Regards, / Thanks,
+        - Sent from my iPhone / Sent from Outlook
+        - Long disclaimer blocks
+
+        Args:
+            email_body: Raw email body text
+
+        Returns:
+            Email body with signature stripped
+        """
+        import re
+
+        # Common signature markers (case insensitive)
+        signature_markers = [
+            r'(?i)\n\s*(kind\s+regards|best\s+regards|regards|thanks|thank\s+you|cheers|sincerely)[,\s]*\n',
+            r'(?i)\n\s*sent\s+from\s+(my\s+)?(iphone|android|outlook|mobile|blackberry)',
+            r'\n_{3,}',  # Horizontal lines (_____)
+            r'\n-{3,}',  # Horizontal lines (-----)
+        ]
+
+        # Find the earliest signature marker
+        earliest_match = None
+        earliest_pos = len(email_body)
+
+        for pattern in signature_markers:
+            match = re.search(pattern, email_body)
+            if match and match.start() < earliest_pos:
+                earliest_pos = match.start()
+                earliest_match = match
+
+        if earliest_match:
+            # Keep everything before the signature marker
+            email_body = email_body[:earliest_pos].strip()
+
+        # Remove common footer patterns that appear after the message
+        # (legal disclaimers, company info, etc.)
+        footer_patterns = [
+            r'\n\s*This\s+email.*?confidential.*',
+            r'\n\s*NOTICE:.*?(?:\n\n|\Z)',
+            r'\n\s*DISCLAIMER:.*?(?:\n\n|\Z)',
+            r'\n\s*The\s+information\s+contained.*?confidential.*',
+        ]
+
+        for pattern in footer_patterns:
+            email_body = re.sub(pattern, '', email_body, flags=re.DOTALL | re.IGNORECASE)
+
+        return email_body.strip()
 
     def _ensure_token_valid(self):
         """
