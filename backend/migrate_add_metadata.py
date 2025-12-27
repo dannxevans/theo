@@ -27,6 +27,8 @@ def migrate():
             columns_to_add.append('model')
         if 'intent' not in columns:
             columns_to_add.append('intent')
+        if 'metadata' not in columns:  # ADD THIS
+            columns_to_add.append('metadata')
 
         if not columns_to_add:
             print("✓ All columns already exist. No migration needed.")
