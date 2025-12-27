@@ -97,14 +97,14 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
                            "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
         "update_appointment": ["move", "reschedule", "change time", "update"],
         "cancel_appointment": ["cancel", "delete", "remove"],
-        "manage_email": ["send email", "draft email", "compose", "write email", "reply to"],
+        "compose_email": ["send email", "draft email", "compose", "write email", "reply to", "reply", "respond to"],
     }
 
     # Read-action keywords (lower priority)
     READ_ACTION_KEYWORDS = {
         "read_calendar": ["calendar", "availability", "available", "free", "busy",
                          "when am i", "what's on", "whats on", "schedule for"],
-        "manage_email": ["email", "inbox", "unread", "check email"],
+        "read_email": ["email", "inbox", "unread", "check email", "email summary"],
     }
 
     # First check for confirmation intents (approve/reject)
@@ -116,6 +116,8 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
                 if memory:
                     from core.confirmation_manager import ConfirmationManager
                     # We'll check for pending confirmations in the action router
+                    import logging
+                    logging.warning(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' in text: '{text[:100]}'")
                     _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
                     return confirmation_intent
 
@@ -470,7 +472,7 @@ def route_request(context: dict, stream: bool = False):
     # Action Intent Routing
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
-    ACTION_INTENTS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "manage_email", "approve_confirmation", "reject_confirmation"]
+    ACTION_INTENTS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "read_email", "compose_email", "approve_confirmation", "reject_confirmation"]
 
     if intent in ACTION_INTENTS:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")

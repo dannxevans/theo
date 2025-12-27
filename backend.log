@@ -1,0 +1,242 @@
+2025-12-27 14:40:22,997 INFO Database backups disabled (no S3 bucket configured)
+THEO backend starting on port 1066
+ * Serving Flask app 'app'
+ * Debug mode: on
+2025-12-27 14:40:23,036 INFO [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:1066
+ * Running on http://192.168.4.231:1066
+2025-12-27 14:40:23,036 INFO [33mPress CTRL+C to quit[0m
+2025-12-27 14:40:23,036 INFO  * Restarting with stat
+2025-12-27 14:40:23,253 INFO Database backups disabled (no S3 bucket configured)
+2025-12-27 14:40:23,287 WARNING  * Debugger is active!
+2025-12-27 14:40:23,291 INFO  * Debugger PIN: 945-218-331
+2025-12-27 14:40:27,901 INFO 127.0.0.1 - - [27/Dec/2025 14:40:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:40:37,893 INFO 127.0.0.1 - - [27/Dec/2025 14:40:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:40:47,889 INFO 127.0.0.1 - - [27/Dec/2025 14:40:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:40:55,083 INFO [AUTH] Authenticated user_id: 1
+2025-12-27 14:40:55,094 INFO [MODE] User 1 current_mode: personal
+2025-12-27 14:40:55,095 INFO [MODE] Set subtab_context_prefix for personal mode: IMPORTANT CONTEXT UPDATE: You are currently operating in PERSONAL mode. This is a casual, personal c
+2025-12-27 14:40:55,099 INFO [ACTION_ROUTER] Routing action request: compose_email
+2025-12-27 14:40:55,103 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:40:55,104 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:40:55,104 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:40:55,105 INFO [ACTION_ROUTER] Searching for email with subject: this is a test
+2025-12-27 14:40:55,392 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:40:55,393 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:40:55,393 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:40:56,546 INFO [ACTION_ROUTER] Generated reply body (218 chars)
+2025-12-27 14:40:56,550 INFO [CONFIRMATION] Created confirmation 63 for action 63 (user 1)
+2025-12-27 14:40:56,550 INFO 127.0.0.1 - - [27/Dec/2025 14:40:56] "GET /api/stream/44601cab-c37c-4644-bdb0-e7b29b47f01b?text=can+you+reply+to+the+email+'this+is+a+test'+with+details+about+what+I+have+going+on+this+week+in+my+calendar?&token=gGQuE22ks7cmdDJiLSDfqozmdRrIP6usfhfyuzu0Yw4 HTTP/1.1" 200 -
+2025-12-27 14:40:56,551 INFO [CONTEXT] update() called for session 44601cab-c37c-4644-bdb0-e7b29b47f01b
+2025-12-27 14:40:56,551 INFO [CONTEXT] Extracted metadata: {'confirmation_id': 63, 'action_id': 63, 'requires_confirmation': True, 'confirmation_message': "Reply to 'RE: This is a test email' from Danny.Black@redwhitesky.uk?", 'expires_at': '2025-12-28T14:40:56.549444', 'action_type': 'reply_email', 'action_category': 'email'}
+2025-12-27 14:40:56,552 INFO [CONTEXT] Storing user turn
+2025-12-27 14:40:56,552 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=user, has_metadata=False
+2025-12-27 14:40:56,553 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:40:56,554 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:40:56,554 INFO [CONTEXT] Storing assistant turn with metadata: True
+2025-12-27 14:40:56,554 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=assistant, has_metadata=True
+2025-12-27 14:40:56,554 INFO [MEMORY] Serialized metadata to JSON, length=269
+2025-12-27 14:40:56,554 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:40:56,555 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:40:56,555 INFO [CONTEXT] Turns stored successfully
+2025-12-27 14:40:56,563 INFO 127.0.0.1 - - [27/Dec/2025 14:40:56] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846456558 HTTP/1.1" 200 -
+2025-12-27 14:40:56,574 INFO 127.0.0.1 - - [27/Dec/2025 14:40:56] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:40:56,578 INFO 127.0.0.1 - - [27/Dec/2025 14:40:56] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:40:57,894 INFO 127.0.0.1 - - [27/Dec/2025 14:40:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:04,333 INFO [MEMORY] Updated turn metadata for confirmation 63: approved=True
+2025-12-27 14:41:04,333 INFO [CONFIRMATION] User 1 approved confirmation 63
+2025-12-27 14:41:04,333 INFO [CONFIRMATION] Executing action 63: reply_email
+2025-12-27 14:41:04,333 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:41:04,334 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:41:04,334 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:41:04,775 INFO [M365] Replied to email: AAMkADA2NWVmNmU2LTYwZWUtNGRmYi05NzQzLTAwYjFlMWI4NmFlZABGAAAAAACVwcWPNatHSKFUd0AmW383BwCg3ZZLXpmAQojNC11NZHYiAAAAAAEMAACg3ZZLXpmAQojNC11NZHYiAAHjQbPJAAA=
+2025-12-27 14:41:04,776 INFO [CONFIRMATION] Action 63 executed successfully
+2025-12-27 14:41:04,777 INFO 127.0.0.1 - - [27/Dec/2025 14:41:04] "POST /api/confirmations/63/approve HTTP/1.1" 200 -
+2025-12-27 14:41:04,783 INFO 127.0.0.1 - - [27/Dec/2025 14:41:04] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846464779 HTTP/1.1" 200 -
+2025-12-27 14:41:04,787 INFO 127.0.0.1 - - [27/Dec/2025 14:41:04] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:41:07,889 INFO 127.0.0.1 - - [27/Dec/2025 14:41:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:17,891 INFO 127.0.0.1 - - [27/Dec/2025 14:41:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:18,189 INFO [AUTH] Authenticated user_id: 1
+2025-12-27 14:41:18,191 INFO [MODE] User 1 current_mode: personal
+2025-12-27 14:41:18,192 INFO [MODE] Set subtab_context_prefix for personal mode: IMPORTANT CONTEXT UPDATE: You are currently operating in PERSONAL mode. This is a casual, personal c
+2025-12-27 14:41:18,193 INFO [ACTION_ROUTER] Routing action request: compose_email
+2025-12-27 14:41:18,193 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:41:18,193 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:41:18,193 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:41:18,193 INFO [ACTION_ROUTER] Searching for email with subject: this is a test
+2025-12-27 14:41:18,418 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:41:18,418 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:41:18,418 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:41:20,270 INFO [ACTION_ROUTER] Generated reply body (218 chars)
+2025-12-27 14:41:20,274 INFO [CONFIRMATION] Created confirmation 64 for action 64 (user 1)
+2025-12-27 14:41:20,275 INFO 127.0.0.1 - - [27/Dec/2025 14:41:20] "GET /api/stream/44601cab-c37c-4644-bdb0-e7b29b47f01b?text=can+you+reply+to+the+email+'this+is+a+test'+with+details+about+what+I+have+going+on+this+week+in+my+calendar?&token=gGQuE22ks7cmdDJiLSDfqozmdRrIP6usfhfyuzu0Yw4 HTTP/1.1" 200 -
+2025-12-27 14:41:20,275 INFO [CONTEXT] update() called for session 44601cab-c37c-4644-bdb0-e7b29b47f01b
+2025-12-27 14:41:20,275 INFO [CONTEXT] Extracted metadata: {'confirmation_id': 64, 'action_id': 64, 'requires_confirmation': True, 'confirmation_message': "Reply to 'RE: This is a test email' from Danny.Black@redwhitesky.uk?", 'expires_at': '2025-12-28T14:41:20.273311', 'action_type': 'reply_email', 'action_category': 'email'}
+2025-12-27 14:41:20,276 INFO [CONTEXT] Storing user turn
+2025-12-27 14:41:20,276 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=user, has_metadata=False
+2025-12-27 14:41:20,277 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:41:20,277 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:41:20,278 INFO [CONTEXT] Storing assistant turn with metadata: True
+2025-12-27 14:41:20,278 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=assistant, has_metadata=True
+2025-12-27 14:41:20,278 INFO [MEMORY] Serialized metadata to JSON, length=269
+2025-12-27 14:41:20,278 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:41:20,279 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:41:20,280 INFO [CONTEXT] Turns stored successfully
+2025-12-27 14:41:20,290 INFO 127.0.0.1 - - [27/Dec/2025 14:41:20] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846480284 HTTP/1.1" 200 -
+2025-12-27 14:41:20,298 INFO 127.0.0.1 - - [27/Dec/2025 14:41:20] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:41:20,301 INFO 127.0.0.1 - - [27/Dec/2025 14:41:20] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:41:27,896 INFO 127.0.0.1 - - [27/Dec/2025 14:41:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:28,430 INFO [MEMORY] Updated turn metadata for confirmation 64: approved=True
+2025-12-27 14:41:28,431 INFO [CONFIRMATION] User 1 approved confirmation 64
+2025-12-27 14:41:28,431 INFO [CONFIRMATION] Executing action 64: reply_email
+2025-12-27 14:41:28,431 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:41:28,431 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:41:28,431 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:41:28,803 INFO [M365] Replied to email: AAMkADA2NWVmNmU2LTYwZWUtNGRmYi05NzQzLTAwYjFlMWI4NmFlZABGAAAAAACVwcWPNatHSKFUd0AmW383BwCg3ZZLXpmAQojNC11NZHYiAAAAAAEMAACg3ZZLXpmAQojNC11NZHYiAAHjQbPKAAA=
+2025-12-27 14:41:28,809 INFO [CONFIRMATION] Action 64 executed successfully
+2025-12-27 14:41:28,809 INFO 127.0.0.1 - - [27/Dec/2025 14:41:28] "POST /api/confirmations/64/approve HTTP/1.1" 200 -
+2025-12-27 14:41:28,821 INFO 127.0.0.1 - - [27/Dec/2025 14:41:28] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846488812 HTTP/1.1" 200 -
+2025-12-27 14:41:28,830 INFO 127.0.0.1 - - [27/Dec/2025 14:41:28] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:41:37,889 INFO 127.0.0.1 - - [27/Dec/2025 14:41:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:47,889 INFO 127.0.0.1 - - [27/Dec/2025 14:41:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:41:57,888 INFO 127.0.0.1 - - [27/Dec/2025 14:41:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:07,893 INFO 127.0.0.1 - - [27/Dec/2025 14:42:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:17,888 INFO 127.0.0.1 - - [27/Dec/2025 14:42:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:27,890 INFO 127.0.0.1 - - [27/Dec/2025 14:42:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:37,455 INFO 127.0.0.1 - - [27/Dec/2025 14:42:37] "GET /api/providers HTTP/1.1" 200 -
+2025-12-27 14:42:37,456 INFO 127.0.0.1 - - [27/Dec/2025 14:42:37] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846557451 HTTP/1.1" 200 -
+2025-12-27 14:42:37,472 INFO 127.0.0.1 - - [27/Dec/2025 14:42:37] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:42:37,889 INFO 127.0.0.1 - - [27/Dec/2025 14:42:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:47,890 INFO 127.0.0.1 - - [27/Dec/2025 14:42:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:42:57,891 INFO 127.0.0.1 - - [27/Dec/2025 14:42:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:07,893 INFO 127.0.0.1 - - [27/Dec/2025 14:43:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:11,865 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/providers HTTP/1.1" 200 -
+2025-12-27 14:43:11,867 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/memories HTTP/1.1" 200 -
+2025-12-27 14:43:11,873 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/intents HTTP/1.1" 200 -
+2025-12-27 14:43:11,877 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/routing HTTP/1.1" 200 -
+2025-12-27 14:43:11,880 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/settings/debug HTTP/1.1" 200 -
+2025-12-27 14:43:11,883 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/settings/system-prompt HTTP/1.1" 200 -
+2025-12-27 14:43:11,885 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/memories HTTP/1.1" 200 -
+2025-12-27 14:43:11,888 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/providers HTTP/1.1" 200 -
+2025-12-27 14:43:11,890 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/providers/health HTTP/1.1" 200 -
+2025-12-27 14:43:11,893 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/mode/settings/work HTTP/1.1" 200 -
+2025-12-27 14:43:11,895 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/mode/settings/personal HTTP/1.1" 200 -
+2025-12-27 14:43:11,898 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/mode/work/subtab/code HTTP/1.1" 200 -
+2025-12-27 14:43:11,900 INFO 127.0.0.1 - - [27/Dec/2025 14:43:11] "GET /api/mode/work/subtab/email HTTP/1.1" 200 -
+2025-12-27 14:43:17,893 INFO 127.0.0.1 - - [27/Dec/2025 14:43:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:27,890 INFO 127.0.0.1 - - [27/Dec/2025 14:43:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:37,895 INFO 127.0.0.1 - - [27/Dec/2025 14:43:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:47,889 INFO 127.0.0.1 - - [27/Dec/2025 14:43:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:43:53,367 INFO 127.0.0.1 - - [27/Dec/2025 14:43:53] "GET /api/providers HTTP/1.1" 200 -
+2025-12-27 14:43:53,368 INFO 127.0.0.1 - - [27/Dec/2025 14:43:53] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846633363 HTTP/1.1" 200 -
+2025-12-27 14:43:53,378 INFO 127.0.0.1 - - [27/Dec/2025 14:43:53] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:43:57,888 INFO 127.0.0.1 - - [27/Dec/2025 14:43:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:07,889 INFO 127.0.0.1 - - [27/Dec/2025 14:44:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:08,614 INFO  * Detected change in '/Users/dannyblack/.claude-worktrees/theo/gallant-sinoussi/backend/core/action_router.py', reloading
+THEO backend starting on port 1066
+2025-12-27 14:44:08,656 INFO  * Restarting with stat
+2025-12-27 14:44:08,982 INFO Database backups disabled (no S3 bucket configured)
+2025-12-27 14:44:09,023 WARNING  * Debugger is active!
+2025-12-27 14:44:09,028 INFO  * Debugger PIN: 945-218-331
+2025-12-27 14:44:17,892 INFO 127.0.0.1 - - [27/Dec/2025 14:44:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:18,508 INFO  * Detected change in '/Users/dannyblack/.claude-worktrees/theo/gallant-sinoussi/backend/core/action_router.py', reloading
+THEO backend starting on port 1066
+2025-12-27 14:44:18,540 INFO  * Restarting with stat
+2025-12-27 14:44:18,843 INFO Database backups disabled (no S3 bucket configured)
+2025-12-27 14:44:18,880 WARNING  * Debugger is active!
+2025-12-27 14:44:18,884 INFO  * Debugger PIN: 945-218-331
+2025-12-27 14:44:27,904 INFO 127.0.0.1 - - [27/Dec/2025 14:44:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:37,892 INFO 127.0.0.1 - - [27/Dec/2025 14:44:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:40,685 INFO [AUTH] Authenticated user_id: 1
+2025-12-27 14:44:40,697 INFO [MODE] User 1 current_mode: personal
+2025-12-27 14:44:40,698 INFO [MODE] Set subtab_context_prefix for personal mode: IMPORTANT CONTEXT UPDATE: You are currently operating in PERSONAL mode. This is a casual, personal c
+2025-12-27 14:44:40,702 INFO [ACTION_ROUTER] Routing action request: compose_email
+2025-12-27 14:44:40,705 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:44:40,706 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:44:40,706 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:44:40,706 INFO [ACTION_ROUTER] Searching for email with subject: this is a test
+2025-12-27 14:44:40,942 WARNING [ACTION_ROUTER] Failed to fetch user name from facts: 'MemoryStore' object has no attribute 'get_facts'
+2025-12-27 14:44:40,944 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:44:40,944 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:44:40,944 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:44:43,045 INFO [ACTION_ROUTER] Generated reply body (210 chars)
+2025-12-27 14:44:43,053 INFO [CONFIRMATION] Created confirmation 65 for action 65 (user 1)
+2025-12-27 14:44:43,054 INFO 127.0.0.1 - - [27/Dec/2025 14:44:43] "GET /api/stream/44601cab-c37c-4644-bdb0-e7b29b47f01b?text=can+you+reply+to+the+email+'this+is+a+test'+with+details+about+what+I+have+going+on+this+week+in+my+calendar?&token=gGQuE22ks7cmdDJiLSDfqozmdRrIP6usfhfyuzu0Yw4 HTTP/1.1" 200 -
+2025-12-27 14:44:43,054 INFO [CONTEXT] update() called for session 44601cab-c37c-4644-bdb0-e7b29b47f01b
+2025-12-27 14:44:43,054 INFO [CONTEXT] Extracted metadata: {'confirmation_id': 65, 'action_id': 65, 'requires_confirmation': True, 'confirmation_message': "Reply to 'RE: This is a test email' from Danny.Black@redwhitesky.uk?", 'expires_at': '2025-12-28T14:44:43.051417', 'action_type': 'reply_email', 'action_category': 'email'}
+2025-12-27 14:44:43,057 INFO [CONTEXT] Storing user turn
+2025-12-27 14:44:43,057 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=user, has_metadata=False
+2025-12-27 14:44:43,059 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:44:43,060 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:44:43,061 INFO [CONTEXT] Storing assistant turn with metadata: True
+2025-12-27 14:44:43,061 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=assistant, has_metadata=True
+2025-12-27 14:44:43,062 INFO [MEMORY] Serialized metadata to JSON, length=269
+2025-12-27 14:44:43,062 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:44:43,062 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:44:43,063 INFO [CONTEXT] Turns stored successfully
+2025-12-27 14:44:43,076 INFO 127.0.0.1 - - [27/Dec/2025 14:44:43] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846683069 HTTP/1.1" 200 -
+2025-12-27 14:44:43,086 INFO 127.0.0.1 - - [27/Dec/2025 14:44:43] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:44:43,089 INFO 127.0.0.1 - - [27/Dec/2025 14:44:43] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:44:47,893 INFO 127.0.0.1 - - [27/Dec/2025 14:44:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:44:48,894 INFO [MEMORY] Updated turn metadata for confirmation 65: approved=True
+2025-12-27 14:44:48,894 INFO [CONFIRMATION] User 1 approved confirmation 65
+2025-12-27 14:44:48,895 INFO [CONFIRMATION] Executing action 65: reply_email
+2025-12-27 14:44:48,895 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:44:48,896 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:44:48,896 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:44:49,286 INFO [M365] Replied to email: AAMkADA2NWVmNmU2LTYwZWUtNGRmYi05NzQzLTAwYjFlMWI4NmFlZABGAAAAAACVwcWPNatHSKFUd0AmW383BwCg3ZZLXpmAQojNC11NZHYiAAAAAAEMAACg3ZZLXpmAQojNC11NZHYiAAHjQbPLAAA=
+2025-12-27 14:44:49,291 INFO [CONFIRMATION] Action 65 executed successfully
+2025-12-27 14:44:49,291 INFO 127.0.0.1 - - [27/Dec/2025 14:44:49] "POST /api/confirmations/65/approve HTTP/1.1" 200 -
+2025-12-27 14:44:49,300 INFO 127.0.0.1 - - [27/Dec/2025 14:44:49] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846689294 HTTP/1.1" 200 -
+2025-12-27 14:44:49,318 INFO 127.0.0.1 - - [27/Dec/2025 14:44:49] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:44:57,895 INFO 127.0.0.1 - - [27/Dec/2025 14:44:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:07,892 INFO 127.0.0.1 - - [27/Dec/2025 14:45:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:15,484 INFO [AUTH] Authenticated user_id: 1
+2025-12-27 14:45:15,489 INFO [MODE] User 1 current_mode: personal
+2025-12-27 14:45:15,489 INFO [MODE] Set subtab_context_prefix for personal mode: IMPORTANT CONTEXT UPDATE: You are currently operating in PERSONAL mode. This is a casual, personal c
+2025-12-27 14:45:15,492 INFO [ACTION_ROUTER] Routing action request: compose_email
+2025-12-27 14:45:15,492 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:45:15,493 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:45:15,493 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:45:15,493 INFO [ACTION_ROUTER] Searching for email with subject: this is a test
+2025-12-27 14:45:15,628 WARNING [ACTION_ROUTER] Failed to fetch user name from facts: 'MemoryStore' object has no attribute 'get_facts'
+2025-12-27 14:45:15,629 INFO [ACTION_REGISTRY] Loading providers for user 1
+2025-12-27 14:45:15,629 INFO [ACTION_REGISTRY] Loaded M365 provider (ID: 3)
+2025-12-27 14:45:15,629 INFO [ACTION_REGISTRY] Loaded 1 provider(s)
+2025-12-27 14:45:16,941 INFO [ACTION_ROUTER] Generated reply body (212 chars)
+2025-12-27 14:45:16,945 INFO [CONFIRMATION] Created confirmation 66 for action 66 (user 1)
+2025-12-27 14:45:16,946 INFO 127.0.0.1 - - [27/Dec/2025 14:45:16] "GET /api/stream/44601cab-c37c-4644-bdb0-e7b29b47f01b?text=can+you+reply+to+the+email+'this+is+a+test'+with+details+about+what+I+have+going+on+this+week+in+my+calendar?&token=gGQuE22ks7cmdDJiLSDfqozmdRrIP6usfhfyuzu0Yw4 HTTP/1.1" 200 -
+2025-12-27 14:45:16,947 INFO [CONTEXT] update() called for session 44601cab-c37c-4644-bdb0-e7b29b47f01b
+2025-12-27 14:45:16,947 INFO [CONTEXT] Extracted metadata: {'confirmation_id': 66, 'action_id': 66, 'requires_confirmation': True, 'confirmation_message': "Reply to 'RE: This is a test email' from Danny.Black@redwhitesky.uk?", 'expires_at': '2025-12-28T14:45:16.944231', 'action_type': 'reply_email', 'action_category': 'email'}
+2025-12-27 14:45:16,948 INFO [CONTEXT] Storing user turn
+2025-12-27 14:45:16,949 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=user, has_metadata=False
+2025-12-27 14:45:16,949 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:45:16,950 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:45:16,951 INFO [CONTEXT] Storing assistant turn with metadata: True
+2025-12-27 14:45:16,951 INFO [MEMORY] save_turn() called: session=44601cab-c37c-4644-bdb0-e7b29b47f01b, role=assistant, has_metadata=True
+2025-12-27 14:45:16,951 INFO [MEMORY] Serialized metadata to JSON, length=269
+2025-12-27 14:45:16,951 INFO [MEMORY] Inserting turn into database...
+2025-12-27 14:45:16,952 INFO [MEMORY] Turn inserted successfully
+2025-12-27 14:45:16,953 INFO [CONTEXT] Turns stored successfully
+2025-12-27 14:45:16,969 INFO 127.0.0.1 - - [27/Dec/2025 14:45:16] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846716960 HTTP/1.1" 200 -
+2025-12-27 14:45:16,978 INFO 127.0.0.1 - - [27/Dec/2025 14:45:16] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:45:16,984 INFO 127.0.0.1 - - [27/Dec/2025 14:45:16] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:45:17,891 INFO 127.0.0.1 - - [27/Dec/2025 14:45:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:17,917 INFO [MEMORY] Updated turn metadata for confirmation 66: approved=False
+2025-12-27 14:45:17,917 INFO [CONFIRMATION] User 1 rejected confirmation 66: User rejected
+2025-12-27 14:45:17,918 INFO 127.0.0.1 - - [27/Dec/2025 14:45:17] "POST /api/confirmations/66/reject HTTP/1.1" 200 -
+2025-12-27 14:45:17,928 INFO 127.0.0.1 - - [27/Dec/2025 14:45:17] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846717920 HTTP/1.1" 200 -
+2025-12-27 14:45:17,938 INFO 127.0.0.1 - - [27/Dec/2025 14:45:17] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:45:27,891 INFO 127.0.0.1 - - [27/Dec/2025 14:45:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:37,896 INFO 127.0.0.1 - - [27/Dec/2025 14:45:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:47,896 INFO 127.0.0.1 - - [27/Dec/2025 14:45:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:45:57,890 INFO 127.0.0.1 - - [27/Dec/2025 14:45:57] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:46:07,888 INFO 127.0.0.1 - - [27/Dec/2025 14:46:07] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:46:16,228 INFO 127.0.0.1 - - [27/Dec/2025 14:46:16] "GET /api/providers HTTP/1.1" 200 -
+2025-12-27 14:46:16,228 INFO 127.0.0.1 - - [27/Dec/2025 14:46:16] "GET /api/sessions/44601cab-c37c-4644-bdb0-e7b29b47f01b/messages?_=1766846776223 HTTP/1.1" 200 -
+2025-12-27 14:46:16,239 INFO 127.0.0.1 - - [27/Dec/2025 14:46:16] "GET /api/session/44601cab-c37c-4644-bdb0-e7b29b47f01b HTTP/1.1" 200 -
+2025-12-27 14:46:17,891 INFO 127.0.0.1 - - [27/Dec/2025 14:46:17] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:46:27,888 INFO 127.0.0.1 - - [27/Dec/2025 14:46:27] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:46:37,892 INFO 127.0.0.1 - - [27/Dec/2025 14:46:37] "GET /api/confirmations/pending HTTP/1.1" 200 -
+2025-12-27 14:46:47,897 INFO 127.0.0.1 - - [27/Dec/2025 14:46:47] "GET /api/confirmations/pending HTTP/1.1" 200 -
