@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import PersonalActions from "./PersonalActions.svelte";
+  import ServiceProviders from "./ServiceProviders.svelte";
   import {
     getProviders,
     listProviders,
@@ -49,7 +50,30 @@
   let promptSaveStatus = null;
 
   // Active tab state
-  let activeTab = "system-prompt";
+  let activeCategory = "general"; // general, operating-modes, accounts, health
+  let activeTab = "general"; // Changes based on category
+
+  // Helper function to switch category and set default tab
+  function switchCategory(category) {
+    activeCategory = category;
+    // Set default tab for each category
+    switch (category) {
+      case "general":
+        activeTab = "general";
+        break;
+      case "operating-modes":
+        activeTab = "personal";
+        break;
+      case "accounts":
+        activeTab = "theo-account";
+        break;
+      case "health":
+        activeTab = "health-monitor";
+        break;
+      default:
+        activeTab = "general";
+    }
+  }
 
   // Mode configuration state
   let workModeSettings = {
@@ -647,77 +671,90 @@
 <div class="settings">
   <h1>Settings</h1>
 
-  <!-- Tab Navigation -->
+  <!-- Category Navigation -->
+  <div class="category-tabs">
+    <button
+      class="category-tab"
+      class:active={activeCategory === "general"}
+      on:click={() => switchCategory("general")}
+    >
+      General
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "operating-modes"}
+      on:click={() => switchCategory("operating-modes")}
+    >
+      Operating Modes
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "accounts"}
+      on:click={() => switchCategory("accounts")}
+    >
+      Accounts
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "health"}
+      on:click={() => switchCategory("health")}
+    >
+      Health
+    </button>
+  </div>
+
+  <!-- Sub-tab Navigation -->
   <div class="tabs">
-    <button
-      class="tab"
-      class:active={activeTab === "system-prompt"}
-      on:click={() => activeTab = "system-prompt"}
-    >
-      System Prompt
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "intents"}
-      on:click={() => activeTab = "intents"}
-    >
-      Intents
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "routing"}
-      on:click={() => activeTab = "routing"}
-    >
-      Routing
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "memory"}
-      on:click={() => activeTab = "memory"}
-    >
-      Memory
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "providers"}
-      on:click={() => activeTab = "providers"}
-    >
-      Providers
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "debug"}
-      on:click={() => activeTab = "debug"}
-    >
-      Debug
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "modes"}
-      on:click={() => activeTab = "modes"}
-    >
-      Modes
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "account"}
-      on:click={() => activeTab = "account"}
-    >
-      Account
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "integrations"}
-      on:click={() => activeTab = "integrations"}
-    >
-      Integrations
-    </button>
+    {#if activeCategory === "general"}
+      <button class="tab" class:active={activeTab === "general"} on:click={() => activeTab = "general"}>
+        General
+      </button>
+      <button class="tab" class:active={activeTab === "intents"} on:click={() => activeTab = "intents"}>
+        Intents
+      </button>
+      <button class="tab" class:active={activeTab === "routing"} on:click={() => activeTab = "routing"}>
+        Routing
+      </button>
+      <button class="tab" class:active={activeTab === "memory"} on:click={() => activeTab = "memory"}>
+        Memory
+      </button>
+    {/if}
+
+    {#if activeCategory === "operating-modes"}
+      <button class="tab" class:active={activeTab === "personal"} on:click={() => activeTab = "personal"}>
+        Personal
+      </button>
+      <button class="tab" class:active={activeTab === "work"} on:click={() => activeTab = "work"}>
+        Work
+      </button>
+    {/if}
+
+    {#if activeCategory === "accounts"}
+      <button class="tab" class:active={activeTab === "theo-account"} on:click={() => activeTab = "theo-account"}>
+        THEO Account
+      </button>
+      <button class="tab" class:active={activeTab === "ai-providers"} on:click={() => activeTab = "ai-providers"}>
+        AI Providers
+      </button>
+      <button class="tab" class:active={activeTab === "integrations"} on:click={() => activeTab = "integrations"}>
+        Integrations
+      </button>
+      <button class="tab" class:active={activeTab === "service-providers"} on:click={() => activeTab = "service-providers"}>
+        Service Providers
+      </button>
+    {/if}
+
+    {#if activeCategory === "health"}
+      <button class="tab" class:active={activeTab === "health-monitor"} on:click={() => activeTab = "health-monitor"}>
+        Health Monitor
+      </button>
+    {/if}
   </div>
 
   <!-- Tab Content -->
   <div class="tab-content">
-    <!-- System Prompt Tab -->
-    {#if activeTab === "system-prompt"}
+    <!-- General Tab (was System Prompt) -->
+    {#if activeTab === "general"}
       <div class="tab-panel">
         <h2>System Prompt Configuration</h2>
         <p class="subtitle">Customize how THEO responds and behaves.</p>
@@ -1093,7 +1130,7 @@
     {/if}
 
     <!-- Providers Tab -->
-    {#if activeTab === "providers"}
+    {#if activeTab === "ai-providers"}
       <div class="tab-panel">
         <h2>Providers</h2>
         <p class="subtitle">Manage AI provider configurations and health status.</p>
@@ -1193,45 +1230,81 @@
     {/if}
 
     <!-- Debug Tab -->
-    {#if activeTab === "debug"}
+    <!-- Health Monitor Tab -->
+    {#if activeTab === "health-monitor"}
       <div class="tab-panel">
-        <h2>Debugging</h2>
-        <p class="subtitle">Enable debug logging and advanced features.</p>
+        <h2>System Health Monitor</h2>
+        <p class="subtitle">Monitor AI provider health, performance metrics, and system status.</p>
 
-        <div class="rule">
-          <label>Debug logs</label>
-          <input
-            type="checkbox"
-            checked={debugEnabled}
-            disabled={savingDebug}
-            on:change={(e) => toggleDebug(e.target.checked)}
-          />
+        <div class="section">
+          <h3>Provider Health Status</h3>
+          <p class="hint">Real-time health monitoring for all configured AI providers</p>
+
+          {#if providers.length === 0}
+            <p class="empty-state">No providers configured yet. Add providers in the Accounts section.</p>
+          {:else}
+            <div class="health-grid">
+              {#each providers as provider}
+                <div class="health-card">
+                  <div class="health-card-header">
+                    <h4>{provider.name}</h4>
+                    <span class="health-badge" class:healthy={provider.enabled} class:unhealthy={!provider.enabled}>
+                      {provider.enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div class="health-card-body">
+                    <p><strong>Type:</strong> {provider.type}</p>
+                    <p><strong>Model:</strong> {provider.model || 'N/A'}</p>
+                    {#if provider.base_url}
+                      <p><strong>Endpoint:</strong> {provider.base_url}</p>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
 
-        <div class="rule">
-          <label>Advanced mode</label>
-          <input
-            type="checkbox"
-            checked={advancedMode}
-            on:change={(e) => toggleAdvancedMode(e.target.checked)}
-          />
-          <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
-            Shows Export and Fork features in chat interface
-          </small>
+        <div class="section">
+          <h3>Debug Settings</h3>
+          <div class="rule">
+            <label>Debug logs</label>
+            <input
+              type="checkbox"
+              checked={debugEnabled}
+              disabled={savingDebug}
+              on:change={(e) => toggleDebug(e.target.checked)}
+            />
+            <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+              Enable detailed logging for troubleshooting
+            </small>
+          </div>
+
+          <div class="rule">
+            <label>Advanced mode</label>
+            <input
+              type="checkbox"
+              checked={advancedMode}
+              on:change={(e) => toggleAdvancedMode(e.target.checked)}
+            />
+            <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+              Shows Export and Fork features in chat interface
+            </small>
+          </div>
         </div>
       </div>
     {/if}
 
     <!-- Modes Tab -->
-    {#if activeTab === "modes"}
+    <!-- Work Mode Tab -->
+    {#if activeTab === "work"}
       <div class="tab-panel">
-        <h2>Work & Personal Modes</h2>
-        <p class="subtitle">Configure different behavior and preferences for work and personal contexts.</p>
+        <h2>💼 Work Mode</h2>
+        <p class="subtitle">Professional tone and optimized for productivity tasks.</p>
 
-        <!-- Work Mode Section -->
+        <!-- Work Mode Settings -->
         <div class="section">
-          <h3>💼 Work Mode</h3>
-          <p class="hint">Professional tone and optimized for productivity tasks</p>
+          <h3>General Settings</h3>
 
           <div class="form-group">
             <label for="work-tone">Tone</label>
@@ -1374,11 +1447,17 @@
             </button>
           </div>
         </div>
+      </div>
+    {/if}
 
-        <!-- Personal Mode Section -->
+    <!-- Personal Mode Tab -->
+    {#if activeTab === "personal"}
+      <div class="tab-panel">
+        <h2>🏠 Personal Mode</h2>
+        <p class="subtitle">Casual tone and optimized for general conversation.</p>
+
         <div class="section">
-          <h3>🏠 Personal Mode</h3>
-          <p class="hint">Casual tone and optimized for general conversation</p>
+          <h3>General Settings</h3>
 
           <div class="form-group">
             <label for="personal-tone">Tone</label>
@@ -1431,7 +1510,7 @@
     {/if}
 
     <!-- Account Tab -->
-    {#if activeTab === "account"}
+    {#if activeTab === "theo-account"}
       <div class="tab-panel">
         <h2>Account & Security</h2>
         <p class="subtitle">Manage your password and security settings.</p>
@@ -1498,6 +1577,12 @@
         <PersonalActions />
       </div>
     {/if}
+
+    {#if activeTab === "service-providers"}
+      <div class="tab-panel">
+        <ServiceProviders />
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -1517,6 +1602,37 @@
     font-size: var(--font-size-2xl);
   }
 
+  .category-tabs {
+    display: flex;
+    background: var(--gray-100);
+    border-bottom: 1px solid var(--gray-300);
+    padding: 0 var(--space-6);
+    gap: var(--space-2);
+  }
+
+  .category-tab {
+    padding: var(--space-4) var(--space-6);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--gray-600);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .category-tab:hover {
+    color: var(--gray-800);
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .category-tab.active {
+    color: var(--info-600);
+    border-bottom-color: var(--info-600);
+    background: var(--gray-50);
+  }
+
   .tabs {
     display: flex;
     background: var(--gray-50);
@@ -1526,7 +1642,7 @@
   }
 
   .tab {
-    padding: var(--space-3) var(--space-6);
+    padding: var(--space-3) var(--space-5);
     border: none;
     background: transparent;
     cursor: pointer;
@@ -2082,5 +2198,70 @@
 
   .section:last-child {
     border-bottom: none;
+  }
+
+  /* Health Monitor Styles */
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .health-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: var(--space-4);
+    background: white;
+    transition: box-shadow 0.2s;
+  }
+
+  .health-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .health-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .health-card-header h4 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--gray-800);
+  }
+
+  .health-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+  }
+
+  .health-badge.healthy {
+    background: var(--success-50);
+    color: var(--success-700);
+  }
+
+  .health-badge.unhealthy {
+    background: var(--gray-100);
+    color: var(--gray-600);
+  }
+
+  .health-card-body p {
+    margin: var(--space-2) 0;
+    font-size: var(--font-size-sm);
+    color: var(--gray-700);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--gray-500);
+    font-style: italic;
   }
 </style>

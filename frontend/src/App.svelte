@@ -15,6 +15,10 @@
   let currentMode = "personal"; // "work" or "personal"
   let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
 
+  // Dropdown state
+  let modeDropdownOpen = false;
+  let settingsDropdownOpen = false;
+
   // Mobile sidebar toggle state
   let sidebarOpen = false;
   $: {
@@ -22,6 +26,22 @@
       document.body.classList.toggle("no-scroll", sidebarOpen);
     }
   }
+
+  // Close dropdowns when clicking outside
+  function handleClickOutside(event) {
+    const target = event.target;
+    if (!target.closest('.dropdown')) {
+      modeDropdownOpen = false;
+      settingsDropdownOpen = false;
+    }
+  }
+
+  onMount(() => {
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  });
   function openSidebar() {
     sidebarOpen = true;
   }
@@ -117,14 +137,15 @@ async function loadUserMode() {
   }
 }
 
-async function toggleMode() {
-  const newMode = currentMode === "work" ? "personal" : "work";
+async function setMode(mode) {
+  if (mode === currentMode) return; // Already in this mode
+
   try {
-    await setUserMode(newMode);
-    currentMode = newMode;
+    await setUserMode(mode);
+    currentMode = mode;
 
     // Load last active subtab from localStorage when switching to work mode
-    if (newMode === "work") {
+    if (mode === "work") {
       const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");
       if (savedSubtab && ["conversation", "email", "code"].includes(savedSubtab)) {
         activeWorkSubtab = savedSubtab;
@@ -257,35 +278,64 @@ async function handleLogout() {
     </div>
 
     <div class="header-right">
-      <button
-        class="btn-pill btn-mode"
-        class:mode-work={currentMode === "work"}
-        class:mode-personal={currentMode === "personal"}
-        on:click={toggleMode}
-        title={currentMode === "work" ? "Switch to Personal Mode" : "Switch to Work Mode"}
-      >
-        {currentMode === "work" ? "💼 Work" : "🏠 Personal"}
-      </button>
+      <div class="dropdown" class:open={modeDropdownOpen}>
+        <button
+          class="btn-pill btn-mode"
+          class:mode-work={currentMode === "work"}
+          class:mode-personal={currentMode === "personal"}
+          on:click={() => { modeDropdownOpen = !modeDropdownOpen; }}
+        >
+          {currentMode === "work" ? "Work Mode" : "Personal Mode"}
+        </button>
+        {#if modeDropdownOpen}
+          <div class="dropdown-content">
+            <button
+              class="dropdown-item"
+              class:active={currentMode === "personal"}
+              on:click={() => { setMode("personal"); modeDropdownOpen = false; }}
+            >
+              🏠 Personal
+            </button>
+            <button
+              class="dropdown-item"
+              class:active={currentMode === "work"}
+              on:click={() => { setMode("work"); modeDropdownOpen = false; }}
+            >
+              💼 Work
+            </button>
+          </div>
+        {/if}
+      </div>
 
       <button
         class="btn-pill"
         class:active={!showSettings}
         on:click={() => { showSettings = false; }}
       >
-        Chat
+        Home
       </button>
 
-      <button
-        class="btn-pill"
-        class:active={showSettings}
-        on:click={() => { showSettings = true; }}
-      >
-        Settings
-      </button>
-
-      <button class="btn-pill btn-logout" on:click={handleLogout}>
-        Logout
-      </button>
+      <div class="dropdown" class:open={settingsDropdownOpen}>
+        <button class="btn-pill" on:click={() => { settingsDropdownOpen = !settingsDropdownOpen; }}>
+          Menu
+        </button>
+        {#if settingsDropdownOpen}
+          <div class="dropdown-content">
+            <button
+              class="dropdown-item"
+              on:click={() => { showSettings = true; settingsDropdownOpen = false; }}
+            >
+              Settings
+            </button>
+            <button
+              class="dropdown-item"
+              on:click={() => { handleLogout(); settingsDropdownOpen = false; }}
+            >
+              Logout
+            </button>
+          </div>
+        {/if}
+      </div>
     </div>
   </header>
 
