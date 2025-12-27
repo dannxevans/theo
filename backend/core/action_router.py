@@ -128,6 +128,7 @@ class ActionRouter:
         - "What's on my calendar Tuesday?"
         - "Am I free tomorrow afternoon?"
         - "Show me my schedule for next week"
+        - "When is my flight?"
 
         Args:
             user_text: User's input text
@@ -138,17 +139,26 @@ class ActionRouter:
         Returns:
             Response dictionary with calendar events
         """
+        # Check if this is a flight/travel specific query
+        user_text_lower = user_text.lower()
+        is_flight_query = any(keyword in user_text_lower for keyword in ["flight", "train", "travel", "trip"])
+
         # Parse the request to extract date range
         date_range = self._parse_date_range(user_text)
 
-        if not date_range:
+        # For flight queries without specific dates, search next 3 months
+        if not date_range and is_flight_query:
+            from datetime import datetime, timedelta
+            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = start_date + timedelta(days=90)  # 3 months
+        elif not date_range:
             return {
                 "text": "I can check your calendar. Which dates would you like me to check? (e.g., 'this Tuesday', 'next week')",
                 "provider": "action_router",
                 "task_type": "read_calendar",
             }
-
-        start_date, end_date = date_range
+        else:
+            start_date, end_date = date_range
 
         # Load providers for this user
         self.action_registry.load_providers(user_id)
@@ -183,7 +193,35 @@ class ActionRouter:
                 ) > now
             ]
 
-            # Format response
+            # If this is a flight query, filter to flight/travel events
+            if is_flight_query:
+                flight_keywords = ["flight", "train", "travel", "trip", "departure", "arrival", "airline", "airport"]
+                flight_events = [
+                    e for e in future_events
+                    if any(keyword in e.get("subject", "").lower() for keyword in flight_keywords)
+                ]
+
+                if not flight_events:
+                    response = "I couldn't find any flights or travel events in your calendar. If you have a booking confirmation, you can paste it and I'll add it to your calendar."
+                elif len(flight_events) == 1:
+                    event = flight_events[0]
+                    response = f"Your flight is scheduled for:\n\n{self._format_event_list([event], show_date=True)}"
+                else:
+                    response = f"I found {len(flight_events)} upcoming flights/travel events:\n\n{self._format_event_list(flight_events, show_date=True)}"
+
+                return {
+                    "text": response,
+                    "provider": "action_router",
+                    "task_type": "read_calendar",
+                    "metadata": {
+                        "events_count": len(flight_events),
+                        "date_range": [start_date.isoformat(), end_date.isoformat()],
+                        "provider_id": provider_id,
+                        "flight_query": True
+                    }
+                }
+
+            # Format response for general calendar queries
             if not future_events:
                 date_str = self._format_date_range(start_date, end_date)
                 response = f"You have no upcoming events {date_str}."
@@ -748,22 +786,30 @@ class ActionRouter:
 
         logging.info(f"[ACTION_ROUTER] Searching for specific email with keywords: '{search_text}'")
 
-        # Search for matching email by subject or sender
+        # Search for matching email by subject, sender, or preview
         matching_email = None
         for email in emails:
             subject = email.get("subject", "").lower()
             sender = email.get("from", "").lower()
+            preview = email.get("preview", "").lower()
 
-            # Check if search terms appear in subject or sender
-            if search_text in subject or search_text in sender:
+            # Check if search terms appear in subject, sender, or preview
+            if search_text in subject or search_text in sender or search_text in preview:
                 matching_email = email
                 break
 
-            # Also check if individual words match
-            search_words = search_text.split()
-            if search_words and any(word in subject or word in sender for word in search_words if len(word) > 3):
-                matching_email = email
-                break
+            # Also check if individual words match (require at least 2 words to match)
+            search_words = [w for w in search_text.split() if len(w) > 3]
+            if len(search_words) >= 2:
+                matches = sum(1 for word in search_words if word in subject or word in sender or word in preview)
+                if matches >= 2:
+                    matching_email = email
+                    break
+            elif search_words:
+                # Single significant word - still check
+                if any(word in subject or word in sender or word in preview for word in search_words):
+                    matching_email = email
+                    break
 
         if not matching_email:
             return {
@@ -1000,12 +1046,146 @@ class ActionRouter:
         """
         Handle composing and sending a new email.
 
-        TODO: Implement new email composition
+        Examples:
+        - "send an email to john@example.com saying I'll be late"
+        - "email danny@example.com about the meeting tomorrow"
         """
+        # Find M365 provider
+        providers = self.action_registry.get_providers_by_capability("send_email", user_id)
+
+        if not providers:
+            return {
+                "text": "I don't have access to your email yet. Would you like to connect your Microsoft 365 account?",
+                "provider": "action_router",
+                "task_type": "compose_email",
+                "metadata": {
+                    "error": "no_provider",
+                    "required_capability": "send_email"
+                }
+            }
+
+        provider_id, provider = providers[0]
+
+        # Extract recipient email address
+        import re
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_matches = re.findall(email_pattern, user_text)
+
+        # Also look for names in quotes or after "to"
+        name_pattern = r'(?:to|email)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+        name_matches = re.findall(name_pattern, user_text)
+
+        recipient = None
+        if email_matches:
+            recipient = email_matches[0]
+        elif name_matches:
+            recipient_name = name_matches[0]
+
+            # Check if user is referring to themselves
+            user_name_fact = None
+            try:
+                facts = self.memory.get_facts(user_id)
+                for fact in facts:
+                    if fact.get("key", "").lower() in ["my name", "name"]:
+                        user_name_fact = fact.get("value", "").lower()
+                        break
+            except:
+                pass
+
+            if user_name_fact and recipient_name.lower() == user_name_fact:
+                # User wants to email themselves - get their M365 email
+                try:
+                    creds = self.memory.get_m365_credentials(user_id)
+                    if creds and creds.get("user_principal_name"):
+                        recipient = creds["user_principal_name"]
+                        logging.info(f"[ACTION_ROUTER] Resolved self-reference '{recipient_name}' to {recipient}")
+                except Exception as e:
+                    logging.warning(f"[ACTION_ROUTER] Failed to get user's email: {e}")
+
+            if not recipient:
+                # Future enhancement: check M365 contacts/people API
+                return {
+                    "text": f"I found the name '{recipient_name}' but don't have their email address. Please provide the email address (e.g., '{recipient_name.lower().replace(' ', '.')}@example.com').",
+                    "provider": "action_router",
+                    "task_type": "compose_email",
+                }
+
+        if not recipient:
+            return {
+                "text": "I couldn't identify the recipient. Please specify an email address (e.g., 'send an email to john@example.com').",
+                "provider": "action_router",
+                "task_type": "compose_email",
+            }
+
+        # Generate email subject and body using LLM
+        subject, body = self._generate_new_email_body(user_text, recipient, user_id)
+
+        if not subject or not body:
+            return {
+                "text": "I couldn't generate the email content. Please try again or provide more details.",
+                "provider": "action_router",
+                "task_type": "compose_email",
+            }
+
+        # Create draft in M365 first
+        try:
+            draft_result = provider.draft_email(
+                to=[recipient],
+                subject=subject,
+                body=body,
+                content_type="HTML"
+            )
+            draft_id = draft_result.get("draft_id")
+            logging.info(f"[ACTION_ROUTER] Created draft email {draft_id}")
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] Failed to create draft: {e}")
+            return {
+                "text": f"Failed to create email draft: {str(e)}",
+                "provider": "action_router",
+                "task_type": "compose_email",
+            }
+
+        # Create confirmation for sending the draft
+        confirmation_result = self.confirmation_manager.create_confirmation(
+            user_id=user_id,
+            session_id=session_id,
+            action_type="send_draft_email",
+            provider_id=provider_id,
+            action_params={
+                "draft_id": draft_id
+            },
+            confirmation_message=f"Send email '{subject}' to {recipient}?"
+        )
+
+        if not confirmation_result:
+            return {
+                "text": "Failed to create confirmation for email.",
+                "provider": "action_router",
+                "task_type": "compose_email",
+            }
+
+        # Extract just the integer ID for JSON serialization
+        confirmation_id = confirmation_result["confirmation_id"]
+
+        # Strip HTML for preview display
+        body_preview = body.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+        import re
+        body_preview = re.sub('<[^<]+?>', '', body_preview)
+
+        # Return confirmation request with metadata for UI widget
         return {
-            "text": "Composing new emails is not yet implemented. Try replying to an existing email.",
+            "text": f"**Draft email to {recipient}:**\n\n**Subject:** {subject}\n\n**Message:**\n{body_preview}\n\n",
             "provider": "action_router",
             "task_type": "compose_email",
+            "metadata": {
+                "requires_confirmation": True,
+                "confirmation_id": confirmation_id,
+                "recipient": recipient,
+                "subject": subject,
+                "draft_id": draft_id,
+                "action_category": "email",
+                "confirmation_message": f"Send email '{subject}' to {recipient}?"
+            }
         }
 
     def _generate_reply_body(
@@ -1145,6 +1325,126 @@ Generate a reply email body:"""
         except Exception as e:
             logging.error(f"[ACTION_ROUTER] Reply generation failed: {e}")
             return None
+
+    def _generate_new_email_body(
+        self,
+        user_request: str,
+        recipient: str,
+        user_id: int
+    ) -> tuple:
+        """
+        Generate new email subject and body using LLM.
+
+        Args:
+            user_request: Original user request
+            recipient: Email recipient
+            user_id: User ID
+
+        Returns:
+            Tuple of (subject, body_html) or (None, None) if generation fails
+        """
+        from providers.openai import OpenAIProvider
+        from core.provider_registry import ProviderRegistry
+
+        try:
+            # Get OpenAI provider
+            registry = ProviderRegistry(self.memory)
+            provider_cfg = registry.get_by_type("openai")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                logging.warning("[ACTION_ROUTER] No OpenAI provider available for email generation")
+                return None
+
+            provider = OpenAIProvider(
+                api_key=provider_cfg["api_key"],
+                base_url=provider_cfg.get("base_url"),
+                model=provider_cfg.get("model") or "gpt-4o-mini"
+            )
+
+            # Get user's name from memory facts
+            user_name = None
+            try:
+                facts = self.memory.get_facts(user_id)
+                for fact in facts:
+                    if fact.get("key", "").lower() in ["my name", "name"]:
+                        user_name = fact.get("value")
+                        logging.info(f"[ACTION_ROUTER] Found user name in facts: {user_name}")
+                        break
+            except Exception as e:
+                logging.warning(f"[ACTION_ROUTER] Failed to fetch user name from facts: {e}")
+
+            # Build context
+            context_parts = []
+
+            # Add user's name if available
+            if user_name:
+                context_parts.append(f"Sender's name: {user_name}")
+
+            context_parts.append(f"Recipient: {recipient}")
+
+            context_text = "\n".join(context_parts)
+
+            # Construct prompt
+            system_prompt = """You are an email assistant helping the user compose a new email.
+
+Generate a professional, friendly email based on the user's instructions.
+
+Your response must be in this EXACT format:
+SUBJECT: [concise subject line based on email content]
+BODY:
+[email body with greeting, content, and closing]
+
+Guidelines:
+1. Generate a concise, relevant subject line that summarizes the email content
+2. Use proper email formatting (greeting, body, closing)
+3. Match an appropriate tone for the context
+4. Format as plain text (we'll convert to HTML)
+5. CRITICAL: Always include the sender's name after the closing (e.g., "Best regards,\nDanny" NOT "Best regards,"). Never use placeholders like "[Your Name]", "Theo", or leave it blank."""
+
+            # Build user prompt with explicit name instruction if available
+            name_instruction = ""
+            if user_name:
+                name_instruction = f"\n\nIMPORTANT: The email MUST be signed with the sender's name: {user_name}"
+
+            user_prompt = f"""User request: {user_request}
+
+{context_text}{name_instruction}
+
+Generate the email with subject and body:"""
+
+            response = provider.chat(
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+
+            response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+
+            # Parse subject and body from response
+            subject = None
+            body = None
+
+            import re
+            subject_match = re.search(r'SUBJECT:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
+            if subject_match:
+                subject = subject_match.group(1).strip()
+
+            body_match = re.search(r'BODY:\s*(.+)', response_text, re.IGNORECASE | re.DOTALL)
+            if body_match:
+                body = body_match.group(1).strip()
+
+            if not subject or not body:
+                logging.error(f"[ACTION_ROUTER] Failed to parse subject/body from LLM response")
+                return None, None
+
+            # Convert to simple HTML
+            body_html = body.replace("\n", "<br>\n")
+
+            logging.info(f"[ACTION_ROUTER] Generated email: subject='{subject}' body=({len(body_html)} chars)")
+            return subject, body_html
+
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] Email generation failed: {e}")
+            return None, None
 
     def _generate_email_summary(self, emails: list, user_id: int, unread_only: bool = False) -> str:
         """

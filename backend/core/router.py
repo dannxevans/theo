@@ -68,10 +68,15 @@ def set_action_registry(registry: ActionProviderRegistry):
     action_registry = registry
 
 
-def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
+def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Optional[int] = None) -> str:
     """
     Dynamic intent classification based on user-defined intents.
     Checks action intents first (highest priority), then user-defined intents.
+
+    Args:
+        text: User's input text
+        memory: Optional MemoryStore instance
+        user_id: Optional user ID for checking pending confirmations
     """
     if not text:
         return "general"
@@ -91,37 +96,68 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
         "reject_confirmation": ["reject", "no", "don't", "nevermind", "never mind"],
     }
 
+    # Calendar context words - must be present with generic verbs
+    CALENDAR_CONTEXT = ["calendar", "diary", "schedule", "appointment", "meeting", "lunch", "dinner",
+                        "breakfast", "call", "event", "reminder", "today", "tomorrow", "monday", "tuesday",
+                        "wednesday", "thursday", "friday", "saturday", "sunday", "am", "pm"]
+
     # Write-action keywords (high priority)
     WRITE_ACTION_KEYWORDS = {
-        "book_appointment": ["add", "create", "schedule", "book", "set up", "make", "arrange",
-                           "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
+        "book_appointment": ["schedule", "book", "set up", "arrange", "appointment", "schedule me", "reserve"],
         "update_appointment": ["move", "reschedule", "change time", "update"],
         "cancel_appointment": ["cancel", "delete", "remove"],
-        "compose_email": ["send email", "draft email", "compose", "write email", "reply to", "reply", "respond to"],
+        "compose_email": ["send email", "draft email", "compose", "write email", "email to", "send an email", "reply to", "reply", "respond to"],
     }
 
     # Read-action keywords (lower priority)
     READ_ACTION_KEYWORDS = {
         "read_calendar": ["calendar", "availability", "available", "free", "busy",
-                         "when am i", "what's on", "whats on", "schedule for"],
-        "read_email": ["email", "inbox", "unread", "check email", "email summary"],
+                         "when am i", "what's on", "whats on", "schedule for", "flight", "train", "travel"],
+        "read_email": ["my emails", "my email", "inbox", "unread", "check email", "email summary", "what emails", "any emails"],
     }
 
     # First check for confirmation intents (approve/reject)
-    # Only trigger if there are pending confirmations
-    for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text_l:
-                # Check if user has pending confirmations
-                if memory:
-                    from core.confirmation_manager import ConfirmationManager
-                    # We'll check for pending confirmations in the action router
-                    import logging
-                    logging.warning(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' in text: '{text[:100]}'")
-                    _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
-                    return confirmation_intent
+    # Only trigger if there are pending confirmations AND specific keywords match
+    if memory and user_id:
+        from core.confirmation_manager import ConfirmationManager
+        import logging
+        conf_manager = ConfirmationManager(memory)
 
-    # Then check for write actions (add, create, schedule, etc.)
+        # Only check confirmation keywords if there are pending confirmations
+        pending = conf_manager.get_pending_confirmations(user_id)
+        logging.info(f"[ROUTER] Checking confirmations for user {user_id}: {len(pending) if pending else 0} pending")
+        if pending:
+            import re
+            for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
+                for keyword in keywords:
+                    # Use word boundaries for common words to avoid false matches
+                    if keyword in ["no", "yes", "ok"]:
+                        # For very common words, require them as standalone words
+                        pattern = rf'\b{re.escape(keyword)}\b'
+                        if re.search(pattern, text_l):
+                            import logging
+                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                            _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
+                            return confirmation_intent
+                    else:
+                        # For specific phrases, use substring match
+                        if keyword in text_l:
+                            import logging
+                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                            _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
+                            return confirmation_intent
+
+    # Check for generic verbs that need calendar context (add, create, make)
+    generic_calendar_verbs = ["add", "create", "make", "put"]
+    for verb in generic_calendar_verbs:
+        if verb in text_l:
+            # Check if there's calendar context
+            has_calendar_context = any(ctx_word in text_l for ctx_word in CALENDAR_CONTEXT)
+            if has_calendar_context:
+                _debug(memory, f"Matched book_appointment via generic verb '{verb}' with calendar context")
+                return "book_appointment"
+
+    # Then check for write actions (schedule, book, etc.)
     for action_intent, keywords in WRITE_ACTION_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text_l:
@@ -460,7 +496,7 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
-    intent = classify_intent(text, memory)
+    intent = classify_intent(text, memory, user_id=context.get("user_id"))
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)

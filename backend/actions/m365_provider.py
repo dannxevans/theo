@@ -45,6 +45,8 @@ class M365Provider(ActionProvider):
         "send_email",
         "reply_email",
         "draft_email",
+        "send_draft_email",
+        "delete_draft_email",
     ]
 
     GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
@@ -125,6 +127,8 @@ class M365Provider(ActionProvider):
             "send_email": self._validate_send_email,
             "reply_email": self._validate_reply_email,
             "draft_email": self._validate_draft_email,
+            "send_draft_email": self._validate_send_draft_email,
+            "delete_draft_email": self._validate_delete_draft_email,
         }
 
         validator = validators.get(action_type)
@@ -425,7 +429,7 @@ class M365Provider(ActionProvider):
                 {"emailAddress": {"address": email}} for email in bcc
             ]
 
-        payload = {"message": message, "saveToSentItems": "true"}
+        payload = {"message": message, "saveToSentItems": True}
 
         url = f"{self.GRAPH_API_BASE}/me/sendMail"
 
@@ -504,6 +508,76 @@ class M365Provider(ActionProvider):
         except requests.HTTPError as e:
             logging.error(f"[M365] Email draft creation failed: {e}")
             raise ActionExecutionError(f"Failed to create email draft: {e}")
+
+    def send_draft_email(self, draft_id: str) -> Dict:
+        """
+        Send a draft email.
+
+        Args:
+            draft_id: ID of the draft message to send
+
+        Returns:
+            Dictionary with send status
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If API call fails
+        """
+        self._ensure_token_valid()
+
+        headers = self._get_headers()
+        url = f"{self.GRAPH_API_BASE}/me/messages/{draft_id}/send"
+
+        try:
+            response = requests.post(url, headers=headers, timeout=15)
+            response.raise_for_status()
+
+            logging.info(f"[M365] Sent draft email: {draft_id}")
+
+            return {
+                "status": "sent",
+                "draft_id": draft_id,
+                "sent_at": datetime.utcnow().isoformat()
+            }
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Failed to send draft email: {e}")
+            raise ActionExecutionError(f"Failed to send draft email: {e}")
+
+    def delete_draft_email(self, draft_id: str) -> Dict:
+        """
+        Delete a draft email.
+
+        Args:
+            draft_id: ID of the draft message to delete
+
+        Returns:
+            Dictionary with deletion status
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If API call fails
+        """
+        self._ensure_token_valid()
+
+        headers = self._get_headers()
+        url = f"{self.GRAPH_API_BASE}/me/messages/{draft_id}"
+
+        try:
+            response = requests.delete(url, headers=headers, timeout=15)
+            response.raise_for_status()
+
+            logging.info(f"[M365] Deleted draft email: {draft_id}")
+
+            return {
+                "status": "deleted",
+                "draft_id": draft_id,
+                "deleted_at": datetime.utcnow().isoformat()
+            }
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Failed to delete draft email: {e}")
+            raise ActionExecutionError(f"Failed to delete draft email: {e}")
 
     def reply_email(
         self,
@@ -586,13 +660,30 @@ class M365Provider(ActionProvider):
             # Strip HTML tags if content type is HTML
             content_type = body_data.get("contentType", "")
             if content_type == "html":
-                # Simple HTML tag removal (could use a library like BeautifulSoup for more robust parsing)
                 import re
+                # First, replace block-level tags with newlines to preserve structure
+                body_content = re.sub(r'</(p|div|br|tr|h[1-6])>', '\n', body_content, flags=re.IGNORECASE)
+                body_content = re.sub(r'<br\s*/?>', '\n', body_content, flags=re.IGNORECASE)
+                body_content = re.sub(r'</li>', '\n', body_content, flags=re.IGNORECASE)
+
+                # Then strip all remaining HTML tags
                 body_content = re.sub('<[^<]+?>', '', body_content)
+
+                # Replace HTML entities
                 body_content = body_content.replace('&nbsp;', ' ')
                 body_content = body_content.replace('&amp;', '&')
                 body_content = body_content.replace('&lt;', '<')
                 body_content = body_content.replace('&gt;', '>')
+                body_content = body_content.replace('&quot;', '"')
+                body_content = body_content.replace('&#39;', "'")
+
+                # Clean up excessive whitespace while preserving intentional line breaks
+                body_content = re.sub(r' +', ' ', body_content)  # Multiple spaces to single
+                body_content = re.sub(r'\n +', '\n', body_content)  # Remove leading spaces on lines
+                body_content = re.sub(r' +\n', '\n', body_content)  # Remove trailing spaces on lines
+
+            # Strip email signature/footer noise
+            body_content = self._strip_email_signature(body_content)
 
             logging.info(f"[M365] Fetched full body for email: {email_id}")
             return body_content.strip()
@@ -611,6 +702,89 @@ class M365Provider(ActionProvider):
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
         }
+
+    def _strip_email_signature(self, email_body: str) -> str:
+        """
+        Strip email signature and footer noise from email body.
+
+        Removes content after common signature markers like:
+        - Kind regards, / Best regards, / Regards, / Thanks,
+        - Sent from my iPhone / Sent from Outlook
+        - Long disclaimer blocks
+        - Company contact information
+        - Legal disclaimers
+
+        Args:
+            email_body: Raw email body text
+
+        Returns:
+            Email body with signature stripped
+        """
+        import re
+
+        # Common signature markers (case insensitive)
+        # Now that HTML is properly converted to newlines, we can match signatures more reliably
+        signature_markers = [
+            r'(?i)\n\s*(kind\s+regards|best\s+regards|warm\s+regards|many\s+thanks|yours\s+sincerely|yours\s+faithfully|best\s+wishes)',
+            r'(?i)\n\s*(regards|thanks|thank\s+you|cheers|sincerely|best)\s*[,\.]?\s*\n',
+            r'(?i)sent\s+from\s+(my\s+)?(iphone|android|outlook|mobile|blackberry|samsung)',
+            r'\n_{3,}',  # Horizontal lines (_____)
+            r'\n-{3,}',  # Horizontal lines (-----)
+            r'\n={3,}',  # Horizontal lines (=====)
+        ]
+
+        # Find the earliest signature marker
+        earliest_match = None
+        earliest_pos = len(email_body)
+
+        for pattern in signature_markers:
+            match = re.search(pattern, email_body)
+            if match and match.start() < earliest_pos:
+                earliest_pos = match.start()
+                earliest_match = match
+
+        if earliest_match:
+            # Keep everything before the signature marker
+            email_body = email_body[:earliest_pos].strip()
+
+        # Remove common footer patterns (legal disclaimers, company info, etc.)
+        # These patterns match multiple lines of footer content
+        footer_patterns = [
+            # Legal disclaimers
+            r'(?i)\n\s*This\s+(email|message|communication).*?confidential.*?(\n\n|\Z)',
+            r'(?i)\n\s*NOTICE:.*?(\n\n|\Z)',
+            r'(?i)\n\s*DISCLAIMER:.*?(\n\n|\Z)',
+            r'(?i)\n\s*CONFIDENTIALITY.*?(\n\n|\Z)',
+            r'(?i)\n\s*The\s+information\s+contained.*?confidential.*?(\n\n|\Z)',
+            r'(?i)\n\s*If\s+you\s+(have\s+received|are\s+not).*?intended\s+recipient.*?(\n\n|\Z)',
+            r'(?i)\n\s*Please\s+consider.*?environment.*?print.*?(\n\n|\Z)',
+
+            # Company info blocks (multiple lines with address, phone, etc.)
+            r'(?i)\n\s*T:.*?\n\s*E:.*?(\n\n|\Z)',  # Phone/Email format
+            r'(?i)\n\s*(Tel|Phone|Mobile|Fax):.*?(\n\n|\Z)',
+            r'(?i)\n\s*Registered\s+(in|office).*?(\n\n|\Z)',
+            r'(?i)\n\s*VAT\s+(No|Number|Registration).*?(\n\n|\Z)',
+            r'(?i)\n\s*Company\s+(No|Number|Registration).*?(\n\n|\Z)',
+
+            # Website/social media links at end
+            r'(?i)\n\s*www\..*?(\n\n|\Z)',
+            r'(?i)\n\s*https?://.*?(\n\n|\Z)',
+
+            # "Scanned by" / antivirus footers
+            r'(?i)\n\s*Scanned\s+by.*?(\n\n|\Z)',
+            r'(?i)\n\s*Virus-free.*?(\n\n|\Z)',
+
+            # Multiple blank lines (often separating content from footer)
+            r'\n\s*\n\s*\n\s*\n.*',  # 3+ consecutive blank lines and everything after
+        ]
+
+        for pattern in footer_patterns:
+            email_body = re.sub(pattern, '', email_body, flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove trailing whitespace and excessive blank lines
+        email_body = re.sub(r'\n\s*\n\s*\n+', '\n\n', email_body)  # Collapse multiple blank lines to max 2
+
+        return email_body.strip()
 
     def _ensure_token_valid(self):
         """
@@ -793,3 +967,15 @@ class M365Provider(ActionProvider):
         """Validate draft_email parameters."""
         # Same as send_email
         return self._validate_send_email(params)
+
+    def _validate_send_draft_email(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate send_draft_email parameters."""
+        if not params.get("draft_id"):
+            return False, "draft_id must be provided"
+        return True, None
+
+    def _validate_delete_draft_email(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate delete_draft_email parameters."""
+        if not params.get("draft_id"):
+            return False, "draft_id must be provided"
+        return True, None
