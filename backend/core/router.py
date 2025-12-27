@@ -88,13 +88,15 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     # Confirmation keywords (highest priority - process before other actions)
     CONFIRMATION_KEYWORDS = {
         "approve_confirmation": ["approve", "yes", "confirm", "ok", "looks good", "go ahead", "do it"],
-        "reject_confirmation": ["reject", "no", "cancel", "don't", "nevermind", "never mind"],
+        "reject_confirmation": ["reject", "no", "don't", "nevermind", "never mind"],
     }
 
     # Write-action keywords (high priority)
     WRITE_ACTION_KEYWORDS = {
         "book_appointment": ["add", "create", "schedule", "book", "set up", "make", "arrange",
                            "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
+        "update_appointment": ["move", "reschedule", "change time", "update"],
+        "cancel_appointment": ["cancel", "delete", "remove"],
         "manage_email": ["send email", "draft email", "compose", "write email", "reply to"],
     }
 
@@ -468,7 +470,7 @@ def route_request(context: dict, stream: bool = False):
     # Action Intent Routing
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
-    ACTION_INTENTS = ["read_calendar", "book_appointment", "manage_email", "approve_confirmation", "reject_confirmation"]
+    ACTION_INTENTS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "manage_email", "approve_confirmation", "reject_confirmation"]
 
     if intent in ACTION_INTENTS:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")

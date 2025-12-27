@@ -91,6 +91,8 @@ class ActionRouter:
         handlers = {
             "read_calendar": self._handle_read_calendar,
             "book_appointment": self._handle_book_appointment,
+            "update_appointment": self._handle_update_appointment,
+            "cancel_appointment": self._handle_cancel_appointment,
             "manage_email": self._handle_manage_email,
             "approve_confirmation": self._handle_approve_confirmation,
             "reject_confirmation": self._handle_reject_confirmation,
@@ -170,21 +172,33 @@ class ActionRouter:
         try:
             events = provider.read_calendar(start_date, end_date)
 
+            # Filter out past events - only show future events
+            from datetime import datetime
+            now = datetime.now()
+            future_events = [
+                e for e in events
+                if e.get("start_time") and datetime.fromisoformat(
+                    re.sub(r'\.(\d{6})\d+', r'.\1', e["start_time"]).replace("Z", "+00:00")
+                ) > now
+            ]
+
             # Format response
-            if not events:
+            if not future_events:
                 date_str = self._format_date_range(start_date, end_date)
-                response = f"You have no events scheduled {date_str}."
+                response = f"You have no upcoming events {date_str}."
             else:
-                event_list = self._format_event_list(events)
+                # Check if this is a multi-day range (more than 1 day)
+                is_multiday = (end_date - start_date).days > 1
+                event_list = self._format_event_list(future_events, show_date=is_multiday)
                 date_str = self._format_date_range(start_date, end_date)
                 response = f"Here are your upcoming events {date_str}:\n\n{event_list}"
 
             return {
                 "text": response,
-                "provider": f"m365_calendar_{provider_id}",
+                "provider": "action_router",
                 "task_type": "read_calendar",
                 "metadata": {
-                    "events_count": len(events),
+                    "events_count": len(future_events),
                     "date_range": [start_date.isoformat(), end_date.isoformat()],
                     "provider_id": provider_id
                 }
@@ -324,6 +338,279 @@ class ActionRouter:
                 "metadata": {
                     "error": str(e)
                 }
+            }
+
+    def _handle_update_appointment(
+        self,
+        user_text: str,
+        session_id: str,
+        user_id: int,
+        context: Dict
+    ) -> Dict:
+        """
+        Handle appointment update/move requests.
+
+        Examples:
+        - "move lunch with Sean to 3pm"
+        - "reschedule my 2pm meeting to tomorrow"
+        - "change my haircut to 4pm"
+
+        Args:
+            user_text: User's input text
+            session_id: Session ID
+            user_id: User ID
+            context: Full request context
+
+        Returns:
+            Response dictionary with update result
+        """
+        # Load providers for this user
+        self.action_registry.load_providers(user_id)
+
+        # Find M365 provider
+        providers = self.action_registry.get_providers_by_capability("update_calendar_event", user_id)
+
+        if not providers:
+            return {
+                "text": "I don't have access to your calendar yet. Would you like to connect your Microsoft 365 account?",
+                "provider": "action_router",
+                "task_type": "update_appointment",
+            }
+
+        provider_id, provider = providers[0]
+
+        # Get today's events to find the one to update
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+
+        try:
+            events = provider.read_calendar(start_of_day, end_of_day)
+
+            # Search for matching event
+            user_text_lower = user_text.lower()
+            matching_event = None
+
+            for event in events:
+                subject = event.get("subject", "").lower()
+                if any(word in user_text_lower for word in subject.split() if len(word) > 3):
+                    matching_event = event
+                    break
+
+            if not matching_event:
+                return {
+                    "text": f"I couldn't find an event matching '{user_text}' in your calendar today. Can you be more specific?",
+                    "provider": "action_router",
+                    "task_type": "update_appointment",
+                }
+
+            # Extract new time from user request
+            import re
+            time_match = re.search(r'to\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', user_text_lower)
+            if not time_match:
+                return {
+                    "text": f"I couldn't understand the new time. Please specify the time (e.g., 'move lunch to 3pm').",
+                    "provider": "action_router",
+                    "task_type": "update_appointment",
+                }
+
+            hour = int(time_match.group(1))
+            minute = int(time_match.group(2) or 0)
+            meridiem = time_match.group(3)
+
+            # Convert to 24-hour format
+            if meridiem == 'pm' and hour != 12:
+                hour += 12
+            elif meridiem == 'am' and hour == 12:
+                hour = 0
+            elif not meridiem and hour < 12:
+                hour += 12
+
+            # Calculate new start and end times
+            # M365 provider returns start_time/end_time as ISO strings
+            from dateutil import parser as date_parser
+            old_start = date_parser.isoparse(matching_event["start_time"])
+            old_end = date_parser.isoparse(matching_event["end_time"])
+            duration = old_end - old_start
+
+            new_start = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            new_end = new_start + duration
+
+            # Create confirmation request
+            if not self.confirmation_manager:
+                return {
+                    "text": "The confirmation system is not initialized.",
+                    "provider": "action_router",
+                    "task_type": "update_appointment",
+                }
+
+            start_str = new_start.strftime("%B %d at %I:%M %p").replace(" 0", " ")
+            end_str = new_end.strftime("%I:%M %p").replace(" 0", " ")
+            confirmation_message = f"Move '{matching_event['subject']}' to {start_str} to {end_str}?"
+
+            confirmation = self.confirmation_manager.create_confirmation(
+                user_id=user_id,
+                session_id=session_id,
+                action_type="update_calendar_event",
+                action_params={
+                    "event_id": matching_event["id"],
+                    "updates": {
+                        "start": {
+                            "dateTime": new_start.isoformat(),
+                            "timeZone": "UTC"
+                        },
+                        "end": {
+                            "dateTime": new_end.isoformat(),
+                            "timeZone": "UTC"
+                        }
+                    }
+                },
+                confirmation_message=confirmation_message,
+                provider_id=provider_id,
+                expires_in_hours=24
+            )
+
+            # Convert expires_at datetime to ISO string
+            expires_at = confirmation.get("expires_at")
+            if expires_at and hasattr(expires_at, 'isoformat'):
+                expires_at = expires_at.isoformat()
+
+            return {
+                "text": f"{confirmation_message}\n\nI've created a confirmation request.",
+                "provider": "action_router",
+                "task_type": "update_appointment",
+                "metadata": {
+                    "confirmation_id": confirmation["confirmation_id"],
+                    "action_id": confirmation["action_id"],
+                    "requires_confirmation": True,
+                    "confirmation_message": confirmation_message,
+                    "expires_at": expires_at,
+                    "action_type": "update_calendar_event",
+                    "action_category": "calendar"
+                }
+            }
+
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] Failed to update appointment: {e}")
+            return {
+                "text": f"I encountered an error: {str(e)}",
+                "provider": "action_router",
+                "task_type": "update_appointment",
+            }
+
+    def _handle_cancel_appointment(
+        self,
+        user_text: str,
+        session_id: str,
+        user_id: int,
+        context: Dict
+    ) -> Dict:
+        """
+        Handle appointment cancellation requests.
+
+        Examples:
+        - "cancel lunch with Sean today"
+        - "delete my 2pm meeting"
+        - "remove haircut appointment"
+
+        Args:
+            user_text: User's input text
+            session_id: Session ID
+            user_id: User ID
+            context: Full request context
+
+        Returns:
+            Response dictionary with cancellation result
+        """
+        # Load providers for this user
+        self.action_registry.load_providers(user_id)
+
+        # Find M365 provider
+        providers = self.action_registry.get_providers_by_capability("delete_calendar_event", user_id)
+
+        if not providers:
+            return {
+                "text": "I don't have access to your calendar yet. Would you like to connect your Microsoft 365 account?",
+                "provider": "action_router",
+                "task_type": "cancel_appointment",
+            }
+
+        provider_id, provider = providers[0]
+
+        # Get today's events to find the one to cancel
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+
+        try:
+            events = provider.read_calendar(start_of_day, end_of_day)
+
+            # Search for matching event
+            user_text_lower = user_text.lower()
+            matching_event = None
+
+            for event in events:
+                subject = event.get("subject", "").lower()
+                # Check if any words from the event subject are in the user's request
+                if any(word in user_text_lower for word in subject.split() if len(word) > 3):
+                    matching_event = event
+                    break
+
+            if not matching_event:
+                return {
+                    "text": f"I couldn't find an event matching '{user_text}' in your calendar today. Can you be more specific?",
+                    "provider": "action_router",
+                    "task_type": "cancel_appointment",
+                }
+
+            # Create confirmation request for deletion
+            if not self.confirmation_manager:
+                return {
+                    "text": "The confirmation system is not initialized.",
+                    "provider": "action_router",
+                    "task_type": "cancel_appointment",
+                }
+
+            confirmation_message = f"Delete '{matching_event['subject']}' from your calendar?"
+
+            confirmation = self.confirmation_manager.create_confirmation(
+                user_id=user_id,
+                session_id=session_id,
+                action_type="delete_calendar_event",
+                action_params={"event_id": matching_event["id"]},
+                confirmation_message=confirmation_message,
+                provider_id=provider_id,
+                expires_in_hours=24
+            )
+
+            # Convert expires_at datetime to ISO string
+            expires_at = confirmation.get("expires_at")
+            if expires_at and hasattr(expires_at, 'isoformat'):
+                expires_at = expires_at.isoformat()
+
+            return {
+                "text": f"{confirmation_message}\n\nI've created a confirmation request.",
+                "provider": "action_router",
+                "task_type": "cancel_appointment",
+                "metadata": {
+                    "confirmation_id": confirmation["confirmation_id"],
+                    "action_id": confirmation["action_id"],
+                    "requires_confirmation": True,
+                    "confirmation_message": confirmation_message,
+                    "expires_at": expires_at,
+                    "action_type": "delete_calendar_event",
+                    "action_category": "calendar"
+                }
+            }
+
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] Failed to cancel appointment: {e}")
+            return {
+                "text": f"I encountered an error: {str(e)}",
+                "provider": "action_router",
+                "task_type": "cancel_appointment",
             }
 
     def _handle_manage_email(
@@ -798,12 +1085,13 @@ Rules:
         # Different months
         return f"from {start_date.strftime('%B %d')} to {end_date.strftime('%B %d')}"
 
-    def _format_event_list(self, events: list) -> str:
+    def _format_event_list(self, events: list, show_date: bool = False) -> str:
         """
         Format a list of events for display.
 
         Args:
             events: List of event dictionaries
+            show_date: If True, include day and date for each event (for multi-day ranges)
 
         Returns:
             Formatted string with event details
@@ -820,29 +1108,45 @@ Rules:
         for event in events:
             # Parse start time
             start_time_str = event.get("start_time", "")
-            try:
-                start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
-                time_str = start_time.strftime("%I:%M %p").lstrip("0")
-            except:
-                time_str = "Time TBD"
+            time_str = "Time TBD"
+            start_time = None
 
-            # Build event line
+            logging.info(f"[ACTION_ROUTER] Formatting event: {event.get('subject')}, start_time='{start_time_str}', type={type(start_time_str)}")
+
+            if start_time_str:
+                try:
+                    # Handle both ISO format with and without timezone
+                    if isinstance(start_time_str, str):
+                        # Microsoft Graph API returns fractional seconds with 7 digits, but Python only supports 6
+                        # e.g., "2025-12-27T15:00:00.0000000" -> "2025-12-27T15:00:00.000000"
+                        time_str_cleaned = re.sub(r'\.(\d{6})\d+', r'.\1', start_time_str)
+                        time_str_cleaned = time_str_cleaned.replace("Z", "+00:00")
+
+                        start_time = datetime.fromisoformat(time_str_cleaned)
+                        time_str = start_time.strftime("%I:%M %p").lstrip("0").replace(" 0", " ")
+                        logging.info(f"[ACTION_ROUTER] Parsed time successfully: {time_str}")
+                except Exception as e:
+                    logging.warning(f"[ACTION_ROUTER] Failed to parse start time '{start_time_str}': {e}")
+
+            # Build event line - keep subject and time on same line
             subject = event.get("subject", "Untitled Event")
             location = event.get("location")
 
-            event_line = f"• **{subject}**"
-            details = []
+            # Format: • Subject at Time • Location
+            # If show_date=True (multi-day range), prepend day and date
+            if show_date and start_time:
+                day_date = start_time.strftime("%A, %B %d")  # e.g., "Monday, December 27"
+                event_line = f"**{day_date}**\n• {subject}"
+            else:
+                event_line = f"• {subject}"
 
             if time_str != "Time TBD":
-                details.append(time_str)
+                event_line += f" at {time_str}"
 
             if location:
-                details.append(location)
+                event_line += f" • {location}"
 
-            if details:
-                event_line += f"\n  {' • '.join(details)}"
-
-            # Add attendees if present
+            # Add attendees on next line if present
             attendees = event.get("attendees", [])
             if attendees and len(attendees) > 0:
                 attendee_count = len(attendees)
