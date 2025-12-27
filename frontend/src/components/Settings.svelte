@@ -21,7 +21,12 @@
     createMemory,
     deleteMemory,
     pinMemory,
-    changePassword
+    changePassword,
+    getAllModeSettings,
+    getModeSettings,
+    updateModeSettings,
+    getWorkSubtabConfig,
+    updateWorkSubtabConfig
   } from "../lib/api";
 
   let providers = [];
@@ -44,6 +49,40 @@
 
   // Active tab state
   let activeTab = "system-prompt";
+
+  // Mode configuration state
+  let workModeSettings = {
+    system_prompt_override: "",
+    preferred_provider_id: null,
+    tone: "professional"
+  };
+  let personalModeSettings = {
+    system_prompt_override: "",
+    preferred_provider_id: null,
+    tone: "casual"
+  };
+  let savingWorkMode = false;
+  let savingPersonalMode = false;
+  let workModeSaveStatus = null;
+  let personalModeSaveStatus = null;
+
+  // Work mode subtab configuration state
+  let codeSubtabConfig = {
+    language: "servicenow_javascript",
+    framework: "",
+    additional_context: ""
+  };
+  let emailSubtabConfig = {
+    tone: "professional",
+    signature: ""
+  };
+  let conversationSubtabConfig = {
+    context: ""
+  };
+  let savingCodeSubtab = false;
+  let savingEmailSubtab = false;
+  let codeSubtabSaveStatus = null;
+  let emailSubtabSaveStatus = null;
 
   // Memory state
   let memories = [];
@@ -123,6 +162,53 @@
     await loadMemories();
     await loadProvidersList();
 
+    // Load mode settings
+    try {
+      const workSettings = await getModeSettings("work");
+      if (workSettings && Object.keys(workSettings).length > 0) {
+        workModeSettings = {
+          system_prompt_override: workSettings.system_prompt_override || "",
+          preferred_provider_id: workSettings.preferred_provider_id || null,
+          tone: workSettings.tone || "professional"
+        };
+      }
+
+      const personalSettings = await getModeSettings("personal");
+      if (personalSettings && Object.keys(personalSettings).length > 0) {
+        personalModeSettings = {
+          system_prompt_override: personalSettings.system_prompt_override || "",
+          preferred_provider_id: personalSettings.preferred_provider_id || null,
+          tone: personalSettings.tone || "casual"
+        };
+      }
+    } catch (e) {
+      console.warn("Failed to load mode settings:", e);
+    }
+
+    // Load work subtab configs
+    try {
+      const codeConfig = await getWorkSubtabConfig("code");
+      if (codeConfig && codeConfig.config_json) {
+        const parsed = JSON.parse(codeConfig.config_json);
+        codeSubtabConfig = {
+          language: parsed.language || "servicenow_javascript",
+          framework: parsed.framework || "",
+          additional_context: parsed.additional_context || ""
+        };
+      }
+
+      const emailConfig = await getWorkSubtabConfig("email");
+      if (emailConfig && emailConfig.config_json) {
+        const parsed = JSON.parse(emailConfig.config_json);
+        emailSubtabConfig = {
+          tone: parsed.tone || "professional",
+          signature: parsed.signature || ""
+        };
+      }
+    } catch (e) {
+      console.warn("Failed to load work subtab configs:", e);
+    }
+
     loaded = true;
   }
 
@@ -196,6 +282,70 @@
       promptSaveStatus = `Error: ${e.message}`;
     } finally {
       savingPrompt = false;
+    }
+  }
+
+  async function saveWorkMode() {
+    try {
+      savingWorkMode = true;
+      workModeSaveStatus = null;
+      await updateModeSettings("work", workModeSettings);
+      workModeSaveStatus = "Work mode settings saved!";
+      setTimeout(() => {
+        workModeSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      workModeSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingWorkMode = false;
+    }
+  }
+
+  async function saveCodeSubtab() {
+    try {
+      savingCodeSubtab = true;
+      codeSubtabSaveStatus = null;
+      await updateWorkSubtabConfig("code", codeSubtabConfig);
+      codeSubtabSaveStatus = "Code Development settings saved!";
+      setTimeout(() => {
+        codeSubtabSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      codeSubtabSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingCodeSubtab = false;
+    }
+  }
+
+  async function saveEmailSubtab() {
+    try {
+      savingEmailSubtab = true;
+      emailSubtabSaveStatus = null;
+      await updateWorkSubtabConfig("email", emailSubtabConfig);
+      emailSubtabSaveStatus = "Email Rewrites settings saved!";
+      setTimeout(() => {
+        emailSubtabSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      emailSubtabSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingEmailSubtab = false;
+    }
+  }
+
+  async function savePersonalMode() {
+    try {
+      savingPersonalMode = true;
+      personalModeSaveStatus = null;
+      await updateModeSettings("personal", personalModeSettings);
+      personalModeSaveStatus = "Personal mode settings saved!";
+      setTimeout(() => {
+        personalModeSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      personalModeSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingPersonalMode = false;
     }
   }
 
@@ -539,6 +689,13 @@
       on:click={() => activeTab = "debug"}
     >
       Debug
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === "modes"}
+      on:click={() => activeTab = "modes"}
+    >
+      Modes
     </button>
     <button
       class="tab"
@@ -1053,6 +1210,214 @@
           <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
             Shows Export and Fork features in chat interface
           </small>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Modes Tab -->
+    {#if activeTab === "modes"}
+      <div class="tab-panel">
+        <h2>Work & Personal Modes</h2>
+        <p class="subtitle">Configure different behavior and preferences for work and personal contexts.</p>
+
+        <!-- Work Mode Section -->
+        <div class="section">
+          <h3>💼 Work Mode</h3>
+          <p class="hint">Professional tone and optimized for productivity tasks</p>
+
+          <div class="form-group">
+            <label for="work-tone">Tone</label>
+            <select id="work-tone" bind:value={workModeSettings.tone}>
+              <option value="professional">Professional</option>
+              <option value="neutral">Neutral</option>
+              <option value="casual">Casual</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="work-provider">Preferred Provider (optional)</label>
+            <select id="work-provider" bind:value={workModeSettings.preferred_provider_id}>
+              <option value={null}>Auto-select based on intent</option>
+              {#each providers as provider}
+                {#if provider.enabled}
+                  <option value={provider.id}>{provider.name} ({provider.type})</option>
+                {/if}
+              {/each}
+            </select>
+            <p class="hint">Override automatic provider selection for this mode</p>
+          </div>
+
+          <div class="form-group">
+            <label for="work-prompt">Custom System Prompt Override (optional)</label>
+            <textarea
+              id="work-prompt"
+              bind:value={workModeSettings.system_prompt_override}
+              placeholder="Leave empty to use default system prompt. Add custom instructions specific to work mode here."
+              rows="6"
+            ></textarea>
+            <p class="hint">
+              This will replace the default system prompt when in work mode. Leave empty to use the standard configuration.
+            </p>
+          </div>
+
+          {#if workModeSaveStatus}
+            <div class="success-message">{workModeSaveStatus}</div>
+          {/if}
+
+          <button
+            class="btn-primary"
+            on:click={saveWorkMode}
+            disabled={savingWorkMode}
+          >
+            {savingWorkMode ? "Saving..." : "Save Work Mode Settings"}
+          </button>
+        </div>
+
+        <!-- Work Mode Sub-Tabs Configuration -->
+        <div class="section">
+          <h3>💼 Work Mode Sub-Tabs</h3>
+          <p class="hint">Configure automatic context injection for work mode sub-tabs</p>
+
+          <!-- Code Development Sub-Tab -->
+          <div class="subsection">
+            <h4>💻 Code Development</h4>
+
+            <div class="form-group">
+              <label for="code-language">Programming Language</label>
+              <select id="code-language" bind:value={codeSubtabConfig.language}>
+                <option value="servicenow_javascript">ServiceNow JavaScript</option>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="csharp">C#</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="code-framework">Framework (optional)</label>
+              <input
+                id="code-framework"
+                type="text"
+                bind:value={codeSubtabConfig.framework}
+                placeholder="e.g., React, Vue, Django"
+              />
+              <p class="hint">Specify a framework to add specialized context</p>
+            </div>
+
+            <div class="form-group">
+              <label for="code-additional">Additional Context (optional)</label>
+              <textarea
+                id="code-additional"
+                bind:value={codeSubtabConfig.additional_context}
+                placeholder="Any additional context or coding standards for code development"
+                rows="3"
+              ></textarea>
+            </div>
+
+            {#if codeSubtabSaveStatus}
+              <p class="status-message">{codeSubtabSaveStatus}</p>
+            {/if}
+
+            <button
+              class="btn-primary"
+              on:click={saveCodeSubtab}
+              disabled={savingCodeSubtab}
+            >
+              {savingCodeSubtab ? "Saving..." : "Save Code Development Settings"}
+            </button>
+          </div>
+
+          <!-- Email Rewrites Sub-Tab -->
+          <div class="subsection">
+            <h4>✉️ Email Rewrites</h4>
+
+            <div class="form-group">
+              <label for="email-tone">Email Tone</label>
+              <select id="email-tone" bind:value={emailSubtabConfig.tone}>
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="formal">Formal</option>
+                <option value="casual">Casual</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="email-signature">Email Signature (optional)</label>
+              <textarea
+                id="email-signature"
+                bind:value={emailSubtabConfig.signature}
+                placeholder="Your default email signature"
+                rows="3"
+              ></textarea>
+              <p class="hint">This signature will be suggested when rewriting emails</p>
+            </div>
+
+            {#if emailSubtabSaveStatus}
+              <p class="status-message">{emailSubtabSaveStatus}</p>
+            {/if}
+
+            <button
+              class="btn-primary"
+              on:click={saveEmailSubtab}
+              disabled={savingEmailSubtab}
+            >
+              {savingEmailSubtab ? "Saving..." : "Save Email Rewrite Settings"}
+            </button>
+          </div>
+        </div>
+
+        <!-- Personal Mode Section -->
+        <div class="section">
+          <h3>🏠 Personal Mode</h3>
+          <p class="hint">Casual tone and optimized for general conversation</p>
+
+          <div class="form-group">
+            <label for="personal-tone">Tone</label>
+            <select id="personal-tone" bind:value={personalModeSettings.tone}>
+              <option value="casual">Casual</option>
+              <option value="neutral">Neutral</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="personal-provider">Preferred Provider (optional)</label>
+            <select id="personal-provider" bind:value={personalModeSettings.preferred_provider_id}>
+              <option value={null}>Auto-select based on intent</option>
+              {#each providers as provider}
+                {#if provider.enabled}
+                  <option value={provider.id}>{provider.name} ({provider.type})</option>
+                {/if}
+              {/each}
+            </select>
+            <p class="hint">Override automatic provider selection for this mode</p>
+          </div>
+
+          <div class="form-group">
+            <label for="personal-prompt">Custom System Prompt Override (optional)</label>
+            <textarea
+              id="personal-prompt"
+              bind:value={personalModeSettings.system_prompt_override}
+              placeholder="Leave empty to use default system prompt. Add custom instructions specific to personal mode here."
+              rows="6"
+            ></textarea>
+            <p class="hint">
+              This will replace the default system prompt when in personal mode. Leave empty to use the standard configuration.
+            </p>
+          </div>
+
+          {#if personalModeSaveStatus}
+            <div class="success-message">{personalModeSaveStatus}</div>
+          {/if}
+
+          <button
+            class="btn-primary"
+            on:click={savePersonalMode}
+            disabled={savingPersonalMode}
+          >
+            {savingPersonalMode ? "Saving..." : "Save Personal Mode Settings"}
+          </button>
         </div>
       </div>
     {/if}

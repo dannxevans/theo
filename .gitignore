@@ -5,6 +5,10 @@ __pycache__/
 
 # Node
 node_modules/
+dist/
+build/
+.vite/
+*.local
 
 # Env / secrets
 .env

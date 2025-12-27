@@ -424,10 +424,18 @@ export async function updateSystemPromptConfig(config) {
  * This is intentionally separate from sendMessage() so we can
  * run Socket.IO and SSE side-by-side during migration.
  */
-export function streamMessage({ text, sessionId, forcedProvider, onToken, onEnd, onError }) {
+export function streamMessage({ text, sessionId, forcedProvider, workSubtab, onToken, onEnd, onError }) {
   const params = new URLSearchParams({ text });
   if (forcedProvider) {
     params.append("forced_provider", forcedProvider);
+  }
+  if (workSubtab) {
+    params.append("work_subtab", workSubtab);
+  }
+  // Add auth token to query params since EventSource doesn't support custom headers
+  const token = getAuthToken();
+  if (token) {
+    params.append("token", token);
   }
   const url = `${API_BASE}/api/stream/${sessionId}?${params.toString()}`;
 
@@ -646,6 +654,138 @@ export async function changePassword(currentPassword, newPassword) {
   if (!response.ok) {
     const err = await response.json();
     throw new Error(err.error || "Failed to change password");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Mode Management
+// =============================
+
+export async function getUserMode() {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get user mode");
+  }
+
+  return response.json();
+}
+
+export async function setUserMode(mode) {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ mode })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to set mode");
+  }
+
+  return response.json();
+}
+
+export async function getAllModeSettings() {
+  const response = await fetch(`${API_BASE}/api/mode/settings`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function getModeSettings(mode) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function updateModeSettings(mode, settings) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(settings)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update mode settings");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Work Mode Sub-Tab Management
+// =============================
+
+export async function getWorkSubtabConfig(subtab) {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtab/${subtab}`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get work subtab config");
+  }
+
+  return response.json();
+}
+
+export async function updateWorkSubtabConfig(subtab, config) {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtab/${subtab}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update work subtab config");
+  }
+
+  return response.json();
+}
+
+export async function getAllWorkSubtabConfigs() {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtabs`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get all work subtab configs");
   }
 
   return response.json();

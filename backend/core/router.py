@@ -457,9 +457,15 @@ def route_request(context: dict, stream: bool = False):
     if not context_manager:
         raise RuntimeError("ContextManager not configured")
 
+    # Check for mode-specific system prompt override
+    system_prompt_override = context.get("system_prompt_override")
+    subtab_context_prefix = context.get("subtab_context_prefix")
+
     context_obj = context_manager.build_context(
         session_id=context.get("session_id"),
         user_text=text,
+        system_prompt_override=system_prompt_override,
+        subtab_context_prefix=subtab_context_prefix,
     )
     system_prompt = context_obj["system"]
     messages = context_obj["messages"]
