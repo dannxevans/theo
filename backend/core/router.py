@@ -68,10 +68,15 @@ def set_action_registry(registry: ActionProviderRegistry):
     action_registry = registry
 
 
-def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
+def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Optional[int] = None) -> str:
     """
     Dynamic intent classification based on user-defined intents.
     Checks action intents first (highest priority), then user-defined intents.
+
+    Args:
+        text: User's input text
+        memory: Optional MemoryStore instance
+        user_id: Optional user ID for checking pending confirmations
     """
     if not text:
         return "general"
@@ -108,18 +113,33 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     }
 
     # First check for confirmation intents (approve/reject)
-    # Only trigger if there are pending confirmations
-    for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text_l:
-                # Check if user has pending confirmations
-                if memory:
-                    from core.confirmation_manager import ConfirmationManager
-                    # We'll check for pending confirmations in the action router
-                    import logging
-                    logging.warning(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' in text: '{text[:100]}'")
-                    _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
-                    return confirmation_intent
+    # Only trigger if there are pending confirmations AND specific keywords match
+    if memory and user_id:
+        from core.confirmation_manager import ConfirmationManager
+        conf_manager = ConfirmationManager(memory)
+
+        # Only check confirmation keywords if there are pending confirmations
+        pending = conf_manager.get_pending_confirmations(user_id)
+        if pending:
+            import re
+            for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
+                for keyword in keywords:
+                    # Use word boundaries for common words to avoid false matches
+                    if keyword in ["no", "yes", "ok"]:
+                        # For very common words, require them as standalone words
+                        pattern = rf'\b{re.escape(keyword)}\b'
+                        if re.search(pattern, text_l):
+                            import logging
+                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                            _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
+                            return confirmation_intent
+                    else:
+                        # For specific phrases, use substring match
+                        if keyword in text_l:
+                            import logging
+                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                            _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
+                            return confirmation_intent
 
     # Then check for write actions (add, create, schedule, etc.)
     for action_intent, keywords in WRITE_ACTION_KEYWORDS.items():
@@ -460,7 +480,7 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
-    intent = classify_intent(text, memory)
+    intent = classify_intent(text, memory, user_id=context.get("user_id"))
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)
