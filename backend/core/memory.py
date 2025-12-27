@@ -286,6 +286,131 @@ class MemoryStore:
             Column("updated_at", DateTime, default=datetime.utcnow),
         )
 
+        # =============================
+        # Personal AI Agent: Service Providers
+        # =============================
+        self.service_providers = Table(
+            "service_providers",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False),
+            Column("name", String, nullable=False),
+            Column("category", String, nullable=False),
+            Column("provider_type", String, nullable=False),
+            Column("capabilities", Text, nullable=True),
+            Column("api_base_url", String, nullable=True),
+            Column("auth_method", String, nullable=True),
+            Column("access_token", Text, nullable=True),
+            Column("refresh_token", Text, nullable=True),
+            Column("token_expires_at", DateTime, nullable=True),
+            Column("api_endpoint_calendar", String, nullable=True),
+            Column("api_endpoint_email", String, nullable=True),
+            Column("additional_metadata", Text, nullable=True),
+            Column("trust_level", String, default="manual"),
+            Column("booking_method", String, nullable=True),
+            Column("preferred_for_category", Boolean, default=False),
+            Column("is_enabled", Boolean, default=True),
+            Column("last_synced_at", DateTime, nullable=True),
+            Column("health_status", String, default="unknown"),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Personal AI Agent: Actions
+        # =============================
+        self.actions = Table(
+            "actions",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False),
+            Column("session_id", String, nullable=False),
+            Column("action_type", String, nullable=False),
+            Column("category", String, nullable=False),
+            Column("intent_summary", Text, nullable=False),
+            Column("service_provider_id", Integer, nullable=True),
+            Column("action_params", Text, nullable=True),
+            Column("planned_execution_time", DateTime, nullable=True),
+            Column("status", String, default="pending"),
+            Column("requires_confirmation", Boolean, default=True),
+            Column("initiated_at", DateTime, nullable=True),
+            Column("approved_at", DateTime, nullable=True),
+            Column("executed_at", DateTime, nullable=True),
+            Column("completed_at", DateTime, nullable=True),
+            Column("result_data", Text, nullable=True),
+            Column("error_message", Text, nullable=True),
+            Column("retry_count", Integer, default=0),
+            Column("max_retries", Integer, default=3),
+            Column("is_reversible", Boolean, default=False),
+            Column("rollback_action_id", Integer, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Personal AI Agent: Action Confirmations
+        # =============================
+        self.action_confirmations = Table(
+            "action_confirmations",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("action_id", Integer, nullable=False, unique=True),
+            Column("confirmation_message", Text, nullable=False),
+            Column("user_response", String, nullable=True),
+            Column("user_response_text", Text, nullable=True),
+            Column("modified_params", Text, nullable=True),
+            Column("presented_at", DateTime, nullable=False),
+            Column("responded_at", DateTime, nullable=True),
+            Column("expires_at", DateTime, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Personal AI Agent: M365 Credentials
+        # =============================
+        self.m365_credentials = Table(
+            "m365_credentials",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False, unique=True),
+            Column("access_token", Text, nullable=False),
+            Column("refresh_token", Text, nullable=False),
+            Column("token_type", String, default="Bearer"),
+            Column("expires_at", DateTime, nullable=False),
+            Column("scope", Text, nullable=True),
+            Column("tenant_id", String, nullable=True),
+            Column("user_principal_name", String, nullable=True),
+            Column("is_valid", Boolean, default=True),
+            Column("last_refreshed_at", DateTime, nullable=True),
+            Column("last_error", Text, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
+        # Personal AI Agent: Calendar Events Cache
+        # =============================
+        self.calendar_events_cache = Table(
+            "calendar_events_cache",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False),
+            Column("event_id", String, nullable=False),
+            Column("calendar_id", String, nullable=True),
+            Column("subject", String, nullable=True),
+            Column("start_time", DateTime, nullable=False),
+            Column("end_time", DateTime, nullable=False),
+            Column("location", String, nullable=True),
+            Column("description", Text, nullable=True),
+            Column("attendees", Text, nullable=True),
+            Column("is_all_day", Boolean, default=False),
+            Column("status", String, nullable=True),
+            Column("importance", String, nullable=True),
+            Column("fetched_at", DateTime, nullable=False),
+            Column("cache_expires_at", DateTime, nullable=True),
+            Column("created_at", DateTime, default=datetime.utcnow),
+        )
+
         self.meta.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
@@ -1663,3 +1788,342 @@ class MemoryStore:
                 delete(self.auth_sessions)
                 .where(self.auth_sessions.c.expires_at < datetime.utcnow())
             )
+    # =============================
+    # Personal AI Agent: Service Providers API
+    # =============================
+
+    def store_service_provider(self, user_id, name, category, provider_type, **kwargs):
+        """Store a service provider."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(self.service_providers).values(
+                    user_id=user_id,
+                    name=name,
+                    category=category,
+                    provider_type=provider_type,
+                    capabilities=kwargs.get("capabilities"),
+                    api_base_url=kwargs.get("api_base_url"),
+                    auth_method=kwargs.get("auth_method"),
+                    access_token=kwargs.get("access_token"),
+                    refresh_token=kwargs.get("refresh_token"),
+                    token_expires_at=kwargs.get("token_expires_at"),
+                    trust_level=kwargs.get("trust_level", "manual"),
+                    booking_method=kwargs.get("booking_method"),
+                    preferred_for_category=kwargs.get("preferred_for_category", False),
+                    is_enabled=True,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            return result.lastrowid
+
+    def get_service_providers(self, user_id, category=None):
+        """Get service providers for a user, optionally filtered by category."""
+        with self.engine.begin() as conn:
+            query = select(self.service_providers).where(
+                self.service_providers.c.user_id == user_id
+            )
+
+            if category:
+                query = query.where(self.service_providers.c.category == category)
+
+            rows = conn.execute(query).fetchall()
+            return [dict(row._mapping) for row in rows]
+
+    def get_service_provider(self, provider_id):
+        """Get a single service provider by ID."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.service_providers).where(
+                    self.service_providers.c.id == provider_id
+                )
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def get_preferred_provider(self, user_id, category):
+        """Get the preferred provider for a category."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.service_providers)
+                .where(self.service_providers.c.user_id == user_id)
+                .where(self.service_providers.c.category == category)
+                .where(self.service_providers.c.preferred_for_category == True)
+                .limit(1)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def update_service_provider(self, provider_id, **kwargs):
+        """Update a service provider."""
+        with self.engine.begin() as conn:
+            update_values = {k: v for k, v in kwargs.items() if v is not None}
+            update_values["updated_at"] = datetime.utcnow()
+
+            conn.execute(
+                update(self.service_providers)
+                .where(self.service_providers.c.id == provider_id)
+                .values(**update_values)
+            )
+
+    def delete_service_provider(self, provider_id, user_id):
+        """Delete a service provider (with user ownership check)."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.service_providers)
+                .where(self.service_providers.c.id == provider_id)
+                .where(self.service_providers.c.user_id == user_id)
+            )
+
+    # =============================
+    # Personal AI Agent: M365 Credentials API
+    # =============================
+
+    def store_m365_credentials(self, user_id, access_token, refresh_token,
+                                expires_at, scope=None, tenant_id=None, upn=None):
+        """Store M365 OAuth credentials."""
+        with self.engine.begin() as conn:
+            # Check if exists
+            existing = conn.execute(
+                select(self.m365_credentials.c.id)
+                .where(self.m365_credentials.c.user_id == user_id)
+            ).fetchone()
+
+            if existing:
+                # Update
+                conn.execute(
+                    update(self.m365_credentials)
+                    .where(self.m365_credentials.c.user_id == user_id)
+                    .values(
+                        access_token=access_token,
+                        refresh_token=refresh_token,
+                        expires_at=expires_at,
+                        scope=scope,
+                        tenant_id=tenant_id,
+                        user_principal_name=upn,
+                        is_valid=True,
+                        last_refreshed_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                )
+            else:
+                # Insert
+                conn.execute(
+                    insert(self.m365_credentials).values(
+                        user_id=user_id,
+                        access_token=access_token,
+                        refresh_token=refresh_token,
+                        expires_at=expires_at,
+                        scope=scope,
+                        tenant_id=tenant_id,
+                        user_principal_name=upn,
+                        is_valid=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                )
+
+    def get_m365_credentials(self, user_id):
+        """Get M365 credentials for a user."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def invalidate_m365_credentials(self, user_id, error=None):
+        """Mark M365 credentials as invalid."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
+                .values(
+                    is_valid=False,
+                    last_error=error,
+                    updated_at=datetime.utcnow()
+                )
+            )
+
+    def delete_m365_credentials(self, user_id):
+        """Delete M365 credentials for a user."""
+        with self.engine.begin() as conn:
+            from sqlalchemy import delete
+            conn.execute(
+                delete(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
+            )
+
+    # =============================
+    # Personal AI Agent: Actions API
+    # =============================
+
+    def create_action(self, user_id, session_id, action_type, category,
+                      intent_summary, service_provider_id=None, **kwargs):
+        """Create a new action."""
+        import json
+
+        # Serialize action_params to JSON if it's a dict
+        action_params = kwargs.get("action_params")
+        if action_params and isinstance(action_params, dict):
+            action_params = json.dumps(action_params)
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(self.actions).values(
+                    user_id=user_id,
+                    session_id=session_id,
+                    action_type=action_type,
+                    category=category,
+                    intent_summary=intent_summary,
+                    service_provider_id=service_provider_id,
+                    action_params=action_params,
+                    planned_execution_time=kwargs.get("planned_execution_time"),
+                    status=kwargs.get("status", "pending"),
+                    requires_confirmation=kwargs.get("requires_confirmation", True),
+                    is_reversible=kwargs.get("is_reversible", False),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+            )
+            return result.lastrowid
+
+    def get_action(self, action_id):
+        """Get an action by ID."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.actions).where(self.actions.c.id == action_id)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def get_pending_actions(self, user_id):
+        """Get all pending actions for a user."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.actions)
+                .where(self.actions.c.user_id == user_id)
+                .where(self.actions.c.status == "pending")
+                .order_by(self.actions.c.created_at.desc())
+            ).fetchall()
+            return [dict(row._mapping) for row in rows]
+
+    def update_action_status(self, action_id, status, **kwargs):
+        """Update action status and related fields."""
+        with self.engine.begin() as conn:
+            update_values = {"status": status, "updated_at": datetime.utcnow()}
+
+            # Add timestamp based on status
+            if status == "approved":
+                update_values["approved_at"] = datetime.utcnow()
+            elif status == "executing":
+                update_values["initiated_at"] = datetime.utcnow()
+            elif status == "completed":
+                update_values["completed_at"] = datetime.utcnow()
+
+            # Add any additional fields
+            for key, value in kwargs.items():
+                if value is not None:
+                    update_values[key] = value
+
+            conn.execute(
+                update(self.actions)
+                .where(self.actions.c.id == action_id)
+                .values(**update_values)
+            )
+
+    # =============================
+    # Personal AI Agent: Action Confirmations API
+    # =============================
+
+    def create_confirmation(self, action_id, confirmation_message, expires_at):
+        """Create a confirmation request for an action."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(self.action_confirmations).values(
+                    action_id=action_id,
+                    confirmation_message=confirmation_message,
+                    presented_at=datetime.utcnow(),
+                    expires_at=expires_at,
+                    created_at=datetime.utcnow()
+                )
+            )
+            return result.lastrowid
+
+    def get_pending_confirmations(self, user_id):
+        """Get all pending confirmations for a user."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(
+                    self.actions,
+                    self.action_confirmations
+                )
+                .join(
+                    self.action_confirmations,
+                    self.actions.c.id == self.action_confirmations.c.action_id
+                )
+                .where(self.actions.c.user_id == user_id)
+                .where(self.actions.c.status == "pending")
+                .where(self.action_confirmations.c.user_response.is_(None))
+            ).fetchall()
+
+            return [dict(row._mapping) for row in rows]
+
+    def update_confirmation_response(self, action_id, user_response, user_response_text=None):
+        """Update confirmation with user response."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.action_confirmations)
+                .where(self.action_confirmations.c.action_id == action_id)
+                .values(
+                    user_response=user_response,
+                    user_response_text=user_response_text,
+                    responded_at=datetime.utcnow()
+                )
+            )
+
+    def get_confirmation_by_id(self, confirmation_id):
+        """Get a confirmation by ID with computed status."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
+            ).fetchone()
+
+            if not row:
+                return None
+
+            result = dict(row._mapping)
+
+            # Add computed status field
+            if result.get("user_response"):
+                result["status"] = result["user_response"]
+            elif result.get("expires_at") and result["expires_at"] < datetime.utcnow():
+                result["status"] = "expired"
+            else:
+                result["status"] = "pending"
+
+            return result
+
+    def update_confirmation_status(self, confirmation_id, status, **kwargs):
+        """
+        Update confirmation status.
+
+        Maps status to user_response field:
+        - "approved" → user_response="approved"
+        - "rejected" → user_response="rejected"
+        - "expired" → user_response="expired"
+        """
+        with self.engine.begin() as conn:
+            update_values = {"user_response": status}
+
+            # Add responded_at if provided
+            if "responded_at" in kwargs:
+                update_values["responded_at"] = kwargs["responded_at"]
+
+            conn.execute(
+                update(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
+                .values(**update_values)
+            )
+
+    def get_action_by_id(self, action_id):
+        """Get an action by ID (alias for get_action)."""
+        return self.get_action(action_id)

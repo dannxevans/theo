@@ -4,11 +4,13 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from core.router import route_request, set_provider_registry, set_context_manager
+from core.router import route_request, set_provider_registry, set_context_manager, set_action_router, set_action_registry
 from core.context import ContextManager
 from core.memory import MemoryStore
 from config import Config
 from core.provider_registry import ProviderRegistry
+from core.action_router import ActionRouter
+from actions.action_registry import ActionProviderRegistry
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Response, stream_with_context
 import json
@@ -68,6 +70,19 @@ set_context_manager(context_manager)
 
 # Inject provider registry into router
 set_provider_registry(provider_registry)
+
+# Initialize action system
+action_registry = ActionProviderRegistry(memory)
+action_router = ActionRouter(action_registry, memory)
+set_action_router(action_router)
+set_action_registry(action_registry)
+
+# Initialize confirmation manager
+from core.confirmation_manager import ConfirmationManager
+confirmation_manager = ConfirmationManager(memory, action_router)
+
+# Connect confirmation manager to action router
+action_router.confirmation_manager = confirmation_manager
 
 # Seed default intents if none exist
 memory.seed_default_intents("local")
@@ -1187,6 +1202,441 @@ def get_all_work_subtabs():
     # Get all subtab configs
     configs = memory.get_all_work_subtab_configs(user["id"])
     return jsonify(configs)
+
+
+# =============================
+# M365 Authentication API
+# =============================
+
+@app.route("/api/m365/auth/start", methods=["POST"])
+def start_m365_auth():
+    """Initiate M365 OAuth device flow."""
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Import M365OAuth
+    from auth.m365_oauth import M365OAuth
+
+    # Check if configured
+    if not M365OAuth.is_configured():
+        return jsonify({
+            "error": "M365 not configured",
+            "instructions": M365OAuth.get_configuration_instructions()
+        }), 500
+
+    try:
+        # Initiate device flow
+        device_info = M365OAuth.initiate_device_flow()
+
+        # Store device_code in session for later polling
+        # (In a production system, you might want to use Redis or similar)
+        # For now, we'll expect the frontend to pass it back
+
+        return jsonify({
+            "user_code": device_info["user_code"],
+            "verification_url": device_info["verification_url"],
+            "message": device_info["message"],
+            "expires_in": device_info["expires_in"],
+            "interval": device_info["interval"],
+            "device_code": device_info["device_code"]  # Frontend will need this for polling
+        })
+
+    except Exception as e:
+        logging.error(f"[API] M365 auth start failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/m365/auth/poll", methods=["POST"])
+def poll_m365_auth():
+    """Poll for M365 OAuth token completion."""
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    data = request.json
+    device_code = data.get("device_code")
+
+    if not device_code:
+        return jsonify({"error": "device_code required"}), 400
+
+    from auth.m365_oauth import M365OAuth
+
+    try:
+        # Poll for token (single attempt)
+        import requests
+        payload = {
+            "client_id": M365OAuth.CLIENT_ID,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            "device_code": device_code
+        }
+
+        response = requests.post(M365OAuth.TOKEN_URL, data=payload, timeout=10)
+
+        if response.status_code == 200:
+            # Success! Store credentials
+            token_data = response.json()
+
+            memory.store_m365_credentials(
+                user_id=user["id"],
+                access_token=token_data["access_token"],
+                refresh_token=token_data["refresh_token"],
+                expires_at=datetime.utcnow() + timedelta(seconds=token_data["expires_in"]),
+                scope=token_data.get("scope")
+            )
+
+            # Create M365 service provider entry
+            import json as json_module
+            provider_id = memory.store_service_provider(
+                user_id=user["id"],
+                name="Microsoft 365",
+                category="calendar",
+                provider_type="m365",
+                capabilities=json_module.dumps([
+                    "read_calendar",
+                    "create_calendar_event",
+                    "update_calendar_event",
+                    "delete_calendar_event",
+                    "read_email",
+                    "send_email",
+                    "draft_email"
+                ]),
+                auth_method="oauth2",
+                trust_level="confirm"
+            )
+
+            logging.info(f"[API] M365 connected successfully for user {user['id']}")
+
+            return jsonify({
+                "status": "success",
+                "message": "M365 connected successfully",
+                "provider_id": provider_id
+            })
+
+        # Check error
+        error_data = response.json()
+        error = error_data.get("error")
+
+        if error == "authorization_pending":
+            # Still waiting
+            return jsonify({"status": "pending"}), 202
+        elif error == "authorization_declined":
+            return jsonify({"status": "declined", "error": "User declined authorization"}), 400
+        elif error == "expired_token":
+            return jsonify({"status": "expired", "error": "Device code expired"}), 400
+        else:
+            logging.error(f"[API] M365 auth error: {error}")
+            return jsonify({"status": "error", "error": error}), 400
+
+    except Exception as e:
+        logging.error(f"[API] M365 auth poll failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/m365/status", methods=["GET"])
+def get_m365_status():
+    """Get M365 connection status."""
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Check for M365 credentials
+    creds = memory.get_m365_credentials(user["id"])
+
+    if not creds:
+        return jsonify({"connected": False})
+
+    return jsonify({
+        "connected": True,
+        "is_valid": creds.get("is_valid"),
+        "expires_at": creds.get("expires_at").isoformat() if creds.get("expires_at") else None,
+        "user_principal_name": creds.get("user_principal_name"),
+        "token_expires_soon": (
+            creds.get("expires_at") < datetime.utcnow() + timedelta(minutes=10)
+            if creds.get("expires_at") else True
+        )
+    })
+
+
+@app.route("/api/m365/disconnect", methods=["POST"])
+def disconnect_m365():
+    """Disconnect M365 account."""
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Delete M365 credentials (not just invalidate)
+    memory.delete_m365_credentials(user["id"])
+
+    # Remove M365 service providers
+    providers = memory.get_service_providers(user["id"])
+    for provider in providers:
+        if provider.get("provider_type") == "m365":
+            memory.delete_service_provider(provider["id"], user["id"])
+
+    logging.info(f"[API] M365 disconnected for user {user['id']}")
+
+    return jsonify({"status": "disconnected"})
+
+
+@app.route("/api/calendar/query", methods=["POST"])
+def query_calendar():
+    """
+    Query calendar using natural language.
+
+    Example request:
+    POST /api/calendar/query
+    {
+        "text": "What's on my calendar tomorrow?",
+        "session_id": "session_123"
+    }
+
+    Returns calendar events or error message.
+    """
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get request data
+    payload = request.json
+    text = payload.get("text", "")
+    session_id = payload.get("session_id", "default")
+
+    if not text:
+        return jsonify({"error": "No query text provided"}), 400
+
+    # Build context for router
+    context = {
+        "text": text,
+        "session_id": session_id,
+        "user_id": user["id"],
+        "memory": memory,
+    }
+
+    # Route through main router (will detect calendar intent and route to ActionRouter)
+    try:
+        result = route_request(context)
+
+        # Log to conversation history
+        context_manager.update(session_id, text, result, provider_registry)
+
+        return jsonify(result)
+
+    except Exception as e:
+        logging.error(f"[API] Calendar query failed: {e}")
+        return jsonify({
+            "error": "Calendar query failed",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/api/confirmations/pending", methods=["GET"])
+def get_pending_confirmations():
+    """
+    Get all pending confirmations for the authenticated user.
+
+    Returns list of confirmations awaiting user approval.
+    """
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get pending confirmations
+    try:
+        confirmations = confirmation_manager.get_pending_confirmations(user["id"])
+
+        # Format for frontend
+        formatted_confirmations = []
+        for conf in confirmations:
+            formatted_confirmations.append({
+                "confirmation_id": conf.get("id"),
+                "action_id": conf.get("action_id"),
+                "message": conf.get("confirmation_message"),
+                "action_type": conf.get("action_type"),
+                "category": conf.get("category"),
+                "created_at": conf.get("created_at").isoformat() if conf.get("created_at") else None,
+                "expires_at": conf.get("expires_at").isoformat() if conf.get("expires_at") else None,
+            })
+
+        return jsonify({
+            "confirmations": formatted_confirmations,
+            "count": len(formatted_confirmations)
+        })
+
+    except Exception as e:
+        logging.error(f"[API] Get pending confirmations failed: {e}")
+        return jsonify({
+            "error": "Failed to get confirmations",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/api/confirmations/<int:confirmation_id>/approve", methods=["POST"])
+def approve_confirmation(confirmation_id):
+    """
+    Approve a confirmation and execute the action.
+
+    Path parameters:
+        confirmation_id: ID of the confirmation to approve
+    """
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Approve confirmation
+    try:
+        result = confirmation_manager.approve_confirmation(confirmation_id, user["id"])
+
+        if result["status"] == "success":
+            return jsonify({
+                "status": "approved",
+                "message": result["message"],
+                "action_result": result.get("action_result")
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": result["message"]
+            }), 400
+
+    except Exception as e:
+        logging.error(f"[API] Approve confirmation failed: {e}")
+        return jsonify({
+            "error": "Failed to approve confirmation",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/api/confirmations/<int:confirmation_id>/reject", methods=["POST"])
+def reject_confirmation(confirmation_id):
+    """
+    Reject a confirmation request.
+
+    Path parameters:
+        confirmation_id: ID of the confirmation to reject
+
+    Body (optional):
+        {
+            "reason": "User's reason for rejection"
+        }
+    """
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get reason if provided
+    payload = request.json or {}
+    reason = payload.get("reason")
+
+    # Reject confirmation
+    try:
+        result = confirmation_manager.reject_confirmation(confirmation_id, user["id"], reason)
+
+        if result["status"] == "success":
+            return jsonify({
+                "status": "rejected",
+                "message": result["message"]
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": result["message"]
+            }), 400
+
+    except Exception as e:
+        logging.error(f"[API] Reject confirmation failed: {e}")
+        return jsonify({
+            "error": "Failed to reject confirmation",
+            "details": str(e)
+        }), 500
 
 
 def debug_log(message):
