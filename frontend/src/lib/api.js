@@ -790,3 +790,119 @@ export async function getAllWorkSubtabConfigs() {
 
   return response.json();
 }
+
+// =============================
+// M365 Integration
+// =============================
+
+export async function startM365Auth() {
+  const response = await fetch(`${API_BASE}/api/m365/auth/start`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to start M365 authentication");
+  }
+
+  return response.json();
+}
+
+export async function pollM365Auth(deviceCode) {
+  const response = await fetch(`${API_BASE}/api/m365/auth/poll`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ device_code: deviceCode })
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to poll M365 authentication");
+  }
+
+  return response.json();
+}
+
+export async function getM365Status() {
+  const response = await fetch(`${API_BASE}/api/m365/status`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get M365 status");
+  }
+
+  return response.json();
+}
+
+export async function disconnectM365() {
+  const response = await fetch(`${API_BASE}/api/m365/disconnect`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to disconnect M365");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Confirmation Workflow
+// =============================
+
+export async function getPendingConfirmations() {
+  const response = await fetch(`${API_BASE}/api/confirmations/pending`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get pending confirmations");
+  }
+
+  return response.json();
+}
+
+export async function approveConfirmation(confirmationId) {
+  const response = await fetch(`${API_BASE}/api/confirmations/${confirmationId}/approve`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to approve confirmation");
+  }
+
+  return response.json();
+}
+
+export async function rejectConfirmation(confirmationId, reason = null) {
+  const response = await fetch(`${API_BASE}/api/confirmations/${confirmationId}/reject`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ reason })
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to reject confirmation");
+  }
+
+  return response.json();
+}

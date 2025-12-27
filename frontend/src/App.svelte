@@ -7,11 +7,13 @@
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
   import Login from "./components/Login.svelte";
+  import PersonalActions from "./components/PersonalActions.svelte";
   import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode, getWorkSubtabConfig } from "./lib/api.js";
 
   let isAuthenticated = false;
   let currentUser = null;
   let showSettings = false;
+  let showActions = false; // New: show actions panel in personal mode
   let currentMode = "personal"; // "work" or "personal"
   let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
 
@@ -269,16 +271,26 @@ async function handleLogout() {
 
       <button
         class="btn-pill"
-        class:active={!showSettings}
-        on:click={() => { showSettings = false; }}
+        class:active={!showSettings && !showActions}
+        on:click={() => { showSettings = false; showActions = false; }}
       >
         Chat
       </button>
 
+      {#if currentMode === "personal"}
+        <button
+          class="btn-pill"
+          class:active={showActions && !showSettings}
+          on:click={() => { showSettings = false; showActions = true; }}
+        >
+          Actions
+        </button>
+      {/if}
+
       <button
         class="btn-pill"
         class:active={showSettings}
-        on:click={() => { showSettings = true; }}
+        on:click={() => { showSettings = true; showActions = false; }}
       >
         Settings
       </button>
@@ -351,6 +363,8 @@ async function handleLogout() {
       <div class="chat-main">
         {#if showSettings}
           <Settings />
+        {:else if showActions && currentMode === "personal"}
+          <PersonalActions />
         {:else}
           <Chat sessionId={activeSessionId} currentMode={currentMode} activeWorkSubtab={activeWorkSubtab} />
         {/if}
