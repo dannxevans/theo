@@ -92,6 +92,8 @@ class ActionRouter:
             "read_calendar": self._handle_read_calendar,
             "book_appointment": self._handle_book_appointment,
             "manage_email": self._handle_manage_email,
+            "approve_confirmation": self._handle_approve_confirmation,
+            "reject_confirmation": self._handle_reject_confirmation,
         }
 
         handler = handlers.get(intent)
@@ -355,6 +357,146 @@ class ActionRouter:
             "provider": "action_router",
             "task_type": "manage_email",
         }
+
+    # =============================
+    # Confirmation Actions
+    # =============================
+
+    def _handle_approve_confirmation(
+        self,
+        user_text: str,
+        session_id: str,
+        user_id: int,
+        context: Dict
+    ) -> Dict:
+        """
+        Handle natural language approval of pending confirmations.
+
+        Examples:
+        - "approve"
+        - "yes"
+        - "looks good"
+        - "go ahead"
+
+        Args:
+            user_text: User's input text
+            session_id: Session ID
+            user_id: User ID
+            context: Full request context
+
+        Returns:
+            Response dictionary with approval result
+        """
+        if not self.confirmation_manager:
+            return {
+                "text": "The confirmation system is not initialized.",
+                "provider": "action_router",
+                "task_type": "approve_confirmation",
+            }
+
+        # Get pending confirmations for this user
+        pending = self.confirmation_manager.get_pending_confirmations(user_id)
+
+        if not pending:
+            return {
+                "text": "You don't have any pending confirmations to approve.",
+                "provider": "action_router",
+                "task_type": "approve_confirmation",
+            }
+
+        # Approve the most recent confirmation
+        confirmation = pending[0]
+        result = self.confirmation_manager.approve_confirmation(
+            confirmation["id"], user_id
+        )
+
+        if result["status"] == "success":
+            return {
+                "text": f"✓ Approved! {result.get('message', 'Action completed successfully.')}",
+                "provider": "action_router",
+                "task_type": "approve_confirmation",
+                "metadata": {
+                    "confirmation_id": confirmation["id"],
+                    "approved": True
+                }
+            }
+        else:
+            return {
+                "text": f"Failed to approve: {result.get('message', 'Unknown error')}",
+                "provider": "action_router",
+                "task_type": "approve_confirmation",
+                "metadata": {
+                    "error": result.get("message")
+                }
+            }
+
+    def _handle_reject_confirmation(
+        self,
+        user_text: str,
+        session_id: str,
+        user_id: int,
+        context: Dict
+    ) -> Dict:
+        """
+        Handle natural language rejection of pending confirmations.
+
+        Examples:
+        - "reject"
+        - "no"
+        - "cancel"
+        - "nevermind"
+
+        Args:
+            user_text: User's input text
+            session_id: Session ID
+            user_id: User ID
+            context: Full request context
+
+        Returns:
+            Response dictionary with rejection result
+        """
+        if not self.confirmation_manager:
+            return {
+                "text": "The confirmation system is not initialized.",
+                "provider": "action_router",
+                "task_type": "reject_confirmation",
+            }
+
+        # Get pending confirmations for this user
+        pending = self.confirmation_manager.get_pending_confirmations(user_id)
+
+        if not pending:
+            return {
+                "text": "You don't have any pending confirmations to reject.",
+                "provider": "action_router",
+                "task_type": "reject_confirmation",
+            }
+
+        # Reject the most recent confirmation
+        confirmation = pending[0]
+        result = self.confirmation_manager.reject_confirmation(
+            confirmation["id"], user_id, reason="Rejected via chat"
+        )
+
+        if result["status"] == "success":
+            return {
+                "text": f"✗ Rejected. The action was cancelled.",
+                "provider": "action_router",
+                "task_type": "reject_confirmation",
+                "metadata": {
+                    "confirmation_id": confirmation["id"],
+                    "rejected": True
+                }
+            }
+        else:
+            return {
+                "text": f"Failed to reject: {result.get('message', 'Unknown error')}",
+                "provider": "action_router",
+                "task_type": "reject_confirmation",
+                "metadata": {
+                    "error": result.get("message")
+                }
+            }
 
     # =============================
     # Event Parsing Helpers
