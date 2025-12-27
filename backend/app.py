@@ -238,7 +238,11 @@ def stream_chat_sse(session_id):
             for i in range(0, len(full_text), chunk_size):
                 chunk = full_text[i:i + chunk_size]
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
-            
+
+            # Save the turn to database BEFORE sending end event
+            # This ensures metadata is persisted before frontend reloads messages
+            context_manager.update(session_id, text, result, provider_registry)
+
             # Send metadata at end of stream
             end_payload = {
                 "provider": result.get("provider"),
@@ -250,9 +254,6 @@ def stream_chat_sse(session_id):
 
             yield "event: end\n"
             yield f"data: {json.dumps(end_payload)}\n\n"
-
-            # Pass the full result object so metadata can be extracted
-            context_manager.update(session_id, text, result, provider_registry)
 
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
@@ -520,6 +521,7 @@ def get_session_messages(session_id):
             "provider": t.get("provider_id"),
             "model": t.get("model"),
             "task_type": t.get("intent"),
+            "metadata": t.get("metadata"),
         }
         for t in turns
     ])
@@ -687,7 +689,8 @@ Title:"""
             "text": title_prompt,
             "session_id": session_id,
             "memory": memory,
-            "forced_provider": None  # Let router pick best provider
+            "forced_provider": None,  # Let router pick best provider
+            "force_intent": "general"  # Force general intent to avoid action routing
         }
 
         result = route_request(router_context)

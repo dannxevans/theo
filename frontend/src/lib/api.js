@@ -157,8 +157,17 @@ export async function deleteSessionApi(sessionId) {
 }
 
 export async function getSessionMessages(sessionId) {
+  // Add cache-busting timestamp to prevent browser caching
+  const timestamp = Date.now();
   const response = await fetch(
-    `${API_BASE}/api/sessions/${sessionId}/messages`
+    `${API_BASE}/api/sessions/${sessionId}/messages?_=${timestamp}`,
+    {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    }
   );
 
   if (!response.ok) {

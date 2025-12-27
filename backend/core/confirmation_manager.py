@@ -233,6 +233,10 @@ class ConfirmationManager:
 
         self.memory.update_action_status(action["id"], "approved")
 
+        # Update the turn metadata to reflect approval
+        if action.get("session_id"):
+            self.memory.update_turn_metadata(action["session_id"], confirmation_id, approved=True)
+
         logging.info(
             f"[CONFIRMATION] User {user_id} approved confirmation {confirmation_id}"
         )
@@ -334,6 +338,10 @@ class ConfirmationManager:
         self.memory.update_action_status(
             action["id"], "cancelled", error_message=cancel_reason
         )
+
+        # Update the turn metadata to reflect rejection
+        if action.get("session_id"):
+            self.memory.update_turn_metadata(action["session_id"], confirmation_id, approved=False)
 
         logging.info(
             f"[CONFIRMATION] User {user_id} rejected confirmation {confirmation_id}: {cancel_reason}"

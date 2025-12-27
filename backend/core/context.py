@@ -188,16 +188,20 @@ class ContextManager:
         """
         Persist the latest turn and update the rolling session summary.
         """
+        logging.info(f"[CONTEXT] update() called for session {session_id}")
 
         # Extract metadata from assistant response if it's a dict
         provider_id = None
         model = None
         intent = None
+        metadata = None
 
         if isinstance(assistant_text, dict):
             provider_id = assistant_text.get("provider")
             model = assistant_text.get("model")
             intent = assistant_text.get("task_type")  # task_type is the intent
+            metadata = assistant_text.get("metadata")  # Extract metadata for confirmations
+            logging.info(f"[CONTEXT] Extracted metadata: {metadata}")
 
             if provider_id:
                 self.memory.set_last_provider(session_id, provider_id)
@@ -205,8 +209,11 @@ class ContextManager:
             assistant_text = assistant_text.get("text", "")
 
         # Store recent turns
+        logging.info(f"[CONTEXT] Storing user turn")
         self._store_turn(session_id, "user", user_text)
-        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent)
+        logging.info(f"[CONTEXT] Storing assistant turn with metadata: {metadata is not None}")
+        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent, metadata=metadata)
+        logging.info(f"[CONTEXT] Turns stored successfully")
 
         # Derive and persist session title if supported by memory store
         if hasattr(self.memory, "save_session_title"):
@@ -269,7 +276,7 @@ class ContextManager:
             limit=self.MAX_RECENT_TURNS * 2
         )
 
-    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None):
+    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None, metadata=None):
         self.memory.save_turn(
             session_id=session_id,
             role=role,
@@ -277,7 +284,8 @@ class ContextManager:
             created_at=datetime.utcnow(),
             provider_id=provider_id,
             model=model,
-            intent=intent
+            intent=intent,
+            metadata=metadata
         )
 
     def _generate_summary(self, session_id):

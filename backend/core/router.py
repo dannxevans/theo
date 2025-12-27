@@ -85,10 +85,18 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     # IMPORTANT: Check write actions before read actions to avoid false positives
     # e.g., "add to calendar" should match book_appointment, not read_calendar
 
-    # Write-action keywords (highest priority)
+    # Confirmation keywords (highest priority - process before other actions)
+    CONFIRMATION_KEYWORDS = {
+        "approve_confirmation": ["approve", "yes", "confirm", "ok", "looks good", "go ahead", "do it"],
+        "reject_confirmation": ["reject", "no", "don't", "nevermind", "never mind"],
+    }
+
+    # Write-action keywords (high priority)
     WRITE_ACTION_KEYWORDS = {
         "book_appointment": ["add", "create", "schedule", "book", "set up", "make", "arrange",
                            "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
+        "update_appointment": ["move", "reschedule", "change time", "update"],
+        "cancel_appointment": ["cancel", "delete", "remove"],
         "manage_email": ["send email", "draft email", "compose", "write email", "reply to"],
     }
 
@@ -99,7 +107,19 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
         "manage_email": ["email", "inbox", "unread", "check email"],
     }
 
-    # First check for write actions (add, create, schedule, etc.)
+    # First check for confirmation intents (approve/reject)
+    # Only trigger if there are pending confirmations
+    for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in text_l:
+                # Check if user has pending confirmations
+                if memory:
+                    from core.confirmation_manager import ConfirmationManager
+                    # We'll check for pending confirmations in the action router
+                    _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
+                    return confirmation_intent
+
+    # Then check for write actions (add, create, schedule, etc.)
     for action_intent, keywords in WRITE_ACTION_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text_l:
@@ -450,7 +470,7 @@ def route_request(context: dict, stream: bool = False):
     # Action Intent Routing
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
-    ACTION_INTENTS = ["read_calendar", "book_appointment", "manage_email"]
+    ACTION_INTENTS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "manage_email", "approve_confirmation", "reject_confirmation"]
 
     if intent in ACTION_INTENTS:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")

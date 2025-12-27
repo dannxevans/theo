@@ -13,7 +13,9 @@
   getProviders,
   exportSession,
   forkSession,
-  generateSessionTitle
+  generateSessionTitle,
+  approveConfirmation,
+  rejectConfirmation
 } from "../lib/api.js";
   import { marked } from "marked";
   import Prism from "prismjs";
@@ -216,7 +218,8 @@
         provider: t.provider,
         model: t.model,
         task_type: t.task_type,
-        created_at: t.created_at
+        created_at: t.created_at,
+        metadata: t.metadata || null
       }));
 
       // Track unique providers used in this session
@@ -307,22 +310,12 @@
             usedProviders = new Set([...usedProviders, meta.provider]);
           }
 
-          messages = [
-            ...messages,
-            {
-              role: "assistant",
-              text: streamedText,
-              provider: meta?.provider,
-              model: meta?.model,
-              task_type: meta?.task_type,
-              fallback_reason: meta?.fallback_reason,
-              created_at: new Date().toISOString()
-            }
-          ];
-
           streamedText = "";
           streaming = false;
           loading = false;
+
+          // Reload messages from database to get metadata (including confirmation data)
+          await loadSessionMessages(sessionId);
 
           await tick();
           scrollToBottom();
@@ -362,6 +355,68 @@
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
+  }
+
+  async function handleApprove(confirmationId) {
+    try {
+      await approveConfirmation(confirmationId);
+
+      // Update the message metadata to show approved status
+      messages = messages.map(m => {
+        if (m.metadata && m.metadata.confirmation_id === confirmationId) {
+          return {
+            ...m,
+            metadata: { ...m.metadata, approved: true, rejected: false }
+          };
+        }
+        return m;
+      });
+
+      // Reload messages to get any updates
+      await loadSessionMessages(sessionId);
+    } catch (e) {
+      alert("Failed to approve: " + e.message);
+    }
+  }
+
+  async function handleReject(confirmationId) {
+    try {
+      await rejectConfirmation(confirmationId);
+
+      // Update the message metadata to show rejected status
+      messages = messages.map(m => {
+        if (m.metadata && m.metadata.confirmation_id === confirmationId) {
+          return {
+            ...m,
+            metadata: { ...m.metadata, approved: false, rejected: true }
+          };
+        }
+        return m;
+      });
+
+      // Reload messages to get any updates
+      await loadSessionMessages(sessionId);
+    } catch (e) {
+      alert("Failed to reject: " + e.message);
+    }
+  }
+
+  function getTimeRemaining(expiresAt) {
+    if (!expiresAt) return "";
+
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diff = expiry - now;
+
+    if (diff < 0) return "expired";
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
   }
 </script>
 
@@ -456,6 +511,76 @@
                   <div class="markdown">
                     {@html renderMarkdown(m.text)}
                   </div>
+
+                  {#if m.metadata && m.metadata.requires_confirmation}
+                    <div class="confirmation-widget {m.metadata.approved ? 'approved' : ''} {m.metadata.rejected ? 'rejected' : ''}">
+                      {#if m.metadata.approved || m.metadata.rejected}
+                        <!-- Completed state: show clean status -->
+                        <div class="confirmation-header">
+                          <span class="confirmation-icon">
+                            {#if m.metadata.action_category === "calendar"}
+                              📅
+                            {:else if m.metadata.action_category === "email"}
+                              ✉️
+                            {:else}
+                              ⚡
+                            {/if}
+                            CALENDAR
+                          </span>
+                        </div>
+                        <div class="confirmation-result">
+                          {#if m.metadata.approved}
+                            {m.metadata.confirmation_message.replace('?', '.').replace('Add ', '')}
+                          {:else}
+                            {#if m.metadata.confirmation_message.includes("'")}
+                              '{m.metadata.confirmation_message.split("'")[1]}' was not added to your calendar.
+                            {:else}
+                              Action was not performed.
+                            {/if}
+                          {/if}
+                        </div>
+                        <div class="confirmation-status-final {m.metadata.approved ? 'approved' : 'rejected'}">
+                          {m.metadata.approved ? 'Approved' : 'Rejected'}
+                        </div>
+                      {:else}
+                        <!-- Pending state: show approval buttons -->
+                        <div class="confirmation-header">
+                          <span class="confirmation-icon">
+                            {#if m.metadata.action_category === "calendar"}
+                              📅
+                            {:else if m.metadata.action_category === "email"}
+                              ✉️
+                            {:else}
+                              ⚡
+                            {/if}
+                            CALENDAR Approval
+                          </span>
+                          <span class="confirmation-expires">
+                            {#if m.metadata.expires_at}
+                              Expires in {getTimeRemaining(m.metadata.expires_at)}
+                            {/if}
+                          </span>
+                        </div>
+                        <div class="confirmation-message">
+                          {m.metadata.confirmation_message}
+                        </div>
+                        <div class="confirmation-actions">
+                          <button
+                            class="btn-approve"
+                            on:click={() => handleApprove(m.metadata.confirmation_id)}
+                          >
+                            ✓ Approve
+                          </button>
+                          <button
+                            class="btn-reject"
+                            on:click={() => handleReject(m.metadata.confirmation_id)}
+                          >
+                            × Reject
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
 
                   {#if m.provider}
                     <div class="bubble-footer">
@@ -578,5 +703,131 @@
 
   :global(.copy-btn:hover) {
     background: #388bfd;
-  }  
+  }
+
+  .confirmation-widget {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+  }
+
+  .confirmation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .confirmation-icon {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #007bff;
+  }
+
+  .confirmation-expires {
+    font-size: 0.85rem;
+    color: #6c757d;
+  }
+
+  .confirmation-message {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    color: #495057;
+  }
+
+  .confirmation-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .btn-approve,
+  .btn-reject {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-approve {
+    background: #28a745;
+    color: white;
+  }
+
+  .btn-approve:hover:not(:disabled) {
+    background: #218838;
+  }
+
+  .btn-reject {
+    background: #dc3545;
+    color: white;
+  }
+
+  .btn-reject:hover:not(:disabled) {
+    background: #c82333;
+  }
+
+  .btn-approve:disabled,
+  .btn-reject:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .confirmation-status {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .confirmation-status.approved {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  .confirmation-status.rejected {
+    background: #f8d7da;
+    color: #721c24;
+  }
+
+  /* Completed state styling */
+  .confirmation-widget.approved {
+    border-color: #28a745;
+    background: #f0f9f4;
+  }
+
+  .confirmation-widget.rejected {
+    border-color: #dc3545;
+    background: #fef5f6;
+  }
+
+  .confirmation-result {
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    color: #495057;
+    line-height: 1.5;
+  }
+
+  .confirmation-status-final {
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .confirmation-status-final.approved {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  .confirmation-status-final.rejected {
+    background: #f8d7da;
+    color: #721c24;
+  }
 </style>
