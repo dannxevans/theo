@@ -525,7 +525,7 @@
                             {:else}
                               ⚡
                             {/if}
-                            CALENDAR
+                            {(m.metadata.action_category || 'ACTION').toUpperCase()}
                           </span>
                         </div>
                         <div class="confirmation-result">
@@ -533,7 +533,11 @@
                             {m.metadata.confirmation_message.replace('?', '.').replace('Add ', '')}
                           {:else}
                             {#if m.metadata.confirmation_message.includes("'")}
-                              '{m.metadata.confirmation_message.split("'")[1]}' was not added to your calendar.
+                              {#if m.metadata.action_category === "email"}
+                                '{m.metadata.confirmation_message.split("'")[1]}' was not sent.
+                              {:else}
+                                '{m.metadata.confirmation_message.split("'")[1]}' was not added to your calendar.
+                              {/if}
                             {:else}
                               Action was not performed.
                             {/if}
@@ -553,7 +557,7 @@
                             {:else}
                               ⚡
                             {/if}
-                            CALENDAR Approval
+                            {(m.metadata.action_category || 'ACTION').toUpperCase()} Approval
                           </span>
                           <span class="confirmation-expires">
                             {#if m.metadata.expires_at}

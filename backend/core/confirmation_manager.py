@@ -420,6 +420,8 @@ class ConfirmationManager:
             result = provider.delete_calendar_event(**params)
         elif action_type == "send_email":
             result = provider.send_email(**params)
+        elif action_type == "reply_email":
+            result = provider.reply_email(**params)
         elif action_type == "draft_email":
             result = provider.draft_email(**params)
         else:

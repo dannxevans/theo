@@ -11,6 +11,7 @@ Supported capabilities:
 - delete_calendar_event: Delete events
 - read_email: Read inbox messages
 - send_email: Send emails
+- reply_email: Reply to emails
 - draft_email: Create email drafts
 """
 
@@ -42,12 +43,13 @@ class M365Provider(ActionProvider):
         "delete_calendar_event",
         "read_email",
         "send_email",
+        "reply_email",
         "draft_email",
     ]
 
     GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
 
-    def __init__(self, access_token: str, refresh_token: str, expires_at: datetime):
+    def __init__(self, access_token: str, refresh_token: str, expires_at: datetime, user_id: int = None, memory_store = None):
         """
         Initialize M365 provider with OAuth credentials.
 
@@ -55,10 +57,14 @@ class M365Provider(ActionProvider):
             access_token: Microsoft Graph API access token
             refresh_token: Refresh token for obtaining new access tokens
             expires_at: Datetime when access token expires
+            user_id: User ID for storing refreshed tokens
+            memory_store: Memory store instance for persisting tokens
         """
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.expires_at = expires_at
+        self.user_id = user_id
+        self.memory_store = memory_store
 
     # =============================
     # Health & Validation
@@ -117,6 +123,7 @@ class M365Provider(ActionProvider):
             "delete_calendar_event": self._validate_delete_event,
             "read_email": self._validate_read_email,
             "send_email": self._validate_send_email,
+            "reply_email": self._validate_reply_email,
             "draft_email": self._validate_draft_email,
         }
 
@@ -498,6 +505,102 @@ class M365Provider(ActionProvider):
             logging.error(f"[M365] Email draft creation failed: {e}")
             raise ActionExecutionError(f"Failed to create email draft: {e}")
 
+    def reply_email(
+        self,
+        email_id: str,
+        body: str,
+        content_type: str = "HTML"
+    ) -> Dict:
+        """
+        Reply to an email.
+
+        Args:
+            email_id: ID of the email to reply to
+            body: Reply body content
+            content_type: "HTML" or "Text" (default: "HTML")
+
+        Returns:
+            Dictionary with reply status
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If API call fails
+        """
+        self._ensure_token_valid()
+
+        headers = self._get_headers()
+
+        message = {
+            "comment": body
+        }
+
+        url = f"{self.GRAPH_API_BASE}/me/messages/{email_id}/reply"
+
+        try:
+            response = requests.post(url, headers=headers, json=message, timeout=15)
+            response.raise_for_status()
+
+            logging.info(f"[M365] Replied to email: {email_id}")
+
+            return {
+                "status": "sent",
+                "email_id": email_id,
+                "sent_at": datetime.utcnow().isoformat()
+            }
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Email reply failed: {e}")
+            raise ActionExecutionError(f"Failed to reply to email: {e}")
+
+    def get_email_body(self, email_id: str) -> str:
+        """
+        Get the full body of an email by ID.
+
+        Args:
+            email_id: ID of the email to fetch
+
+        Returns:
+            Email body content as text
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If API call fails
+        """
+        self._ensure_token_valid()
+
+        headers = self._get_headers()
+        url = f"{self.GRAPH_API_BASE}/me/messages/{email_id}"
+
+        params = {
+            "$select": "body"
+        }
+
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=15)
+            response.raise_for_status()
+
+            data = response.json()
+            body_data = data.get("body", {})
+            body_content = body_data.get("content", "")
+
+            # Strip HTML tags if content type is HTML
+            content_type = body_data.get("contentType", "")
+            if content_type == "html":
+                # Simple HTML tag removal (could use a library like BeautifulSoup for more robust parsing)
+                import re
+                body_content = re.sub('<[^<]+?>', '', body_content)
+                body_content = body_content.replace('&nbsp;', ' ')
+                body_content = body_content.replace('&amp;', '&')
+                body_content = body_content.replace('&lt;', '<')
+                body_content = body_content.replace('&gt;', '>')
+
+            logging.info(f"[M365] Fetched full body for email: {email_id}")
+            return body_content.strip()
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Failed to fetch email body: {e}")
+            raise ActionExecutionError(f"Failed to fetch email body: {e}")
+
     # =============================
     # Helper Methods
     # =============================
@@ -511,15 +614,46 @@ class M365Provider(ActionProvider):
 
     def _ensure_token_valid(self):
         """
-        Check if token needs refresh.
+        Check if token needs refresh and automatically refresh if expired.
 
         Raises:
             ActionAuthenticationError: If token is expired and can't be refreshed
         """
-        if datetime.utcnow() >= self.expires_at:
-            raise ActionAuthenticationError(
-                "Access token expired. Token refresh is handled by the confirmation manager."
-            )
+        # Add buffer of 5 minutes to refresh before actual expiration
+        if datetime.utcnow() >= (self.expires_at - timedelta(minutes=5)):
+            logging.info("[M365] Access token expired or expiring soon, attempting refresh...")
+
+            # Import M365OAuth here to avoid circular imports
+            from auth.m365_oauth import M365OAuth
+
+            # Attempt to refresh token
+            new_token_data = M365OAuth.refresh_access_token(self.refresh_token)
+
+            if not new_token_data:
+                raise ActionAuthenticationError(
+                    "Access token expired and refresh failed. Please reconnect your Microsoft 365 account."
+                )
+
+            # Update instance variables
+            self.access_token = new_token_data["access_token"]
+            self.refresh_token = new_token_data["refresh_token"]
+            self.expires_at = new_token_data["expires_at"]
+
+            logging.info(f"[M365] Token refreshed successfully. New expiry: {self.expires_at}")
+
+            # Persist refreshed tokens to database if we have user_id and memory_store
+            if self.user_id and self.memory_store:
+                try:
+                    self.memory_store.store_m365_credentials(
+                        user_id=self.user_id,
+                        access_token=self.access_token,
+                        refresh_token=self.refresh_token,
+                        expires_at=self.expires_at
+                    )
+                    logging.info("[M365] Refreshed tokens persisted to database")
+                except Exception as e:
+                    logging.error(f"[M365] Failed to persist refreshed tokens: {e}")
+                    # Don't fail the operation if we can't persist - tokens are still valid in memory
 
     def _normalize_event(self, event: Dict) -> Dict:
         """Normalize Microsoft Graph event to THEO format."""
@@ -637,6 +771,21 @@ class M365Provider(ActionProvider):
 
         if not isinstance(params["to"], list):
             return False, "to must be a list of email addresses"
+
+        return True, None
+
+    def _validate_reply_email(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate reply_email parameters."""
+        required = ["email_id", "body"]
+        for field in required:
+            if field not in params:
+                return False, f"Missing required field: {field}"
+
+        if not params.get("email_id"):
+            return False, "email_id must be provided"
+
+        if not params.get("body"):
+            return False, "body must be provided"
 
         return True, None
 

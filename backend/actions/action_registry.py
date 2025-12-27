@@ -60,7 +60,9 @@ class ActionProviderRegistry:
                         provider = M365Provider(
                             access_token=creds["access_token"],
                             refresh_token=creds["refresh_token"],
-                            expires_at=creds["expires_at"]
+                            expires_at=creds["expires_at"],
+                            user_id=user_id,
+                            memory_store=self.memory
                         )
                         self._providers[sp["id"]] = provider
                         logging.info(f"[ACTION_REGISTRY] Loaded M365 provider (ID: {sp['id']})")
@@ -232,7 +234,9 @@ class ActionProviderRegistry:
                     provider = M365Provider(
                         access_token=creds["access_token"],
                         refresh_token=creds["refresh_token"],
-                        expires_at=creds["expires_at"]
+                        expires_at=creds["expires_at"],
+                        user_id=user_id,
+                        memory_store=self.memory
                     )
                     self._providers[provider_id] = provider
                     logging.info(f"[ACTION_REGISTRY] Reloaded provider {provider_id}")
