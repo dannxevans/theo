@@ -657,17 +657,21 @@ class ActionRouter:
 
         provider_id, provider = providers[0]
 
-        # Determine if user wants unread emails only
+        # Determine if user wants to read a specific email or get a summary
         user_text_lower = user_text.lower()
-        filter_unread = "unread" in user_text_lower
+
+        # Check if user wants to read a specific email (e.g., "read me the solicitors email")
+        is_specific_email = any(keyword in user_text_lower for keyword in ["read me", "read the", "show me the", "open the"])
 
         try:
-            # Read emails (unread only if specified)
+            # Fetch emails
+            filter_unread = "unread" in user_text_lower
+
             if filter_unread:
                 emails = provider.read_email(folder="inbox", top=20, filter_query="isRead eq false")
                 logging.info(f"[ACTION_ROUTER] Fetched {len(emails)} unread emails with filter 'isRead eq false'")
             else:
-                emails = provider.read_email(folder="inbox", top=20)
+                emails = provider.read_email(folder="inbox", top=50)
                 logging.info(f"[ACTION_ROUTER] Fetched {len(emails)} emails (no filter)")
 
             if not emails:
@@ -682,7 +686,11 @@ class ActionRouter:
                     }
                 }
 
-            # Generate AI summary of emails
+            # If user wants a specific email, search for it
+            if is_specific_email:
+                return self._read_specific_email(user_text, emails, user_id)
+
+            # Otherwise, generate AI summary of emails
             summary = self._generate_email_summary(emails, user_id, filter_unread)
 
             return {
@@ -705,6 +713,107 @@ class ActionRouter:
                     "error": str(e)
                 }
             }
+
+    def _read_specific_email(
+        self,
+        user_text: str,
+        emails: list,
+        user_id: int
+    ) -> Dict:
+        """
+        Read a specific email based on user's description.
+
+        Args:
+            user_text: User's request (e.g., "read me the solicitors email")
+            emails: List of email dictionaries to search
+            user_id: User ID
+
+        Returns:
+            Response dictionary with email content
+        """
+        import re
+
+        # Extract keywords from user request to find matching email
+        user_text_lower = user_text.lower()
+
+        # Remove common phrases to get the actual search terms
+        # Use word boundaries to avoid removing parts of words
+        import re
+        search_text = user_text_lower
+
+        # Remove action phrases at the beginning
+        search_text = re.sub(r'\b(read me|read the|show me|show me the|open the|can you)\b', '', search_text)
+        search_text = re.sub(r'\b(the|email|from)\b', '', search_text)
+        search_text = search_text.strip()
+
+        logging.info(f"[ACTION_ROUTER] Searching for specific email with keywords: '{search_text}'")
+
+        # Search for matching email by subject or sender
+        matching_email = None
+        for email in emails:
+            subject = email.get("subject", "").lower()
+            sender = email.get("from", "").lower()
+
+            # Check if search terms appear in subject or sender
+            if search_text in subject or search_text in sender:
+                matching_email = email
+                break
+
+            # Also check if individual words match
+            search_words = search_text.split()
+            if search_words and any(word in subject or word in sender for word in search_words if len(word) > 3):
+                matching_email = email
+                break
+
+        if not matching_email:
+            return {
+                "text": f"I couldn't find an email matching '{search_text}'. Can you be more specific?",
+                "provider": "action_router",
+                "task_type": "read_email",
+            }
+
+        # Get the M365 provider to fetch full email body
+        self.action_registry.load_providers(user_id)
+        providers = self.action_registry.get_providers_by_capability("read_email", user_id)
+
+        if not providers:
+            return {
+                "text": "Failed to access email provider.",
+                "provider": "action_router",
+                "task_type": "read_email",
+            }
+
+        provider_id, provider = providers[0]
+
+        # Fetch full email body
+        try:
+            email_id = matching_email.get("id")
+            body = provider.get_email_body(email_id)
+        except Exception as e:
+            logging.warning(f"[ACTION_ROUTER] Failed to fetch full email body: {e}")
+            body = matching_email.get("preview", "No content available")
+
+        # Format the email for display
+        subject = matching_email.get("subject", "No subject")
+        sender = matching_email.get("from", "Unknown")
+        received = matching_email.get("received_at", "")
+
+        response_text = f"**Email from {sender}**\n\n"
+        response_text += f"**Subject:** {subject}\n\n"
+        if received:
+            response_text += f"**Received:** {received}\n\n"
+        response_text += f"**Content:**\n{body}"
+
+        return {
+            "text": response_text,
+            "provider": "action_router",
+            "task_type": "read_email",
+            "metadata": {
+                "email_id": matching_email.get("id"),
+                "subject": subject,
+                "sender": sender
+            }
+        }
 
     def _handle_compose_email(
         self,

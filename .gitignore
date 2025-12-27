@@ -18,7 +18,9 @@ data/
 backend/data/
 *.sqlite
 *.sqlite3
+data/theo.db
+backend.log
+*.log
 
 # OS
 .DS_Store
-data/theo.db
