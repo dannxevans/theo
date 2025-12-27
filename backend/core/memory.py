@@ -1950,6 +1950,13 @@ class MemoryStore:
     def create_action(self, user_id, session_id, action_type, category,
                       intent_summary, service_provider_id=None, **kwargs):
         """Create a new action."""
+        import json
+
+        # Serialize action_params to JSON if it's a dict
+        action_params = kwargs.get("action_params")
+        if action_params and isinstance(action_params, dict):
+            action_params = json.dumps(action_params)
+
         with self.engine.begin() as conn:
             result = conn.execute(
                 insert(self.actions).values(
@@ -1959,7 +1966,7 @@ class MemoryStore:
                     category=category,
                     intent_summary=intent_summary,
                     service_provider_id=service_provider_id,
-                    action_params=kwargs.get("action_params"),
+                    action_params=action_params,
                     planned_execution_time=kwargs.get("planned_execution_time"),
                     status=kwargs.get("status", "pending"),
                     requires_confirmation=kwargs.get("requires_confirmation", True),
@@ -2020,7 +2027,7 @@ class MemoryStore:
     def create_confirmation(self, action_id, confirmation_message, expires_at):
         """Create a confirmation request for an action."""
         with self.engine.begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 insert(self.action_confirmations).values(
                     action_id=action_id,
                     confirmation_message=confirmation_message,
@@ -2029,6 +2036,7 @@ class MemoryStore:
                     created_at=datetime.utcnow()
                 )
             )
+            return result.lastrowid
 
     def get_pending_confirmations(self, user_id):
         """Get all pending confirmations for a user."""
@@ -2061,3 +2069,52 @@ class MemoryStore:
                     responded_at=datetime.utcnow()
                 )
             )
+
+    def get_confirmation_by_id(self, confirmation_id):
+        """Get a confirmation by ID with computed status."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
+            ).fetchone()
+
+            if not row:
+                return None
+
+            result = dict(row._mapping)
+
+            # Add computed status field
+            if result.get("user_response"):
+                result["status"] = result["user_response"]
+            elif result.get("expires_at") and result["expires_at"] < datetime.utcnow():
+                result["status"] = "expired"
+            else:
+                result["status"] = "pending"
+
+            return result
+
+    def update_confirmation_status(self, confirmation_id, status, **kwargs):
+        """
+        Update confirmation status.
+
+        Maps status to user_response field:
+        - "approved" → user_response="approved"
+        - "rejected" → user_response="rejected"
+        - "expired" → user_response="expired"
+        """
+        with self.engine.begin() as conn:
+            update_values = {"user_response": status}
+
+            # Add responded_at if provided
+            if "responded_at" in kwargs:
+                update_values["responded_at"] = kwargs["responded_at"]
+
+            conn.execute(
+                update(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
+                .values(**update_values)
+            )
+
+    def get_action_by_id(self, action_id):
+        """Get an action by ID (alias for get_action)."""
+        return self.get_action(action_id)
