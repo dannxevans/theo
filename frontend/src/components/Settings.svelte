@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import PersonalActions from "./PersonalActions.svelte";
   import {
     getProviders,
     listProviders,
@@ -703,6 +704,13 @@
       on:click={() => activeTab = "account"}
     >
       Account
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === "integrations"}
+      on:click={() => activeTab = "integrations"}
+    >
+      Integrations
     </button>
   </div>
 
@@ -1481,6 +1489,13 @@
             {changingPassword ? "Changing Password..." : "Change Password"}
           </button>
         </div>
+      </div>
+    {/if}
+
+    <!-- Integrations Tab -->
+    {#if activeTab === "integrations"}
+      <div class="tab-panel">
+        <PersonalActions />
       </div>
     {/if}
   </div>

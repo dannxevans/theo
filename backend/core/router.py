@@ -82,16 +82,35 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     # Priority 1: Action Intents
     # =============================
     # These take precedence over conversation intents
-    ACTION_KEYWORDS = {
-        "read_calendar": ["calendar", "availability", "available", "free", "busy", "when am i", "schedule", "what's on", "whats on"],
-        "book_appointment": ["book", "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
-        "manage_email": ["email", "send email", "draft email", "inbox", "unread", "compose"],
+    # IMPORTANT: Check write actions before read actions to avoid false positives
+    # e.g., "add to calendar" should match book_appointment, not read_calendar
+
+    # Write-action keywords (highest priority)
+    WRITE_ACTION_KEYWORDS = {
+        "book_appointment": ["add", "create", "schedule", "book", "set up", "make", "arrange",
+                           "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
+        "manage_email": ["send email", "draft email", "compose", "write email", "reply to"],
     }
 
-    for action_intent, keywords in ACTION_KEYWORDS.items():
+    # Read-action keywords (lower priority)
+    READ_ACTION_KEYWORDS = {
+        "read_calendar": ["calendar", "availability", "available", "free", "busy",
+                         "when am i", "what's on", "whats on", "schedule for"],
+        "manage_email": ["email", "inbox", "unread", "check email"],
+    }
+
+    # First check for write actions (add, create, schedule, etc.)
+    for action_intent, keywords in WRITE_ACTION_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text_l:
-                _debug(memory, f"Matched action intent '{action_intent}' via keyword '{keyword}'")
+                _debug(memory, f"Matched write action intent '{action_intent}' via keyword '{keyword}'")
+                return action_intent
+
+    # Then check for read actions (calendar, availability, etc.)
+    for action_intent, keywords in READ_ACTION_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in text_l:
+                _debug(memory, f"Matched read action intent '{action_intent}' via keyword '{keyword}'")
                 return action_intent
 
     # =============================

@@ -37,7 +37,8 @@
   async function checkM365Status() {
     try {
       m365Status = await getM365Status();
-      m365Connected = m365Status.connected;
+      // Check both connected and is_valid (credentials might be marked invalid)
+      m365Connected = m365Status.connected && m365Status.is_valid !== false;
     } catch (err) {
       console.error("Failed to check M365 status:", err);
       m365Connected = false;
@@ -49,6 +50,10 @@
       authInProgress = true;
       const authData = await startM365Auth();
 
+      if (authData.error) {
+        throw new Error(authData.error + (authData.instructions ? "\n\n" + authData.instructions : ""));
+      }
+
       deviceCode = authData.device_code;
       userCode = authData.user_code;
       verificationUrl = authData.verification_url;
@@ -57,7 +62,7 @@
       pollingInterval = setInterval(async () => {
         try {
           const result = await pollM365Auth(deviceCode);
-          if (result.status === "completed") {
+          if (result.status === "success") {
             // Success!
             clearInterval(pollingInterval);
             pollingInterval = null;
@@ -68,12 +73,12 @@
             await checkM365Status();
           } else if (result.status === "pending") {
             // Still waiting
-          } else if (result.status === "failed") {
+          } else if (result.status === "declined" || result.status === "failed") {
             // Error
             clearInterval(pollingInterval);
             pollingInterval = null;
             authInProgress = false;
-            alert("Authentication failed: " + result.error);
+            alert("Authentication failed: " + (result.error || result.message));
           }
         } catch (err) {
           console.error("Polling error:", err);
@@ -82,7 +87,7 @@
     } catch (err) {
       console.error("Failed to start M365 auth:", err);
       authInProgress = false;
-      alert("Failed to start authentication");
+      alert(err.message);
     }
   }
 

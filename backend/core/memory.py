@@ -1943,6 +1943,15 @@ class MemoryStore:
                 )
             )
 
+    def delete_m365_credentials(self, user_id):
+        """Delete M365 credentials for a user."""
+        with self.engine.begin() as conn:
+            from sqlalchemy import delete
+            conn.execute(
+                delete(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
+            )
+
     # =============================
     # Personal AI Agent: Actions API
     # =============================

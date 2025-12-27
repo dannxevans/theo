@@ -242,8 +242,11 @@ class ConfirmationManager:
             result = self._execute_action(action)
 
             # Mark action as completed
+            # Serialize result to JSON for storage
+            import json
+            result_json = json.dumps(result) if result else None
             self.memory.update_action_status(
-                action["id"], "completed", result=result
+                action["id"], "completed", result_data=result_json
             )
 
             logging.info(
@@ -355,8 +358,15 @@ class ConfirmationManager:
             Exception: If action execution fails
         """
         action_type = action["action_type"]
-        params = action.get("parameters", {})
+        params_json = action.get("action_params", "{}")
         provider_id = action.get("provider_id")
+
+        # Deserialize JSON params
+        import json
+        if isinstance(params_json, str):
+            params = json.loads(params_json)
+        else:
+            params = params_json or {}
 
         logging.info(
             f"[CONFIRMATION] Executing action {action['id']}: {action_type}"
@@ -380,6 +390,13 @@ class ConfirmationManager:
             if not providers:
                 raise Exception(f"No provider found for {action_type}")
             provider_id, provider = providers[0]
+
+        # Deserialize datetime strings to datetime objects for calendar operations
+        if action_type in ["create_calendar_event", "update_calendar_event"]:
+            if "start_time" in params and isinstance(params["start_time"], str):
+                params["start_time"] = datetime.fromisoformat(params["start_time"])
+            if "end_time" in params and isinstance(params["end_time"], str):
+                params["end_time"] = datetime.fromisoformat(params["end_time"])
 
         # Validate parameters
         valid, error = provider.validate_params(action_type, params)

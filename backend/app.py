@@ -81,6 +81,9 @@ set_action_registry(action_registry)
 from core.confirmation_manager import ConfirmationManager
 confirmation_manager = ConfirmationManager(memory, action_router)
 
+# Connect confirmation manager to action router
+action_router.confirmation_manager = confirmation_manager
+
 # Seed default intents if none exist
 memory.seed_default_intents("local")
 
@@ -1406,8 +1409,8 @@ def disconnect_m365():
     if not user or not user["is_enabled"]:
         return jsonify({"error": "User not found"}), 401
 
-    # Invalidate credentials
-    memory.invalidate_m365_credentials(user["id"], error="User disconnected")
+    # Delete M365 credentials (not just invalidate)
+    memory.delete_m365_credentials(user["id"])
 
     # Remove M365 service providers
     providers = memory.get_service_providers(user["id"])

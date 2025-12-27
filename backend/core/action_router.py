@@ -37,16 +37,18 @@ class ActionRouter:
       → Return formatted events
     """
 
-    def __init__(self, action_registry, memory_store):
+    def __init__(self, action_registry, memory_store, confirmation_manager=None):
         """
         Initialize action router.
 
         Args:
             action_registry: ActionProviderRegistry instance
             memory_store: MemoryStore instance
+            confirmation_manager: ConfirmationManager instance (optional, set later)
         """
         self.action_registry = action_registry
         self.memory = memory_store
+        self.confirmation_manager = confirmation_manager
 
     def route_action_request(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -143,6 +145,9 @@ class ActionRouter:
 
         start_date, end_date = date_range
 
+        # Load providers for this user
+        self.action_registry.load_providers(user_id)
+
         # Find M365 provider
         providers = self.action_registry.get_providers_by_capability("read_calendar", user_id)
 
@@ -205,13 +210,10 @@ class ActionRouter:
         Handle appointment booking requests.
 
         This follows the haircut booking example from requirements:
-        1. Parse booking request (service type, time)
-        2. Read calendar for availability
-        3. Identify service provider
-        4. Query provider availability
-        5. Optimize slot selection
-        6. Create action plan
-        7. Request confirmation
+        1. Parse booking request (subject, time, attendees)
+        2. Find calendar provider
+        3. Create confirmation request for user approval
+        4. Return confirmation details
 
         Args:
             user_text: User's input text
@@ -220,15 +222,98 @@ class ActionRouter:
             context: Full request context
 
         Returns:
-            Response dictionary with booking plan
+            Response dictionary with confirmation request
         """
-        # For now, return placeholder
-        # TODO: Implement full booking flow in Phase 6
-        return {
-            "text": "I'm working on booking your appointment. This feature is under development and will be ready in Phase 6.",
-            "provider": "action_router",
-            "task_type": "book_appointment",
+        # Check if confirmation manager is available
+        if not self.confirmation_manager:
+            return {
+                "text": "The confirmation system is not initialized. Please contact support.",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+            }
+
+        # Use LLM to extract event details from natural language
+        event_details = self._extract_event_with_llm(user_text, user_id)
+
+        if not event_details:
+            return {
+                "text": "I couldn't understand the event details. Please include the event subject and time (e.g., 'add lunch with Sean at 1pm today').",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+            }
+
+        # Load providers for this user
+        self.action_registry.load_providers(user_id)
+
+        # Find M365 provider
+        providers = self.action_registry.get_providers_by_capability("create_calendar_event", user_id)
+
+        if not providers:
+            return {
+                "text": "I don't have access to your calendar yet. Would you like to connect your Microsoft 365 account?",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+                "metadata": {
+                    "error": "no_provider",
+                    "required_capability": "create_calendar_event"
+                }
+            }
+
+        provider_id, provider = providers[0]
+
+        # Build action parameters for create_calendar_event
+        # Note: datetime objects will be serialized to ISO strings by ConfirmationManager
+        action_params = {
+            "subject": event_details["subject"],
+            "start_time": event_details["start_time"].isoformat(),
+            "end_time": event_details["end_time"].isoformat(),
         }
+
+        if event_details.get("location"):
+            action_params["location"] = event_details["location"]
+
+        if event_details.get("description"):
+            action_params["description"] = event_details["description"]
+
+        # Format confirmation message
+        start_str = event_details["start_time"].strftime("%B %d at %I:%M %p").replace(" 0", " ")
+        end_str = event_details["end_time"].strftime("%I:%M %p").replace(" 0", " ")
+
+        confirmation_message = f"Add '{event_details['subject']}' to your calendar on {start_str} to {end_str}?"
+
+        # Create confirmation request
+        try:
+            confirmation = self.confirmation_manager.create_confirmation(
+                user_id=user_id,
+                session_id=session_id,
+                action_type="create_calendar_event",
+                action_params=action_params,
+                confirmation_message=confirmation_message,
+                provider_id=provider_id,
+                expires_in_hours=24
+            )
+
+            return {
+                "text": f"{confirmation_message}\n\nI've created a confirmation request. Please approve it in Settings → Integrations.",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+                "metadata": {
+                    "confirmation_id": confirmation["confirmation_id"],
+                    "action_id": confirmation["action_id"],
+                    "requires_confirmation": True
+                }
+            }
+
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] Failed to create confirmation: {e}")
+            return {
+                "text": f"I encountered an error creating the confirmation: {str(e)}",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+                "metadata": {
+                    "error": str(e)
+                }
+            }
 
     def _handle_manage_email(
         self,
@@ -260,6 +345,187 @@ class ActionRouter:
             "text": "Email management is under development and will be ready in Phase 7.",
             "provider": "action_router",
             "task_type": "manage_email",
+        }
+
+    # =============================
+    # Event Parsing Helpers
+    # =============================
+
+    def _extract_event_with_llm(self, user_text: str, user_id: int) -> Optional[Dict]:
+        """
+        Use LLM to extract structured event details from natural language.
+
+        Args:
+            user_text: User's natural language request
+            user_id: User ID for context
+
+        Returns:
+            Dictionary with parsed event details or None if extraction fails
+        """
+        from providers.openai import OpenAIProvider
+        from core.provider_registry import ProviderRegistry
+        import json
+
+        # Get OpenAI provider for parsing
+        try:
+            registry = ProviderRegistry(self.memory)
+            provider_cfg = registry.get_by_type("openai")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                # Fallback to basic parsing if no LLM available
+                logging.warning("[ACTION_ROUTER] No OpenAI provider available, using basic parsing")
+                return self._parse_event_details(user_text)
+
+            provider = OpenAIProvider(
+                api_key=provider_cfg["api_key"],
+                base_url=provider_cfg.get("base_url"),
+                model=provider_cfg.get("model") or "gpt-4o-mini"
+            )
+
+            # Construct extraction prompt
+            system_prompt = """You are a calendar event parser. Extract structured event information from user requests.
+
+Return ONLY a JSON object with these fields:
+- subject: Short, clear event title (e.g., "Lunch with Sean", "Team Meeting")
+- start_time: ISO datetime string (e.g., "2025-12-27T13:00:00")
+- end_time: ISO datetime string (1 hour after start if not specified)
+- location: Optional location string
+- description: Optional additional details
+
+Rules:
+1. Make the subject concise and professional
+2. Use the current date/time as reference for relative times
+3. Default duration is 1 hour unless specified
+4. Return ONLY valid JSON, no other text"""
+
+            current_time = datetime.now().isoformat()
+            user_prompt = f"Current time: {current_time}\n\nUser request: {user_text}\n\nExtract event details as JSON:"
+
+            response = provider.chat(
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+
+            # Parse LLM response (OpenAI provider returns string directly)
+            response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+
+            # Try to extract JSON from response (LLM might add markdown code blocks)
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+
+            event_data = json.loads(response_text)
+
+            # Convert ISO strings to datetime objects
+            if "start_time" in event_data:
+                event_data["start_time"] = datetime.fromisoformat(event_data["start_time"])
+            if "end_time" in event_data:
+                event_data["end_time"] = datetime.fromisoformat(event_data["end_time"])
+
+            logging.info(f"[ACTION_ROUTER] LLM extracted event: {event_data.get('subject')}")
+            return event_data
+
+        except Exception as e:
+            logging.error(f"[ACTION_ROUTER] LLM extraction failed: {e}")
+            # Fallback to basic parsing
+            return self._parse_event_details(user_text)
+
+    def _parse_event_details(self, text: str) -> Optional[Dict]:
+        """
+        Parse event details from natural language.
+
+        Extracts:
+        - subject: Event title/description
+        - start_time: When the event starts
+        - end_time: When the event ends (defaults to 1 hour after start)
+        - location: Optional location
+
+        Examples:
+        - "add lunch with Sean at 1pm today"
+          → {"subject": "lunch with Sean", "start_time": today@13:00, "end_time": today@14:00}
+        - "schedule meeting tomorrow at 3pm for 2 hours"
+          → {"subject": "meeting", "start_time": tomorrow@15:00, "end_time": tomorrow@17:00}
+
+        Args:
+            text: User input text
+
+        Returns:
+            Dictionary with event details or None if parsing fails
+        """
+        text_l = text.lower()
+        now = datetime.now()
+
+        # Parse time first
+        time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text_l)
+        if not time_match:
+            # Try to find "at" followed by time words
+            return None
+
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2) or 0)
+        meridiem = time_match.group(3)
+
+        # Convert to 24-hour format
+        if meridiem == 'pm' and hour != 12:
+            hour += 12
+        elif meridiem == 'am' and hour == 12:
+            hour = 0
+        elif not meridiem and hour < 12:
+            # Assume PM for times like "1:00" without AM/PM
+            hour += 12
+
+        # Parse date (today, tomorrow, specific day)
+        date_base = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+        if "tomorrow" in text_l:
+            date_base = date_base + timedelta(days=1)
+        elif "today" not in text_l:
+            # Check for day of week
+            days_of_week = {
+                "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                "friday": 4, "saturday": 5, "sunday": 6
+            }
+            for day_name, day_num in days_of_week.items():
+                if day_name in text_l:
+                    days_ahead = day_num - now.weekday()
+                    if days_ahead <= 0:
+                        days_ahead += 7
+                    date_base = date_base + timedelta(days=days_ahead)
+                    break
+
+        start_time = date_base
+
+        # Parse duration (defaults to 1 hour)
+        duration_hours = 1
+        duration_match = re.search(r'for (\d+)\s*(hour|hr)', text_l)
+        if duration_match:
+            duration_hours = int(duration_match.group(1))
+
+        end_time = start_time + timedelta(hours=duration_hours)
+
+        # Parse subject - extract text before time indicators
+        # Remove common action words
+        subject_text = text
+        for pattern in ['add', 'create', 'schedule', 'book', 'set up', 'make an?']:
+            subject_text = re.sub(f'\\b{pattern}\\b', '', subject_text, flags=re.IGNORECASE)
+
+        # Remove time references
+        subject_text = re.sub(r'\bat\s+\d{1,2}(?::\d{2})?\s*(am|pm)?', '', subject_text, flags=re.IGNORECASE)
+        subject_text = re.sub(r'\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', '', subject_text, flags=re.IGNORECASE)
+        subject_text = re.sub(r'\bto my calendar\b', '', subject_text, flags=re.IGNORECASE)
+        subject_text = re.sub(r'\bfor \d+\s*(hour|hr)s?\b', '', subject_text, flags=re.IGNORECASE)
+
+        # Clean up whitespace
+        subject = ' '.join(subject_text.split()).strip()
+
+        if not subject:
+            subject = "Event"
+
+        return {
+            "subject": subject,
+            "start_time": start_time,
+            "end_time": end_time,
         }
 
     # =============================

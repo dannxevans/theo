@@ -804,11 +804,14 @@ export async function startM365Auth() {
     }
   });
 
+  // Return JSON even on error so we can show configuration instructions
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error("Failed to start M365 authentication");
+    return data; // Return error object with instructions
   }
 
-  return response.json();
+  return data;
 }
 
 export async function pollM365Auth(deviceCode) {
@@ -821,11 +824,15 @@ export async function pollM365Auth(deviceCode) {
     body: JSON.stringify({ device_code: deviceCode })
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to poll M365 authentication");
+  const data = await response.json();
+
+  // Backend returns 200 for success, 202 for pending, 400+ for errors
+  if (response.ok || response.status === 202) {
+    return data;
   }
 
-  return response.json();
+  // Error case
+  throw new Error(data.error || "Failed to poll M365 authentication");
 }
 
 export async function getM365Status() {
