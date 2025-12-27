@@ -100,14 +100,25 @@ def stream_chat_sse(session_id):
 
     def event_stream():
         try:
-            # Get user from auth token
+            # Get user from auth token (check both header and query param)
             auth_header = request.headers.get("Authorization")
+            token = None
             user_id = None
+
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
+            elif request.args.get("token"):
+                token = request.args.get("token")
+
+            if token:
                 session = memory.get_auth_session(token)
                 if session and session["expires_at"] >= datetime.utcnow():
                     user_id = session["user_id"]
+                    logging.info(f"[AUTH] Authenticated user_id: {user_id}")
+                else:
+                    logging.warning(f"[AUTH] Invalid or expired session token")
+            else:
+                logging.warning(f"[AUTH] No token provided in request")
 
             context = context_manager.build_context(session_id, text)
 
@@ -122,6 +133,7 @@ def stream_chat_sse(session_id):
             if user_id:
                 mode_config = memory.get_user_mode(user_id)
                 current_mode = mode_config.get("active_mode", "personal")
+                logging.info(f"[MODE] User {user_id} current_mode: {current_mode}")
                 mode_settings = memory.get_mode_settings(user_id, current_mode)
 
                 if mode_settings:
@@ -135,6 +147,72 @@ def stream_chat_sse(session_id):
 
                     # Store mode for metadata
                     router_context["active_mode"] = current_mode
+
+                # Inject base mode awareness context
+                mode_context_prefix = None
+                if current_mode == "work":
+                    mode_context_prefix = "IMPORTANT CONTEXT UPDATE: You are currently operating in WORK mode. This is a professional work context. If the user asks what mode you are in, you MUST respond that you are in WORK mode, regardless of any previous conversation history."
+                elif current_mode == "personal":
+                    mode_context_prefix = "IMPORTANT CONTEXT UPDATE: You are currently operating in PERSONAL mode. This is a casual, personal context. If the user asks what mode you are in, you MUST respond that you are in PERSONAL mode, regardless of any previous conversation history."
+
+                # Apply work mode subtab context if in work mode
+                if current_mode == "work":
+                    work_subtab = request.args.get("work_subtab", "conversation")
+                    logging.info(f"[MODE] Work mode - subtab: {work_subtab}")
+                    subtab_config = memory.get_work_subtab_config(user_id, work_subtab)
+
+                    context_prefix = None
+                    if subtab_config:
+                        logging.info(f"[MODE] Found subtab config for {work_subtab}")
+                        import json as json_module
+                        config = json_module.loads(subtab_config.get("config_json", "{}"))
+
+                        # Build context prefix based on subtab
+                        if work_subtab == "code":
+                            language = config.get("language", "servicenow_javascript")
+                            framework = config.get("framework", "")
+                            additional = config.get("additional_context", "")
+
+                            language_names = {
+                                "servicenow_javascript": "ServiceNow JavaScript",
+                                "javascript": "JavaScript",
+                                "typescript": "TypeScript",
+                                "python": "Python",
+                                "java": "Java",
+                                "csharp": "C#",
+                            }
+                            lang_name = language_names.get(language, language)
+
+                            context_prefix = f"You are an expert {lang_name} developer."
+                            if framework:
+                                context_prefix += f" You specialize in {framework}."
+                            if additional:
+                                context_prefix += f" {additional}"
+
+                        elif work_subtab == "email":
+                            tone = config.get("tone", "professional")
+                            context_prefix = f"You are helping rewrite emails with a {tone} tone. Focus on clarity, professionalism, and appropriate formatting for business communication."
+                    else:
+                        logging.info(f"[MODE] No subtab config found for {work_subtab}")
+
+                    # Combine mode context with subtab context (MOVED OUTSIDE if subtab_config block)
+                    if context_prefix and mode_context_prefix:
+                        combined_context = f"{mode_context_prefix} {context_prefix}"
+                        router_context["subtab_context_prefix"] = combined_context
+                        logging.info(f"[MODE] Set combined context for work mode")
+                    elif context_prefix:
+                        router_context["subtab_context_prefix"] = context_prefix
+                        logging.info(f"[MODE] Set subtab context only for work mode")
+                    elif mode_context_prefix:
+                        router_context["subtab_context_prefix"] = mode_context_prefix
+                        logging.info(f"[MODE] Set mode context only for work mode: {mode_context_prefix[:100]}")
+                else:
+                    # Not in work mode, just apply mode context if available
+                    if mode_context_prefix:
+                        router_context["subtab_context_prefix"] = mode_context_prefix
+                        logging.info(f"[MODE] Set subtab_context_prefix for {current_mode} mode: {mode_context_prefix[:100]}")
+            else:
+                logging.warning(f"[MODE] No user_id - skipping mode context injection")
 
             # Route request (non-streaming, we chunk manually)
             result = route_request(router_context)
@@ -1022,6 +1100,93 @@ def update_mode_settings(mode):
     )
 
     return jsonify({"status": "ok"})
+
+
+# =============================
+# Work Mode Sub-Tab Endpoints
+# =============================
+
+@app.route("/api/mode/work/subtab/<subtab>", methods=["GET"])
+def get_work_subtab(subtab):
+    """Get configuration for a specific work subtab."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    if subtab not in ["conversation", "email", "code"]:
+        return jsonify({"error": "Subtab must be 'conversation', 'email', or 'code'"}), 400
+
+    # Get subtab config
+    config = memory.get_work_subtab_config(user["id"], subtab)
+    return jsonify(config if config else {})
+
+
+@app.route("/api/mode/work/subtab/<subtab>", methods=["POST"])
+def update_work_subtab(subtab):
+    """Update configuration for a specific work subtab."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    if subtab not in ["conversation", "email", "code"]:
+        return jsonify({"error": "Subtab must be 'conversation', 'email', or 'code'"}), 400
+
+    # Get config from request
+    data = request.json
+    import json as json_module
+    config_json = json_module.dumps(data)
+
+    # Update subtab config
+    memory.update_work_subtab_config(user["id"], subtab, config_json)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/mode/work/subtabs", methods=["GET"])
+def get_all_work_subtabs():
+    """Get all work subtab configurations."""
+    # Get token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get all subtab configs
+    configs = memory.get_all_work_subtab_configs(user["id"])
+    return jsonify(configs)
 
 
 def debug_log(message):

@@ -24,12 +24,13 @@ class ContextManager:
     # =============================
     # Context construction
     # =============================
-    def build_context(self, session_id, user_text, system_prompt_override=None):
+    def build_context(self, session_id, user_text, system_prompt_override=None, subtab_context_prefix=None):
         """
         Build the context package sent to the router / provider layer.
         Step 2: Use selective memory recall instead of full dump.
         Args:
             system_prompt_override: Optional custom system prompt to replace the default
+            subtab_context_prefix: Optional context prefix from work mode subtabs
         """
 
         session_summary = self._get_session_summary(session_id)
@@ -45,6 +46,12 @@ class ContextManager:
             system_prompt = system_prompt_override[:self.MAX_SYSTEM_CHARS]
         else:
             system_prompt = self._build_system_prompt(user_memory, relevant_memories)
+            system_prompt = system_prompt[:self.MAX_SYSTEM_CHARS]
+
+        # Prepend subtab context prefix if provided - this takes precedence over base system prompt
+        if subtab_context_prefix:
+            # Place mode context at the VERY TOP with maximum authority
+            system_prompt = f"=== CURRENT MODE (HIGHEST PRIORITY) ===\n{subtab_context_prefix}\n\n{system_prompt}"
             system_prompt = system_prompt[:self.MAX_SYSTEM_CHARS]
 
         messages = []
@@ -131,7 +138,7 @@ class ContextManager:
 
         system_prompt += (
             "SYSTEM PERSONA:\n"
-            f"You are {persona_name}, a personal AI assistant.\n"
+            f"You are {persona_name}, an AI assistant.\n"
             f"Tone: {tone}.\n"
             "Rules:\n"
             f"{style_rules}\n"
@@ -306,7 +313,7 @@ class ContextManager:
 
         # Core intent
         summary_points.append(
-            "The user is working with THEO as a personal AI assistant."
+            "The user is working with THEO as an AI assistant."
         )
 
         # Detect explicit preferences

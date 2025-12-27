@@ -1,171 +1,440 @@
 # THEO – Personal Multi-Model AI Assistant
 
-THEO is a personal, self-hosted AI assistant designed to route user requests to the most appropriate AI model based on intent, while maintaining continuity across models.
+THEO is a self-hosted AI assistant that intelligently routes user requests to the most appropriate AI model based on intent, while maintaining conversation continuity and user context across models.
 
-The goal is not "one model to rule them all", but a system that:
-- Uses different models for different tasks
-- Preserves user context when models change
-- Remains fully under the user's control
+The philosophy is not "one model to rule them all", but rather:
+- **Use different models for different tasks** - Leverage each model's strengths
+- **Preserve user context when models change** - Seamless experience across providers
+- **Remain fully under user control** - Self-hosted, transparent routing decisions
 
-This repository contains both the backend and frontend for THEO.
+---
 
 ## 📚 Documentation
 
-- **[Authentication Guide](docs/AUTHENTICATION.md)** - Login, password management, and security settings
-- **[Database Persistence Guide](docs/DATABASE_PERSISTENCE.md)** - S3 backup/restore setup for AWS deployments
-- **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** - Step-by-step ECS configuration for database persistence
+- **[Authentication Guide](docs/AUTHENTICATION.md)** - Login, password management, and security
+- **[Database Persistence Guide](docs/DATABASE_PERSISTENCE.md)** - S3 backup/restore for AWS deployments
+- **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** - AWS ECS configuration and deployment
 
 ---
 
-## What THEO Does (Current)
+## ✨ Current Features
 
-- **Authentication**: Login/logout with password management and session security
-- Chat-based UI similar to ChatGPT
-- Multiple AI providers supported (e.g. Mock, OpenAI, Anthropic)
-- Provider selection via UI
-- Session-based conversations
-- Persistent storage using SQLite with S3 backup/restore for AWS deployments
-- Streaming responses over Socket.IO
-- AI-powered automatic chat title generation
-- Basic memory capture ("remember X") stored server-side
-- Mobile-responsive design with touch-optimized interface
-- Settings panel (system prompt, intents, routing, memory, providers, debug, account)
+### Core Functionality
+- **Multi-Model Routing**: Intelligent routing based on user-defined intents with keyword matching
+- **Streaming Responses**: Real-time token streaming via Server-Sent Events (SSE)
+- **Session Management**: Multi-turn conversations with persistent context and summaries
+- **Memory System**: Structured memory (facts, preferences, goals) with relevance scoring and pinning
+- **Authentication**: Secure session-based login with password management (7-day sessions)
+- **Work/Personal Modes**: Dual-mode system with mode-specific configurations
+- **Provider Health Monitoring**: Circuit breaker pattern, failure tracking, and automatic fallback
+
+### Work Mode Features
+When in work mode, THEO provides specialized subtabs:
+- **Conversation**: General professional discussion context
+- **Email Rewrites**: Configure tone and signature for email assistance
+- **Code Development**: Set programming language, framework, and expertise context
+  - Supports: ServiceNow JavaScript, JavaScript, TypeScript, Python, Java, C#
+
+### Provider Support
+- **Anthropic (Claude)**: Full streaming support
+- **OpenAI (GPT)**: ChatGPT and GPT-4 models
+- **Mock Provider**: Deterministic testing provider
+- **Extensible Architecture**: Easy to add new providers
+
+### User Interface
+- **Chat Interface**: ChatGPT-style UI with markdown rendering and syntax highlighting
+- **Settings Panel**: Comprehensive configuration for:
+  - System prompts and persona customization
+  - Provider management (add/edit/delete)
+  - Intent definitions and routing rules
+  - Memory browser and management
+  - Work/Personal mode settings
+  - Account and debug options
+- **Mobile-Responsive**: Touch-optimized interface
+- **Session Management**: Export conversations (JSON/Markdown), fork sessions, auto-generated titles
+
+### Deployment Ready
+- **Docker Compose**: Single-command local deployment
+- **AWS ECS**: Production-ready task definitions
+- **S3 Database Backup**: Automatic backup/restore every 5 minutes
+- **CloudFront Integration**: ALB and proxy-aware middleware
 
 ---
 
-## What THEO Is Becoming (Design Goals)
+## 🏗️ Architecture
 
-- Intent-based routing (e.g. coding → one model, general chat → another)
-- Cross-model continuity using summaries instead of raw chat history
-- Pluggable provider architecture
-- Self-hosted, Dockerised deployment (Unraid target)
-- Strong guardrails to avoid hallucinations
-- Explicit memory control (remember / forget)
-
-The project is deliberately evolving in small, testable steps.
-
----
-
-## Repository Structure
-
+### Backend (Python/Flask)
 ```
-theo/
-├── backend/
-│   ├── app.py          # Flask app + Socket.IO
-│   ├── db_backup.py    # S3 backup/restore manager
-│   ├── core/
-│   │   ├── router.py   # Intent routing + provider selection
-│   │   ├── context.py  # Context & summary construction
-│   │   └── memory.py   # SQLite-backed persistence
-│   ├── providers/
-│   │   ├── mock.py
-│   │   ├── openai.py
-│   │   └── anthropic.py
-│   └── data/
-│       └── theo.db     # Local SQLite database (ignored in git)
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.svelte
-│   │   ├── components/
-│   │   │   ├── Chat.svelte
-│   │   │   └── Settings.svelte
-│   │   └── lib/
-│   │       └── api.js
-│   └── public/
-│       └── style.css
-│
-├── docs/
-│   ├── DATABASE_PERSISTENCE.md
-│   └── ECS_DATABASE_SETUP.md
-│
-├── ecs-task-definition-backend-UPDATED.json
-├── iam-policy-s3-database-backup.json
-├── README.md
-└── .gitignore
+backend/
+├── app.py                    # Flask server (port 1066) with 60+ REST endpoints
+├── auth.py                   # Authentication with SHA-256 hashing
+├── db_backup.py              # S3 backup/restore manager
+├── core/
+│   ├── router.py             # Intent classification & provider selection
+│   ├── context.py            # Context building & system prompt injection
+│   ├── memory.py             # SQLAlchemy ORM with 17 database tables
+│   └── provider_registry.py # Runtime provider registry
+└── providers/
+    ├── base.py               # Abstract provider interface
+    ├── mock.py               # Testing provider
+    ├── openai.py             # OpenAI integration
+    └── anthropic.py          # Anthropic integration (streaming SSE)
 ```
 
+**Routing Logic**:
+1. Intent classification via keyword matching
+2. Provider selection with fallback chain:
+   - Forced provider (user override)
+   - User routing rules (intent → provider mapping)
+   - Intent-based defaults
+   - Health-based fallback (circuit breaker)
+
+### Frontend (Svelte)
+```
+frontend/
+├── src/
+│   ├── App.svelte           # Main router & session management
+│   ├── components/
+│   │   ├── Chat.svelte      # Message streaming & work mode subtabs
+│   │   ├── Login.svelte     # Authentication UI
+│   │   ├── Settings.svelte  # Multi-tab configuration
+│   │   ├── MessageList.svelte  # Markdown rendering
+│   │   └── Memory.svelte    # Memory browser
+│   └── lib/
+│       └── api.js           # REST client (50+ endpoints)
+└── public/
+    └── style.css            # Global styles
+```
+
+### Database Schema (SQLite + S3)
+
+**Authentication**:
+- `users` - User accounts with password hashes
+- `auth_sessions` - Session tokens (7-day expiration)
+
+**Configuration**:
+- `system_prompt_config` - Persona, tone, style rules
+- `user_mode_config` - Active mode per user (work/personal)
+- `mode_settings` - Mode-specific system prompts and provider preferences
+- `work_mode_subtab_config` - Subtab configurations (code language, email tone)
+
+**Intent & Routing**:
+- `intents` - User-defined intents with keywords and priorities
+- `routing_preferences` - Intent → Provider mappings
+
+**Memory**:
+- `memories` - Structured memory with types (fact/preference/goal/context)
+- `preferences` - Legacy key-value store
+
+**Conversation**:
+- `sessions` - Chat sessions with titles
+- `turns` - Individual messages with provider/model metadata
+- `summaries` - Rolling session summaries
+- `session_providers` - Last used provider per session
+
+**Provider Management**:
+- `providers` - LLM provider configurations
+- `provider_metadata` - Health status, costs, latency, circuit breaker state
+- `request_logs` - Request history with success/failure tracking
+
 ---
 
-## Running Locally
+## 🚀 Getting Started
 
-### Backend
+### Prerequisites
+- Python 3.9+
+- Node.js 16+
+- Optional: AWS account for S3 backups (production)
+
+### Local Development
+
+#### 1. Backend
 ```bash
 cd backend
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-Backend runs on:
-```
-http://localhost:1066
-```
+Backend runs at: `http://localhost:1066`
 
----
-
-### Frontend
+#### 2. Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend runs on:
+Frontend runs at: `http://localhost:5174`
+
+#### 3. Default Login
+- **Username**: `admin`
+- **Password**: `admin`
+- **Important**: Change the default password immediately via Settings → Account!
+
+### Docker Deployment
+
+```bash
+docker-compose up -d
 ```
-http://localhost:5174
+
+Services:
+- Backend: `http://localhost:1066`
+- Frontend: `http://localhost:8080`
+
+### AWS ECS Deployment
+
+See **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** for complete instructions.
+
+**Environment Variables**:
+```bash
+ENV=prod                                    # Development or production
+DATABASE_URL=sqlite:///data/theo.db         # SQLite database path
+THEO_S3_BACKUP_BUCKET=your-bucket-name      # S3 bucket for backups
+THEO_S3_BACKUP_KEY=theo/theo.db            # S3 object key
 ```
+
+**IAM Permissions**: Use `iam-policy-s3-database-backup.json` for S3 access.
 
 ---
 
-## Providers
+## 🛠️ Configuration
 
-Providers are defined in the database and surfaced in the UI.
+### System Prompt
+Customize THEO's personality via Settings → System Prompt:
+- **Persona Name**: Default "THEO"
+- **Tone**: Professional, conversational, direct
+- **Style Rules**: No em dashes, concise first, full working solutions
+- **Custom Instructions**: Additional behavioral guidelines
 
-Each provider specifies:
-- Type (mock, openai, anthropic, etc.)
-- Base URL (if applicable)
-- Model name
-- API key
-- Enabled/disabled state
+### Adding Providers
+Settings → Providers → Add Provider:
+- **Type**: mock, openai, anthropic
+- **Model**: e.g., "gpt-4", "claude-sonnet-4.5"
+- **API Key**: Your provider API key
+- **Base URL**: Custom endpoint (optional)
+- **Enabled**: Toggle provider availability
 
-Routing decisions are made server-side.
+### Defining Intents
+Settings → Intents → Create Intent:
+- **Name**: e.g., "coding", "general", "research"
+- **Keywords**: Comma-separated trigger words
+- **Priority**: Higher priority wins in tie-breaking
+- **Description**: Human-readable explanation
 
----
+### Routing Rules
+Settings → Routing Rules → Add Rule:
+- **Intent**: Select from defined intents
+- **Provider**: Target provider for this intent
+- **Enabled**: Toggle rule on/off
 
-## Debug Logging
+Example: Route "coding" intent to Anthropic Claude for code generation tasks.
 
-Debug logging can be enabled via:
-- Settings panel (UI), or
-- API:
+### Work/Personal Modes
+Settings → Work Mode:
+- **System Prompt Override**: Custom system prompt for work context
+- **Preferred Provider**: Default provider for work mode
+- **Work Subtabs**:
+  - **Code Development**: Programming language, framework, additional context
+  - **Email Rewrites**: Tone setting, signature
+  - **Conversation**: General professional context
+
+### Memory Management
+Settings → Memory:
+- **Add Memory**: Store facts, preferences, goals, or context
+- **Pin Memory**: Always include in system prompt
+- **Delete Memory**: Remove outdated information
+- **Relevance Decay**: Automatic scoring with time-based decay
+
+### Debug Mode
+Settings → Debug → Enable Debug Logs
+
+Or via API:
 ```bash
 curl -X POST http://localhost:1066/api/settings/debug \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"enabled": true}'
 ```
 
-When enabled, internal routing and context decisions are logged to the backend console.
+Logs routing decisions, intent classification, and provider selection to backend console.
 
 ---
 
-## Important Notes
+## 🔌 API Overview
 
-- This is not a finished product
-- Expect breaking changes while architecture settles
-- SQLite is used intentionally for simplicity during early development
-- Memory handling and cross-model continuity are still evolving
+### Authentication
+- `POST /api/auth/login` - Login with username/password
+- `POST /api/auth/logout` - Invalidate session token
+- `GET /api/auth/verify` - Verify current session
+- `POST /api/auth/change-password` - Update password
+
+### Streaming
+- `GET /api/stream/<session_id>?text=...&work_subtab=...` - SSE streaming endpoint
+
+### Sessions
+- `GET /api/sessions` - List all sessions
+- `GET /api/sessions/<id>/messages` - Get session messages
+- `DELETE /api/sessions/<id>` - Delete session
+- `POST /api/sessions/<id>/fork` - Create conversation branch
+- `GET /api/sessions/<id>/export` - Export (JSON/Markdown)
+
+### Memory
+- `GET /api/memories?type=...&limit=...` - Retrieve memories
+- `POST /api/memories` - Create memory
+- `DELETE /api/memories/<id>` - Delete memory
+- `POST /api/memories/<id>/pin` - Pin memory
+- `GET /api/memories/relevant?q=...` - Search memories
+
+### Intents
+- `GET /api/intents` - List intents
+- `POST /api/intents` - Create intent
+- `PUT /api/intents/<id>` - Update intent
+- `DELETE /api/intents/<id>` - Delete intent
+
+### Routing
+- `GET /api/routing` - Get routing rules
+- `POST /api/routing` - Create routing rule
+- `DELETE /api/routing/<intent>` - Delete routing rule
+
+### Providers
+- `GET /api/providers` - List providers
+- `POST /api/providers` - Add provider
+- `DELETE /api/providers/<id>` - Remove provider
+- `GET /api/providers/health` - Get health summary
+
+### Mode Management
+- `GET /api/mode` - Get current mode
+- `POST /api/mode` - Set mode (work/personal)
+- `GET /api/mode/settings/<mode>` - Get mode settings
+- `POST /api/mode/settings/<mode>` - Update mode settings
+- `GET /api/mode/work/subtab/<subtab>` - Get subtab config
+- `POST /api/mode/work/subtab/<subtab>` - Update subtab config
+
+See full API documentation in backend code comments.
 
 ---
 
-## License
+## 🧪 Testing
 
-No license applied yet.  
-This project is currently private / experimental.
+### Mock Provider
+The built-in mock provider is perfect for testing:
+- **Deterministic**: Reflects injected context verbatim
+- **No API Calls**: Zero external dependencies
+- **Fast**: Instant responses
+
+Enable in Settings → Providers or create via API.
 
 ---
 
-## Author
+## 📊 Provider Health Monitoring
 
-Built by Danny Black.  
-THEO is being developed as both a tool and a learning platform. :
+THEO tracks provider health in real-time:
+- **Success Rate**: Percentage of successful requests
+- **Average Latency**: Response time statistics
+- **Total Requests**: Request count over time
+- **Circuit Breaker**: Automatic fallback when provider fails
+- **Cost Estimation**: Token usage and estimated costs
+
+View health dashboard: Settings → Providers → Health Summary
+
+---
+
+## 🔒 Security Notes
+
+### Authentication
+- **Hashing**: SHA-256 with 16-byte random salt
+- **Sessions**: 32-byte URL-safe random tokens
+- **Expiration**: 7-day automatic logout
+- **Password Reset**: CLI utility included (`backend/reset_password.py`)
+
+### For Production
+Consider upgrading:
+- SHA-256 → bcrypt or argon2 for password hashing
+- Add rate limiting on login endpoint
+- Implement password complexity requirements
+- Add two-factor authentication (2FA)
+- Add session activity audit logging
+
+### Designed For
+Single-user or small team self-hosted deployment. Not recommended for large-scale multi-tenant environments without security enhancements.
+
+---
+
+## 🛣️ Roadmap
+
+### Completed
+- ✅ Multi-model routing with intent classification
+- ✅ Session management with persistent context
+- ✅ Structured memory system with relevance scoring
+- ✅ Provider health monitoring and circuit breaker
+- ✅ Authentication with password management
+- ✅ Work/Personal modes with subtab configurations
+- ✅ S3 database backup for AWS deployments
+- ✅ Streaming responses via SSE
+
+### In Progress
+- 🔄 Cross-model conversation continuity (summarization strategy)
+- 🔄 Enhanced memory relevance decay algorithms
+- 🔄 Intent classification confidence scoring
+
+### Planned
+- 📋 Voice input/output support
+- 📋 Multi-user administration UI
+- 📋 Role-based access control (RBAC)
+- 📋 Advanced provider cost optimization
+- 📋 Custom model fine-tuning integration
+- 📋 Plugin system for custom tools
+
+---
+
+## 🐛 Known Limitations
+
+### Current Design Choices
+- **Authentication**: SHA-256 hashing (simple, suitable for self-hosted single-user)
+- **Sessions**: 7-day fixed expiration (no refresh mechanism)
+- **Password**: 4-character minimum (consider complexity rules for production)
+- **Rate Limiting**: None (acceptable for self-hosted)
+
+### Not Yet Implemented
+- Multi-user administration
+- Email-based password reset
+- Two-factor authentication (2FA)
+- Account lockout mechanism
+- Provider streaming timeout handling
+
+---
+
+## 📜 License
+
+No license applied yet. This project is currently private / experimental.
+
+---
+
+## 👨‍💻 Author
+
+**Danny Black**
+
+THEO is being developed as both a tool and a learning platform, exploring the intersection of multi-model AI orchestration, context preservation, and user-centric design.
+
+---
+
+## 🤝 Contributing
+
+This is currently a personal project. If you have suggestions or find issues, feel free to reach out or submit a GitHub issue.
+
+---
+
+## 🙏 Acknowledgments
+
+Built with:
+- [Flask](https://flask.palletsprojects.com/) - Backend framework
+- [Svelte](https://svelte.dev/) - Frontend framework
+- [SQLAlchemy](https://www.sqlalchemy.org/) - ORM
+- [Anthropic Claude](https://www.anthropic.com/) - AI provider
+- [OpenAI GPT](https://openai.com/) - AI provider
+
+---
+
+**Last Updated**: December 2024

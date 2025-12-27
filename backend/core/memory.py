@@ -86,6 +86,20 @@ class MemoryStore:
         )
 
         # =============================
+        # Work Mode Sub-Tab Configuration
+        # =============================
+        self.work_mode_subtab_config = Table(
+            "work_mode_subtab_config",
+            self.meta,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("user_id", Integer, nullable=False),
+            Column("subtab", String, nullable=False),  # "conversation", "email", "code"
+            Column("config_json", Text, nullable=True),  # JSON for subtab-specific config
+            Column("created_at", DateTime, default=datetime.utcnow),
+            Column("updated_at", DateTime, default=datetime.utcnow),
+        )
+
+        # =============================
         # Debug Settings
         # =============================
         self.debug_settings = Table(
@@ -1585,6 +1599,60 @@ class MemoryStore:
             rows = conn.execute(
                 select(self.mode_settings)
                 .where(self.mode_settings.c.user_id == user_id)
+            ).fetchall()
+            return [dict(row._mapping) for row in rows]
+
+    # =============================
+    # Work Mode Sub-Tab API
+    # =============================
+
+    def get_work_subtab_config(self, user_id, subtab):
+        """Get configuration for a specific work subtab."""
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.work_mode_subtab_config)
+                .where(self.work_mode_subtab_config.c.user_id == user_id)
+                .where(self.work_mode_subtab_config.c.subtab == subtab)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def update_work_subtab_config(self, user_id, subtab, config_json):
+        """Update configuration for a specific work subtab."""
+        with self.engine.begin() as conn:
+            # Check if exists
+            existing = conn.execute(
+                select(self.work_mode_subtab_config)
+                .where(self.work_mode_subtab_config.c.user_id == user_id)
+                .where(self.work_mode_subtab_config.c.subtab == subtab)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    update(self.work_mode_subtab_config)
+                    .where(self.work_mode_subtab_config.c.user_id == user_id)
+                    .where(self.work_mode_subtab_config.c.subtab == subtab)
+                    .values(
+                        config_json=config_json,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+            else:
+                conn.execute(
+                    insert(self.work_mode_subtab_config).values(
+                        user_id=user_id,
+                        subtab=subtab,
+                        config_json=config_json,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+
+    def get_all_work_subtab_configs(self, user_id):
+        """Get all work subtab configurations for a user."""
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.work_mode_subtab_config)
+                .where(self.work_mode_subtab_config.c.user_id == user_id)
             ).fetchall()
             return [dict(row._mapping) for row in rows]
 

@@ -22,6 +22,16 @@
   import { tick, afterUpdate } from "svelte";
 
   export let sessionId;
+  export let currentMode = "personal";
+  export let activeWorkSubtab = "conversation";
+
+  function switchWorkSubtab(subtab) {
+    activeWorkSubtab = subtab;
+    // Save to localStorage
+    localStorage.setItem("theo.activeWorkSubtab", subtab);
+    // Dispatch event to notify parent
+    window.dispatchEvent(new CustomEvent("workSubtabChanged", { detail: { subtab } }));
+  }
 
   function generateUUID() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -286,6 +296,7 @@
         sessionId,
         text: userText,
         forcedProvider: forcedModel,
+        workSubtab: currentMode === "work" ? activeWorkSubtab : null,
         onToken(token) {
           streamedText += token;
           scrollToBottom();
@@ -359,6 +370,9 @@
       <div class="session-bar">
         <div class="session-title">
           <strong>Chat</strong>
+          {#if currentMode === "work"}
+            <span class="official-badge">OFFICIAL</span>
+          {/if}
           {#if forcedModel}
             <span class="provider-badge forced">Forced: {forcedModel}</span>
           {:else if usedProviders.size > 0}
@@ -387,6 +401,33 @@
           </button>
         </div>
       </div>
+
+      <!-- Work Mode Sub-Tabs (only visible in work mode) -->
+      {#if currentMode === "work"}
+        <div class="work-subtabs">
+          <button
+            class="subtab"
+            class:active={activeWorkSubtab === "conversation"}
+            on:click={() => switchWorkSubtab("conversation")}
+          >
+            💬 Conversation
+          </button>
+          <button
+            class="subtab"
+            class:active={activeWorkSubtab === "email"}
+            on:click={() => switchWorkSubtab("email")}
+          >
+            ✉️ Email Rewrites
+          </button>
+          <button
+            class="subtab"
+            class:active={activeWorkSubtab === "code"}
+            on:click={() => switchWorkSubtab("code")}
+          >
+            💻 Code Development
+          </button>
+        </div>
+      {/if}
 
       <div class="chat-main">
         <div class="messages">

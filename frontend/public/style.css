@@ -331,6 +331,75 @@ h3 {
 }
 
 /* ============================
+   Work Mode Sub-Tabs
+   ============================ */
+
+.work-subtabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: #f9fafb;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.work-subtabs .subtab {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--gray-600);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.work-subtabs .subtab:hover {
+  color: var(--gray-900);
+  background: white;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.work-subtabs .subtab.active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+  font-weight: 600;
+  background: white;
+}
+
+/* ============================
+   Settings Subsections
+   ============================ */
+
+.subsection {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background: var(--gray-50);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+}
+
+.subsection h4 {
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.subsection .btn-primary {
+  margin-top: var(--space-4);
+}
+
+.status-message {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--success-50);
+  color: var(--success-600);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+/* ============================
    Sidebar
    ============================ */
 
@@ -1103,6 +1172,20 @@ h3 {
     background: var(--warning-500);
     color: #78350f;
     opacity: 1;
+  }
+
+  .official-badge {
+    display: inline-block;
+    background: #dc2626;
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    padding: var(--space-1) var(--space-2);
+    margin-left: var(--space-2);
+    margin-right: var(--space-2);
+    vertical-align: middle;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .providers-used {

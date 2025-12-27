@@ -7,12 +7,13 @@
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
   import Login from "./components/Login.svelte";
-  import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode } from "./lib/api.js";
+  import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode, getWorkSubtabConfig } from "./lib/api.js";
 
   let isAuthenticated = false;
   let currentUser = null;
   let showSettings = false;
   let currentMode = "personal"; // "work" or "personal"
+  let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
 
   // Mobile sidebar toggle state
   let sidebarOpen = false;
@@ -76,6 +77,11 @@ onMount(async () => {
       console.error("Failed to refresh sessions after title generation:", err);
     }
   });
+
+  // Listen for work subtab changes from Chat component
+  window.addEventListener("workSubtabChanged", (e) => {
+    activeWorkSubtab = e.detail.subtab;
+  });
 });
 
 async function loadSessions() {
@@ -116,6 +122,14 @@ async function toggleMode() {
   try {
     await setUserMode(newMode);
     currentMode = newMode;
+
+    // Load last active subtab from localStorage when switching to work mode
+    if (newMode === "work") {
+      const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");
+      if (savedSubtab && ["conversation", "email", "code"].includes(savedSubtab)) {
+        activeWorkSubtab = savedSubtab;
+      }
+    }
   } catch (err) {
     console.error("Failed to switch mode", err);
   }
@@ -126,6 +140,12 @@ function handleLogin(token, user) {
   currentUser = user;
   loadSessions();
   loadUserMode();
+
+  // Load last active work subtab
+  const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");
+  if (savedSubtab && ["conversation", "email", "code"].includes(savedSubtab)) {
+    activeWorkSubtab = savedSubtab;
+  }
 }
 
 async function handleLogout() {
@@ -268,6 +288,7 @@ async function handleLogout() {
       </button>
     </div>
   </header>
+
 <div class="app-body">
 
   <div class="shell layout-shell">
@@ -331,7 +352,7 @@ async function handleLogout() {
         {#if showSettings}
           <Settings />
         {:else}
-          <Chat sessionId={activeSessionId} />
+          <Chat sessionId={activeSessionId} currentMode={currentMode} activeWorkSubtab={activeWorkSubtab} />
         {/if}
       </div>
     </section>
