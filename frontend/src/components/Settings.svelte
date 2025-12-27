@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import PersonalActions from "./PersonalActions.svelte";
+  import ServiceProviders from "./ServiceProviders.svelte";
   import {
     getProviders,
     listProviders,
@@ -49,7 +50,30 @@
   let promptSaveStatus = null;
 
   // Active tab state
-  let activeTab = "system-prompt";
+  let activeCategory = "general"; // general, operating-modes, accounts, health
+  let activeTab = "general"; // Changes based on category
+
+  // Helper function to switch category and set default tab
+  function switchCategory(category) {
+    activeCategory = category;
+    // Set default tab for each category
+    switch (category) {
+      case "general":
+        activeTab = "general";
+        break;
+      case "operating-modes":
+        activeTab = "personal";
+        break;
+      case "accounts":
+        activeTab = "theo-account";
+        break;
+      case "health":
+        activeTab = "health-monitor";
+        break;
+      default:
+        activeTab = "general";
+    }
+  }
 
   // Mode configuration state
   let workModeSettings = {
@@ -134,6 +158,90 @@
   let passwordError = null;
   let passwordSuccess = null;
   let changingPassword = false;
+
+  // Health Monitor state
+  let healthData = {
+    ai_providers: [],
+    m365_integration: { connected: false },
+    service_providers: []
+  };
+  let healthLoading = false;
+  let healthError = null;
+  let testingM365 = false;
+  let m365TestResult = null;
+  let healthRefreshInterval = null;
+
+  async function loadHealthData() {
+    healthLoading = true;
+    healthError = null;
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("/api/health/overview", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load health data");
+      }
+
+      healthData = await response.json();
+    } catch (err) {
+      console.error("Failed to load health data:", err);
+      healthError = err.message;
+    } finally {
+      healthLoading = false;
+    }
+  }
+
+  async function testM365Connection() {
+    testingM365 = true;
+    m365TestResult = null;
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("/api/health/test-m365", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to test M365 connection");
+      }
+
+      m365TestResult = await response.json();
+    } catch (err) {
+      console.error("Failed to test M365 connection:", err);
+      m365TestResult = {
+        healthy: false,
+        error: err.message
+      };
+    } finally {
+      testingM365 = false;
+    }
+  }
+
+  function formatRelativeTime(isoString) {
+    if (!isoString) return 'Never';
+
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  }
 
   async function load() {
     providers = await getProviders();
@@ -641,83 +749,109 @@
     }
   }
 
-  onMount(load);
+  onMount(async () => {
+    await load();
+    await loadHealthData();
+
+    // Set up auto-refresh for health data (every 30 seconds)
+    healthRefreshInterval = setInterval(loadHealthData, 30000);
+
+    // Cleanup on unmount
+    return () => {
+      if (healthRefreshInterval) {
+        clearInterval(healthRefreshInterval);
+      }
+    };
+  });
 </script>
 
 <div class="settings">
   <h1>Settings</h1>
 
-  <!-- Tab Navigation -->
+  <!-- Category Navigation -->
+  <div class="category-tabs">
+    <button
+      class="category-tab"
+      class:active={activeCategory === "general"}
+      on:click={() => switchCategory("general")}
+    >
+      General
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "operating-modes"}
+      on:click={() => switchCategory("operating-modes")}
+    >
+      Operating Modes
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "accounts"}
+      on:click={() => switchCategory("accounts")}
+    >
+      Accounts
+    </button>
+    <button
+      class="category-tab"
+      class:active={activeCategory === "health"}
+      on:click={() => switchCategory("health")}
+    >
+      Health
+    </button>
+  </div>
+
+  <!-- Sub-tab Navigation -->
   <div class="tabs">
-    <button
-      class="tab"
-      class:active={activeTab === "system-prompt"}
-      on:click={() => activeTab = "system-prompt"}
-    >
-      System Prompt
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "intents"}
-      on:click={() => activeTab = "intents"}
-    >
-      Intents
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "routing"}
-      on:click={() => activeTab = "routing"}
-    >
-      Routing
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "memory"}
-      on:click={() => activeTab = "memory"}
-    >
-      Memory
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "providers"}
-      on:click={() => activeTab = "providers"}
-    >
-      Providers
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "debug"}
-      on:click={() => activeTab = "debug"}
-    >
-      Debug
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "modes"}
-      on:click={() => activeTab = "modes"}
-    >
-      Modes
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "account"}
-      on:click={() => activeTab = "account"}
-    >
-      Account
-    </button>
-    <button
-      class="tab"
-      class:active={activeTab === "integrations"}
-      on:click={() => activeTab = "integrations"}
-    >
-      Integrations
-    </button>
+    {#if activeCategory === "general"}
+      <button class="tab" class:active={activeTab === "general"} on:click={() => activeTab = "general"}>
+        General
+      </button>
+      <button class="tab" class:active={activeTab === "intents"} on:click={() => activeTab = "intents"}>
+        Intents
+      </button>
+      <button class="tab" class:active={activeTab === "routing"} on:click={() => activeTab = "routing"}>
+        Routing
+      </button>
+      <button class="tab" class:active={activeTab === "memory"} on:click={() => activeTab = "memory"}>
+        Memory
+      </button>
+    {/if}
+
+    {#if activeCategory === "operating-modes"}
+      <button class="tab" class:active={activeTab === "personal"} on:click={() => activeTab = "personal"}>
+        Personal
+      </button>
+      <button class="tab" class:active={activeTab === "work"} on:click={() => activeTab = "work"}>
+        Work
+      </button>
+    {/if}
+
+    {#if activeCategory === "accounts"}
+      <button class="tab" class:active={activeTab === "theo-account"} on:click={() => activeTab = "theo-account"}>
+        THEO Account
+      </button>
+      <button class="tab" class:active={activeTab === "ai-providers"} on:click={() => activeTab = "ai-providers"}>
+        AI Providers
+      </button>
+      <button class="tab" class:active={activeTab === "integrations"} on:click={() => activeTab = "integrations"}>
+        Integrations
+      </button>
+      <button class="tab" class:active={activeTab === "service-providers"} on:click={() => activeTab = "service-providers"}>
+        Service Providers
+      </button>
+    {/if}
+
+    {#if activeCategory === "health"}
+      <button class="tab" class:active={activeTab === "health-monitor"} on:click={() => activeTab = "health-monitor"}>
+        Health Monitor
+      </button>
+    {/if}
   </div>
 
   <!-- Tab Content -->
   <div class="tab-content">
-    <!-- System Prompt Tab -->
-    {#if activeTab === "system-prompt"}
+    <!-- General Tab (was System Prompt) -->
+    {#if activeTab === "general"}
       <div class="tab-panel">
         <h2>System Prompt Configuration</h2>
         <p class="subtitle">Customize how THEO responds and behaves.</p>
@@ -1093,7 +1227,7 @@
     {/if}
 
     <!-- Providers Tab -->
-    {#if activeTab === "providers"}
+    {#if activeTab === "ai-providers"}
       <div class="tab-panel">
         <h2>Providers</h2>
         <p class="subtitle">Manage AI provider configurations and health status.</p>
@@ -1193,45 +1327,272 @@
     {/if}
 
     <!-- Debug Tab -->
-    {#if activeTab === "debug"}
+    <!-- Health Monitor Tab -->
+    {#if activeTab === "health-monitor"}
       <div class="tab-panel">
-        <h2>Debugging</h2>
-        <p class="subtitle">Enable debug logging and advanced features.</p>
-
-        <div class="rule">
-          <label>Debug logs</label>
-          <input
-            type="checkbox"
-            checked={debugEnabled}
-            disabled={savingDebug}
-            on:change={(e) => toggleDebug(e.target.checked)}
-          />
+        <div class="health-header">
+          <div>
+            <h2>System Health Monitor</h2>
+            <p class="subtitle">Monitor AI provider health, performance metrics, and system status.</p>
+          </div>
+          <button class="btn-secondary" on:click={loadHealthData} disabled={healthLoading}>
+            {healthLoading ? 'Refreshing...' : 'Refresh All'}
+          </button>
         </div>
 
-        <div class="rule">
-          <label>Advanced mode</label>
-          <input
-            type="checkbox"
-            checked={advancedMode}
-            on:change={(e) => toggleAdvancedMode(e.target.checked)}
-          />
-          <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
-            Shows Export and Fork features in chat interface
-          </small>
+        {#if healthError}
+          <div class="error-message">{healthError}</div>
+        {/if}
+
+        <!-- Section 1: AI Providers Health -->
+        <div class="section">
+          <h3>AI Provider Health</h3>
+          <p class="hint">Real-time health monitoring for all configured AI providers</p>
+
+          {#if healthData.ai_providers && healthData.ai_providers.length === 0}
+            <p class="empty-state">No AI providers configured yet. Add providers in the Accounts section.</p>
+          {:else if healthData.ai_providers}
+            <div class="health-grid">
+              {#each healthData.ai_providers as provider}
+                <div class="health-card">
+                  <div class="health-card-header">
+                    <h4>{provider.name}</h4>
+                    <span class="health-badge"
+                      class:badge-healthy={provider.enabled && provider.health_status === 'healthy' && !provider.circuit_breaker_open}
+                      class:badge-degraded={provider.health_status === 'degraded'}
+                      class:badge-unhealthy={provider.health_status === 'unhealthy' || provider.circuit_breaker_open}
+                      class:badge-inactive={!provider.enabled}
+                      class:badge-unknown={provider.health_status === 'unknown' && provider.enabled}>
+                      {#if !provider.enabled}
+                        ⏸️ Inactive
+                      {:else if provider.circuit_breaker_open}
+                        🔌 Circuit Breaker
+                      {:else if provider.health_status === 'healthy'}
+                        🟢 Healthy
+                      {:else if provider.health_status === 'degraded'}
+                        🟡 Degraded
+                      {:else if provider.health_status === 'unhealthy'}
+                        🔴 Unhealthy
+                      {:else}
+                        ⚪ Unknown
+                      {/if}
+                    </span>
+                  </div>
+                  <div class="health-card-body">
+                    <p><strong>Type:</strong> {provider.type}</p>
+                    <p><strong>Model:</strong> {provider.model || 'N/A'}</p>
+
+                    {#if provider.total_requests > 0}
+                      <div class="metric-group">
+                        <p><strong>Requests:</strong> {provider.total_requests} total, {provider.failed_requests} failed</p>
+                        <div class="success-rate-bar">
+                          <div class="success-rate-fill"
+                            class:rate-good={provider.success_rate >= 95}
+                            class:rate-warning={provider.success_rate >= 80 && provider.success_rate < 95}
+                            class:rate-poor={provider.success_rate < 80}
+                            style="width: {provider.success_rate}%"></div>
+                        </div>
+                        <p class="metric-small">Success Rate: {provider.success_rate}%</p>
+                      </div>
+
+                      <p><strong>Avg Latency:</strong>
+                        <span class:latency-good={provider.avg_latency_ms < 500}
+                          class:latency-warning={provider.avg_latency_ms >= 500 && provider.avg_latency_ms < 1000}
+                          class:latency-poor={provider.avg_latency_ms >= 1000}>
+                          {provider.avg_latency_ms}ms
+                        </span>
+                      </p>
+
+                      {#if provider.last_success_at}
+                        <p class="metric-small">Last Success: {formatRelativeTime(provider.last_success_at)}</p>
+                      {/if}
+                      {#if provider.last_failure_at}
+                        <p class="metric-small error-text">Last Failure: {formatRelativeTime(provider.last_failure_at)}</p>
+                      {/if}
+                    {:else}
+                      <p class="metric-small">No requests yet</p>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Section 2: Microsoft 365 Integration -->
+        <div class="section">
+          <h3>Microsoft 365 Integration</h3>
+          <p class="hint">Connection status and token health for Microsoft Graph API</p>
+
+          <div class="health-card m365-card">
+            <div class="health-card-header">
+              <h4>Microsoft 365</h4>
+              <span class="health-badge"
+                class:badge-healthy={healthData.m365_integration?.connected && healthData.m365_integration?.token_valid && healthData.m365_integration?.hours_until_expiry > 24}
+                class:badge-degraded={healthData.m365_integration?.connected && healthData.m365_integration?.hours_until_expiry <= 24 && healthData.m365_integration?.hours_until_expiry > 0}
+                class:badge-unhealthy={!healthData.m365_integration?.connected || !healthData.m365_integration?.token_valid || healthData.m365_integration?.hours_until_expiry <= 0}
+                class:badge-unknown={!healthData.m365_integration?.connected}>
+                {#if !healthData.m365_integration?.connected}
+                  ⚪ Not Configured
+                {:else if !healthData.m365_integration.token_valid || healthData.m365_integration.hours_until_expiry <= 0}
+                  🔴 Disconnected
+                {:else if healthData.m365_integration.hours_until_expiry <= 24}
+                  🟡 Token Expiring Soon
+                {:else}
+                  🟢 Connected
+                {/if}
+              </span>
+            </div>
+
+            {#if healthData.m365_integration?.connected}
+              <div class="health-card-body">
+                <p><strong>Account:</strong> {healthData.m365_integration.account || 'Unknown'}</p>
+                <p><strong>Token Status:</strong>
+                  <span class:error-text={!healthData.m365_integration.token_valid}>
+                    {healthData.m365_integration.token_valid ? 'Valid' : 'Invalid/Expired'}
+                  </span>
+                </p>
+
+                {#if healthData.m365_integration.hours_until_expiry !== null}
+                  <p><strong>Token Expires:</strong>
+                    <span class:warning-text={healthData.m365_integration.hours_until_expiry <= 24}
+                      class:error-text={healthData.m365_integration.hours_until_expiry <= 0}>
+                      {#if healthData.m365_integration.hours_until_expiry > 0}
+                        in {healthData.m365_integration.hours_until_expiry} hours
+                      {:else}
+                        Expired
+                      {/if}
+                    </span>
+                  </p>
+                {/if}
+
+                {#if healthData.m365_integration.last_refreshed_at}
+                  <p class="metric-small">Last Refreshed: {formatRelativeTime(healthData.m365_integration.last_refreshed_at)}</p>
+                {/if}
+
+                {#if healthData.m365_integration.last_error}
+                  <p class="error-text metric-small">Last Error: {healthData.m365_integration.last_error}</p>
+                {/if}
+
+                {#if healthData.m365_integration.scopes && healthData.m365_integration.scopes.length > 0}
+                  <div class="capabilities">
+                    <p><strong>Capabilities:</strong></p>
+                    <ul class="capability-list">
+                      {#each healthData.m365_integration.scopes as scope}
+                        <li>
+                          {#if scope.includes('Calendar')}
+                            ✓ Calendar Access
+                          {:else if scope.includes('Mail')}
+                            ✓ Email Access
+                          {:else}
+                            ✓ {scope}
+                          {/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+
+                <button class="btn-small" on:click={testM365Connection} disabled={testingM365}>
+                  {testingM365 ? 'Testing...' : 'Test Connection'}
+                </button>
+
+                {#if m365TestResult}
+                  <div class="test-result" class:test-success={m365TestResult.healthy} class:test-error={!m365TestResult.healthy}>
+                    {#if m365TestResult.healthy}
+                      ✓ Connected to Microsoft Graph API ({m365TestResult.response_time_ms}ms)
+                    {:else}
+                      ✗ Connection Failed: {m365TestResult.error}
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <div class="health-card-body">
+                <p class="empty-state">Microsoft 365 account not connected. Connect in the Integrations section.</p>
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Section 3: Service Providers -->
+        <div class="section">
+          <h3>Service Providers</h3>
+          <p class="hint">External service providers for bookings and appointments</p>
+
+          {#if healthData.service_providers && healthData.service_providers.length === 0}
+            <p class="empty-state">No service providers configured yet. Add providers in the Service Providers section.</p>
+          {:else if healthData.service_providers}
+            <div class="health-grid">
+              {#each healthData.service_providers as provider}
+                <div class="health-card">
+                  <div class="health-card-header">
+                    <h4>{provider.name}</h4>
+                    <span class="health-badge"
+                      class:badge-healthy={provider.is_enabled}
+                      class:badge-inactive={!provider.is_enabled}>
+                      {provider.is_enabled ? '🟢 Active' : '⏸️ Disabled'}
+                    </span>
+                  </div>
+                  <div class="health-card-body">
+                    <p><strong>Category:</strong> {provider.category}</p>
+                    <p><strong>Type:</strong> {provider.provider_type === 'manual' ? 'Manual Booking' : 'API Integration'}</p>
+
+                    {#if provider.last_synced_at}
+                      <p class="metric-small">Last Synced: {formatRelativeTime(provider.last_synced_at)}</p>
+                    {/if}
+
+                    {#if provider.booking_url}
+                      <p><a href={provider.booking_url} target="_blank" class="booking-link">Open Booking URL →</a></p>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Debug Settings -->
+        <div class="section">
+          <h3>Debug Settings</h3>
+          <div class="rule">
+            <label>Debug logs</label>
+            <input
+              type="checkbox"
+              checked={debugEnabled}
+              disabled={savingDebug}
+              on:change={(e) => toggleDebug(e.target.checked)}
+            />
+            <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+              Enable detailed logging for troubleshooting
+            </small>
+          </div>
+
+          <div class="rule">
+            <label>Advanced mode</label>
+            <input
+              type="checkbox"
+              checked={advancedMode}
+              on:change={(e) => toggleAdvancedMode(e.target.checked)}
+            />
+            <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+              Shows Export and Fork features in chat interface
+            </small>
+          </div>
         </div>
       </div>
     {/if}
 
     <!-- Modes Tab -->
-    {#if activeTab === "modes"}
+    <!-- Work Mode Tab -->
+    {#if activeTab === "work"}
       <div class="tab-panel">
-        <h2>Work & Personal Modes</h2>
-        <p class="subtitle">Configure different behavior and preferences for work and personal contexts.</p>
+        <h2>💼 Work Mode</h2>
+        <p class="subtitle">Professional tone and optimized for productivity tasks.</p>
 
-        <!-- Work Mode Section -->
+        <!-- Work Mode Settings -->
         <div class="section">
-          <h3>💼 Work Mode</h3>
-          <p class="hint">Professional tone and optimized for productivity tasks</p>
+          <h3>General Settings</h3>
 
           <div class="form-group">
             <label for="work-tone">Tone</label>
@@ -1374,11 +1735,17 @@
             </button>
           </div>
         </div>
+      </div>
+    {/if}
 
-        <!-- Personal Mode Section -->
+    <!-- Personal Mode Tab -->
+    {#if activeTab === "personal"}
+      <div class="tab-panel">
+        <h2>🏠 Personal Mode</h2>
+        <p class="subtitle">Casual tone and optimized for general conversation.</p>
+
         <div class="section">
-          <h3>🏠 Personal Mode</h3>
-          <p class="hint">Casual tone and optimized for general conversation</p>
+          <h3>General Settings</h3>
 
           <div class="form-group">
             <label for="personal-tone">Tone</label>
@@ -1431,7 +1798,7 @@
     {/if}
 
     <!-- Account Tab -->
-    {#if activeTab === "account"}
+    {#if activeTab === "theo-account"}
       <div class="tab-panel">
         <h2>Account & Security</h2>
         <p class="subtitle">Manage your password and security settings.</p>
@@ -1498,6 +1865,12 @@
         <PersonalActions />
       </div>
     {/if}
+
+    {#if activeTab === "service-providers"}
+      <div class="tab-panel">
+        <ServiceProviders />
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -1517,6 +1890,37 @@
     font-size: var(--font-size-2xl);
   }
 
+  .category-tabs {
+    display: flex;
+    background: var(--gray-100);
+    border-bottom: 1px solid var(--gray-300);
+    padding: 0 var(--space-6);
+    gap: var(--space-2);
+  }
+
+  .category-tab {
+    padding: var(--space-4) var(--space-6);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--gray-600);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .category-tab:hover {
+    color: var(--gray-800);
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .category-tab.active {
+    color: var(--info-600);
+    border-bottom-color: var(--info-600);
+    background: var(--gray-50);
+  }
+
   .tabs {
     display: flex;
     background: var(--gray-50);
@@ -1526,7 +1930,7 @@
   }
 
   .tab {
-    padding: var(--space-3) var(--space-6);
+    padding: var(--space-3) var(--space-5);
     border: none;
     background: transparent;
     cursor: pointer;
@@ -2082,5 +2486,240 @@
 
   .section:last-child {
     border-bottom: none;
+  }
+
+  /* Health Monitor Styles */
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .health-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: var(--space-4);
+    background: white;
+    transition: box-shadow 0.2s;
+  }
+
+  .health-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .health-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .health-card-header h4 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--gray-800);
+  }
+
+  .health-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+  }
+
+  .health-badge.healthy {
+    background: var(--success-50);
+    color: var(--success-700);
+  }
+
+  .health-badge.unhealthy {
+    background: var(--gray-100);
+    color: var(--gray-600);
+  }
+
+  .health-card-body p {
+    margin: var(--space-2) 0;
+    font-size: var(--font-size-sm);
+    color: var(--gray-700);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--gray-500);
+    font-style: italic;
+  }
+
+  /* Enhanced Health Monitor Styles */
+  .health-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+  }
+
+  .health-badge.badge-healthy {
+    background: #DCFCE7;
+    color: #166534;
+  }
+
+  .health-badge.badge-degraded {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+
+  .health-badge.badge-unhealthy {
+    background: #FEE2E2;
+    color: #991B1B;
+  }
+
+  .health-badge.badge-inactive {
+    background: var(--gray-100);
+    color: var(--gray-600);
+  }
+
+  .health-badge.badge-unknown {
+    background: var(--gray-100);
+    color: var(--gray-500);
+  }
+
+  .metric-group {
+    margin: var(--space-3) 0;
+  }
+
+  .success-rate-bar {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: var(--space-2) 0;
+  }
+
+  .success-rate-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+  }
+
+  .success-rate-fill.rate-good {
+    background: #10B981;
+  }
+
+  .success-rate-fill.rate-warning {
+    background: #F59E0B;
+  }
+
+  .success-rate-fill.rate-poor {
+    background: #EF4444;
+  }
+
+  .metric-small {
+    font-size: var(--font-size-xs);
+    color: var(--gray-600);
+    margin: var(--space-1) 0;
+  }
+
+  .latency-good {
+    color: #10B981;
+    font-weight: 500;
+  }
+
+  .latency-warning {
+    color: #F59E0B;
+    font-weight: 500;
+  }
+
+  .latency-poor {
+    color: #EF4444;
+    font-weight: 500;
+  }
+
+  .error-text {
+    color: #EF4444;
+  }
+
+  .warning-text {
+    color: #F59E0B;
+  }
+
+  .error-message {
+    padding: var(--space-3);
+    background: #FEE2E2;
+    border: 1px solid #F87171;
+    border-radius: 4px;
+    color: #991B1B;
+    margin-bottom: var(--space-4);
+  }
+
+  .m365-card {
+    max-width: 100%;
+  }
+
+  .capabilities {
+    margin-top: var(--space-3);
+  }
+
+  .capability-list {
+    margin: var(--space-2) 0;
+    padding-left: var(--space-5);
+    list-style: none;
+  }
+
+  .capability-list li {
+    margin: var(--space-1) 0;
+    font-size: var(--font-size-sm);
+    color: var(--gray-700);
+  }
+
+  .btn-small {
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
+    border: 1px solid var(--gray-300);
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: var(--space-3);
+  }
+
+  .btn-small:hover:not(:disabled) {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  .btn-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .test-result {
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: 4px;
+    font-size: var(--font-size-sm);
+  }
+
+  .test-success {
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #86EFAC;
+  }
+
+  .test-error {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+  }
+
+  .booking-link {
+    color: var(--info-600);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+  }
+
+  .booking-link:hover {
+    text-decoration: underline;
   }
 </style>

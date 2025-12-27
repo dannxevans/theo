@@ -1861,8 +1861,12 @@ class MemoryStore:
             return dict(row._mapping) if row else None
 
     def get_preferred_provider(self, user_id, category):
-        """Get the preferred provider for a category."""
+        """
+        Get the preferred provider for a category.
+        Falls back to any provider in that category if no preferred one exists.
+        """
         with self.engine.begin() as conn:
+            # First, try to get a preferred provider
             row = conn.execute(
                 select(self.service_providers)
                 .where(self.service_providers.c.user_id == user_id)
@@ -1870,6 +1874,18 @@ class MemoryStore:
                 .where(self.service_providers.c.preferred_for_category == True)
                 .limit(1)
             ).fetchone()
+
+            if row:
+                return dict(row._mapping)
+
+            # Fall back to any provider in this category
+            row = conn.execute(
+                select(self.service_providers)
+                .where(self.service_providers.c.user_id == user_id)
+                .where(self.service_providers.c.category == category)
+                .limit(1)
+            ).fetchone()
+
             return dict(row._mapping) if row else None
 
     def update_service_provider(self, provider_id, **kwargs):

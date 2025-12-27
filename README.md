@@ -11,9 +11,11 @@ The philosophy is not "one model to rule them all", but rather:
 
 ## 📚 Documentation
 
+- **[Implementation Plan](docs/IMPLEMENTATION_PLAN.md)** - Development roadmap and feature tracking
 - **[Authentication Guide](docs/AUTHENTICATION.md)** - Login, password management, and security
 - **[Database Persistence Guide](docs/DATABASE_PERSISTENCE.md)** - S3 backup/restore for AWS deployments
 - **[ECS Setup Guide](docs/ECS_DATABASE_SETUP.md)** - AWS ECS configuration and deployment
+- **[M365 Integration Guide](docs/M365_INTEGRATION.md)** - Microsoft 365 setup and features
 
 ---
 
@@ -27,6 +29,32 @@ The philosophy is not "one model to rule them all", but rather:
 - **Authentication**: Secure session-based login with password management (7-day sessions)
 - **Work/Personal Modes**: Dual-mode system with mode-specific configurations
 - **Provider Health Monitoring**: Circuit breaker pattern, failure tracking, and automatic fallback
+- **Action Execution**: Two-step confirmation workflow for external actions with UI approval widgets
+
+### Microsoft 365 Integration
+THEO includes comprehensive M365 integration via Microsoft Graph API:
+
+**Calendar Management**
+- **Read Events**: Fetch calendar events within date ranges
+- **Create Events**: Book meetings with attendees, location, and descriptions
+- **Update Events**: Modify existing calendar entries
+- **Delete Events**: Remove calendar events
+- **Smart Detection**: Flight/travel detection in calendar queries
+- **Context-Aware Booking**: Generic verbs require calendar context (prevents false positives)
+
+**Email Management**
+- **Read Emails**: Access inbox with search and filtering
+- **Smart Composition**: LLM-generated subjects and content from natural language
+- **Draft Workflow**: Create → Review → Approve/Reject → Send/Delete
+- **Reply to Emails**: Context-aware replies with original message threading
+- **Signature Handling**: Intelligent signature stripping with comprehensive pattern matching
+- **HTML Processing**: Clean conversion to readable plain text
+- **Sent Items**: Automatic saving to Sent Items folder
+
+**OAuth 2.0 Authentication**
+- Automatic token refresh handling
+- Secure credential storage in database
+- Token expiration management
 
 ### Work Mode Features
 When in work mode, THEO provides specialized subtabs:
@@ -37,9 +65,10 @@ When in work mode, THEO provides specialized subtabs:
 
 ### Provider Support
 - **Anthropic (Claude)**: Full streaming support
-- **OpenAI (GPT)**: ChatGPT and GPT-4 models
+- **OpenAI (GPT)**: ChatGPT and GPT-4 models with LLM-powered email generation
+- **Microsoft 365**: Calendar and email operations via Graph API
 - **Mock Provider**: Deterministic testing provider
-- **Extensible Architecture**: Easy to add new providers
+- **Extensible Architecture**: Plugin-style action providers, easy to add new integrations
 
 ### User Interface
 - **Chat Interface**: ChatGPT-style UI with markdown rendering and syntax highlighting
@@ -66,24 +95,32 @@ When in work mode, THEO provides specialized subtabs:
 ### Backend (Python/Flask)
 ```
 backend/
-├── app.py                    # Flask server (port 1066) with 60+ REST endpoints
+├── app.py                    # Flask server (port 1066) with 70+ REST endpoints
 ├── auth.py                   # Authentication with SHA-256 hashing
 ├── db_backup.py              # S3 backup/restore manager
 ├── core/
 │   ├── router.py             # Intent classification & provider selection
+│   ├── action_router.py      # Action execution & email/calendar handling
 │   ├── context.py            # Context building & system prompt injection
-│   ├── memory.py             # SQLAlchemy ORM with 17 database tables
+│   ├── memory.py             # SQLAlchemy ORM with 17+ database tables
+│   ├── confirmation_manager.py # Two-step approval workflow
 │   └── provider_registry.py # Runtime provider registry
-└── providers/
-    ├── base.py               # Abstract provider interface
-    ├── mock.py               # Testing provider
-    ├── openai.py             # OpenAI integration
-    └── anthropic.py          # Anthropic integration (streaming SSE)
+├── providers/
+│   ├── base.py               # Abstract provider interface
+│   ├── mock.py               # Testing provider
+│   ├── openai.py             # OpenAI integration
+│   └── anthropic.py          # Anthropic integration (streaming SSE)
+└── actions/
+    ├── base.py               # Abstract action provider interface
+    ├── action_registry.py    # Action provider lifecycle management
+    └── m365_provider.py      # Microsoft 365 Graph API integration
 ```
 
 **Routing Logic**:
-1. Intent classification via keyword matching
-2. Provider selection with fallback chain:
+1. Confirmation check (pending approvals)
+2. Intent classification via context-aware keyword matching
+3. Action routing (calendar/email operations)
+4. Provider selection with fallback chain:
    - Forced provider (user override)
    - User routing rules (intent → provider mapping)
    - Intent-based defaults
@@ -136,6 +173,12 @@ frontend/
 - `providers` - LLM provider configurations
 - `provider_metadata` - Health status, costs, latency, circuit breaker state
 - `request_logs` - Request history with success/failure tracking
+
+**Action Execution & M365**:
+- `service_providers` - External service provider configurations (M365, etc.)
+- `m365_credentials` - OAuth tokens with automatic refresh
+- `actions` - Action execution history with status tracking
+- `confirmations` - Pending approval requests with expiration
 
 ---
 
@@ -312,6 +355,17 @@ Logs routing decisions, intent classification, and provider selection to backend
 - `GET /api/mode/work/subtab/<subtab>` - Get subtab config
 - `POST /api/mode/work/subtab/<subtab>` - Update subtab config
 
+### Microsoft 365
+- `GET /api/m365/auth/url` - Get OAuth authorization URL
+- `GET /api/m365/auth/callback?code=...` - Handle OAuth callback
+- `GET /api/m365/status` - Check M365 connection status
+- `POST /api/m365/disconnect` - Disconnect M365 account
+
+### Confirmations
+- `GET /api/confirmations/pending` - Get pending approval requests
+- `POST /api/confirmations/<id>/approve` - Approve action
+- `POST /api/confirmations/<id>/reject` - Reject action
+
 See full API documentation in backend code comments.
 
 ---
@@ -373,19 +427,30 @@ Single-user or small team self-hosted deployment. Not recommended for large-scal
 - ✅ Work/Personal modes with subtab configurations
 - ✅ S3 database backup for AWS deployments
 - ✅ Streaming responses via SSE
+- ✅ **Action provider system with two-step confirmations**
+- ✅ **Microsoft 365 integration (Calendar & Email)**
+- ✅ **OAuth 2.0 authentication with automatic token refresh**
+- ✅ **LLM-powered email composition with natural language**
+- ✅ **Context-aware intent routing (calendar/email)**
+- ✅ **Draft workflow: Create → Review → Approve → Send/Delete**
 
 ### In Progress
 - 🔄 Cross-model conversation continuity (summarization strategy)
 - 🔄 Enhanced memory relevance decay algorithms
-- 🔄 Intent classification confidence scoring
+- 🔄 Email attachments support
+- 🔄 Recurring calendar events
 
 ### Planned
+- 📋 Google Workspace integration (Gmail, Calendar, Drive)
+- 📋 Slack integration for team communication
+- 📋 GitHub integration for issue/PR management
 - 📋 Voice input/output support
 - 📋 Multi-user administration UI
 - 📋 Role-based access control (RBAC)
 - 📋 Advanced provider cost optimization
 - 📋 Custom model fine-tuning integration
-- 📋 Plugin system for custom tools
+- 📋 Email threading and conversation view
+- 📋 Calendar conflict detection and smart scheduling
 
 ---
 

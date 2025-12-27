@@ -264,11 +264,9 @@ class ActionRouter:
         """
         Handle appointment booking requests.
 
-        This follows the haircut booking example from requirements:
-        1. Parse booking request (subject, time, attendees)
-        2. Find calendar provider
-        3. Create confirmation request for user approval
-        4. Return confirmation details
+        This handles two scenarios:
+        1. External service bookings (haircut, doctor, etc.) - provides smart context
+        2. Direct calendar events - creates event with confirmation
 
         Args:
             user_text: User's input text
@@ -277,7 +275,7 @@ class ActionRouter:
             context: Full request context
 
         Returns:
-            Response dictionary with confirmation request
+            Response dictionary with booking assistance or confirmation
         """
         # Check if confirmation manager is available
         if not self.confirmation_manager:
@@ -286,6 +284,13 @@ class ActionRouter:
                 "provider": "action_router",
                 "task_type": "book_appointment",
             }
+
+        # Detect if this is a service booking (haircut, doctor, dentist, etc.)
+        service_category = self._detect_service_category(user_text)
+
+        if service_category:
+            # Handle service booking with smart context
+            return self._handle_service_booking(user_text, user_id, session_id, service_category)
 
         # Use LLM to extract event details from natural language
         event_details = self._extract_event_with_llm(user_text, user_id)
@@ -2060,3 +2065,285 @@ Rules:
             formatted.append(event_line)
 
         return "\n\n".join(formatted)
+
+    def _detect_service_category(self, user_text: str) -> str:
+        """
+        Detect if user is requesting a service booking (haircut, doctor, etc.).
+
+        Args:
+            user_text: User's input text
+
+        Returns:
+            Service category (haircut, doctor, dentist) or empty string if none detected
+        """
+        text_lower = user_text.lower()
+
+        # Service keywords mapping
+        service_patterns = {
+            "haircut": ["haircut", "hair cut", "barber", "salon", "trim", "hairstyle"],
+            "doctor": ["doctor", "physician", "gp", "medical appointment", "checkup"],
+            "dentist": ["dentist", "dental", "teeth cleaning", "tooth"],
+            "massage": ["massage", "spa", "therapist"],
+            "gym": ["gym", "personal trainer", "fitness", "workout session"]
+        }
+
+        for category, keywords in service_patterns.items():
+            if any(keyword in text_lower for keyword in keywords):
+                return category
+
+        return ""
+
+    def _handle_service_booking(
+        self,
+        user_text: str,
+        user_id: int,
+        session_id: str,
+        service_category: str
+    ) -> Dict:
+        """
+        Handle external service booking with calendar-aware suggestions.
+
+        Flow:
+        1. Check for configured service provider
+        2. Read user's calendar for availability
+        3. Suggest optimal booking times
+        4. Provide booking link/instructions
+
+        Args:
+            user_text: User's request
+            user_id: User ID
+            session_id: Session ID
+            service_category: Type of service (haircut, doctor, etc.)
+
+        Returns:
+            Response with booking assistance
+        """
+        import json
+        from datetime import timedelta
+
+        # Check for service provider
+        service_provider = self.memory.get_preferred_provider(user_id, service_category)
+
+        if not service_provider:
+            # No provider configured - offer to set one up
+            return {
+                "text": f"I don't have a {service_category} provider configured yet. "
+                       f"Would you like to add one in Settings → Service Providers?",
+                "provider": "action_router",
+                "task_type": "book_appointment",
+                "metadata": {
+                    "service_category": service_category,
+                    "needs_configuration": True
+                }
+            }
+
+        # Get provider details
+        provider_name = service_provider.get("name", f"{service_category} provider")
+        booking_method = service_provider.get("booking_method", "manual")
+
+        # Parse additional metadata if present
+        additional_metadata = service_provider.get("additional_metadata")
+        if isinstance(additional_metadata, str):
+            try:
+                additional_metadata = json.loads(additional_metadata)
+            except:
+                additional_metadata = {}
+        elif not additional_metadata:
+            additional_metadata = {}
+
+        # Get typical duration and travel time
+        typical_duration = additional_metadata.get("typical_duration_minutes", 30)
+        travel_time_home = additional_metadata.get("travel_time_from_home", 15)
+        travel_time_office = additional_metadata.get("travel_time_from_office", 15)
+        booking_url = additional_metadata.get("booking_url", service_provider.get("api_base_url"))
+
+        # Read calendar to find availability
+        # Look ahead 2 weeks
+        today = datetime.now()
+        end_date = today + timedelta(days=14)
+
+        # Load M365 provider to read calendar
+        self.action_registry.load_providers(user_id)
+        calendar_providers = self.action_registry.get_providers_by_capability("read_calendar", user_id)
+
+        calendar_events = []
+        if calendar_providers:
+            provider_id, provider = calendar_providers[0]
+            try:
+                calendar_events = provider.read_calendar(today, end_date)
+            except Exception as e:
+                logging.warning(f"[ACTION_ROUTER] Failed to read calendar: {e}")
+
+        # Find free slots
+        free_slots = self._find_optimal_slots(
+            calendar_events,
+            start_date=today,
+            end_date=end_date,
+            duration_minutes=typical_duration + travel_time_home
+        )
+
+        # Build response
+        if free_slots:
+            slots_text = self._format_free_slots(free_slots[:5])  # Top 5 slots
+
+            response_text = f"I found some good times for your {service_category} at {provider_name}:\n\n"
+            response_text += slots_text
+            response_text += f"\n\n"
+
+            if booking_url:
+                response_text += f"**Book here:** {booking_url}\n\n"
+            else:
+                response_text += f"Contact {provider_name} to book.\n\n"
+
+            response_text += "Would you like me to add a reminder to your calendar once you've booked?"
+        else:
+            response_text = f"Your calendar is quite full! "
+            response_text += f"You may want to check {provider_name} directly for availability.\n\n"
+
+            if booking_url:
+                response_text += f"**Book here:** {booking_url}"
+
+        return {
+            "text": response_text,
+            "provider": "action_router",
+            "task_type": "book_appointment",
+            "metadata": {
+                "service_category": service_category,
+                "provider_name": provider_name,
+                "booking_url": booking_url,
+                "suggested_slots": [slot.isoformat() for slot in free_slots[:5]] if free_slots else []
+            }
+        }
+
+    def _find_optimal_slots(
+        self,
+        calendar_events: list,
+        start_date: datetime,
+        end_date: datetime,
+        duration_minutes: int = 60,
+        preferred_hours: tuple = (9, 18)  # 9am to 6pm
+    ) -> list:
+        """
+        Find optimal free time slots in the user's calendar.
+
+        Args:
+            calendar_events: List of existing calendar events
+            start_date: Start of search range
+            end_date: End of search range
+            duration_minutes: Required duration for slot
+            preferred_hours: Tuple of (start_hour, end_hour) for preferred times
+
+        Returns:
+            List of datetime objects representing optimal start times
+        """
+        from datetime import timedelta
+
+        free_slots = []
+        current_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        while current_date <= end_date:
+            # Skip past dates
+            if current_date.date() < datetime.now().date():
+                current_date += timedelta(days=1)
+                continue
+
+            # Only check weekdays (Monday=0, Sunday=6)
+            if current_date.weekday() >= 5:  # Saturday or Sunday
+                current_date += timedelta(days=1)
+                continue
+
+            # Check each hour in preferred range
+            for hour in range(preferred_hours[0], preferred_hours[1]):
+                slot_start = current_date.replace(hour=hour, minute=0)
+                slot_end = slot_start + timedelta(minutes=duration_minutes)
+
+                # Check if slot conflicts with any event
+                is_free = True
+                for event in calendar_events:
+                    event_start = event.get("start_time")
+                    event_end = event.get("end_time")
+
+                    if isinstance(event_start, str):
+                        # Normalize M365 datetime format (handle 7-digit microseconds)
+                        event_start = self._parse_m365_datetime(event_start)
+                    if isinstance(event_end, str):
+                        event_end = self._parse_m365_datetime(event_end)
+
+                    # Check for overlap
+                    if (slot_start < event_end and slot_end > event_start):
+                        is_free = False
+                        break
+
+                if is_free and slot_start > datetime.now():
+                    free_slots.append(slot_start)
+
+            current_date += timedelta(days=1)
+
+        # Sort by closeness to preferred times (favor early afternoon)
+        def time_score(dt):
+            # Prefer 1pm-3pm (13-15)
+            hour = dt.hour
+            if 13 <= hour < 15:
+                return 0  # Best
+            elif 15 <= hour < 17:
+                return 1  # Good
+            elif 11 <= hour < 13:
+                return 2  # Morning
+            else:
+                return 3  # Other
+
+        free_slots.sort(key=time_score)
+        return free_slots
+
+    def _format_free_slots(self, slots: list) -> str:
+        """
+        Format free time slots for display.
+
+        Args:
+            slots: List of datetime objects
+
+        Returns:
+            Formatted string with suggested times
+        """
+        if not slots:
+            return "No free slots found."
+
+        formatted = []
+        for i, slot in enumerate(slots, 1):
+            day = slot.strftime("%A, %B %d")
+            time = slot.strftime("%I:%M %p").lstrip("0")
+            formatted.append(f"{i}. {day} at {time}")
+
+        return "\n".join(formatted)
+
+    def _parse_m365_datetime(self, dt_string: str) -> datetime:
+        """
+        Parse M365 datetime strings which may have 7-digit microseconds.
+
+        M365 Graph API returns formats like:
+        - 2025-12-28T15:00:00.0000000
+        - 2025-12-28T15:00:00Z
+
+        Args:
+            dt_string: ISO format datetime string
+
+        Returns:
+            datetime object
+        """
+        import re
+
+        # Remove 'Z' timezone indicator
+        dt_string = dt_string.replace('Z', '+00:00')
+
+        # Regex to find and truncate microseconds to 6 digits (Python's limit)
+        # Match: .0000000 (7 digits) and replace with .000000 (6 digits)
+        dt_string = re.sub(r'\.(\d{6})\d+', r'.\1', dt_string)
+
+        try:
+            return datetime.fromisoformat(dt_string)
+        except ValueError as e:
+            # If still fails, log and try without microseconds
+            logging.warning(f"[ACTION_ROUTER] Failed to parse datetime '{dt_string}': {e}")
+            # Remove microseconds entirely
+            dt_string = re.sub(r'\.\d+', '', dt_string)
+            return datetime.fromisoformat(dt_string)
