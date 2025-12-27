@@ -128,6 +128,7 @@ class ActionRouter:
         - "What's on my calendar Tuesday?"
         - "Am I free tomorrow afternoon?"
         - "Show me my schedule for next week"
+        - "When is my flight?"
 
         Args:
             user_text: User's input text
@@ -138,17 +139,26 @@ class ActionRouter:
         Returns:
             Response dictionary with calendar events
         """
+        # Check if this is a flight/travel specific query
+        user_text_lower = user_text.lower()
+        is_flight_query = any(keyword in user_text_lower for keyword in ["flight", "train", "travel", "trip"])
+
         # Parse the request to extract date range
         date_range = self._parse_date_range(user_text)
 
-        if not date_range:
+        # For flight queries without specific dates, search next 3 months
+        if not date_range and is_flight_query:
+            from datetime import datetime, timedelta
+            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = start_date + timedelta(days=90)  # 3 months
+        elif not date_range:
             return {
                 "text": "I can check your calendar. Which dates would you like me to check? (e.g., 'this Tuesday', 'next week')",
                 "provider": "action_router",
                 "task_type": "read_calendar",
             }
-
-        start_date, end_date = date_range
+        else:
+            start_date, end_date = date_range
 
         # Load providers for this user
         self.action_registry.load_providers(user_id)
@@ -183,7 +193,35 @@ class ActionRouter:
                 ) > now
             ]
 
-            # Format response
+            # If this is a flight query, filter to flight/travel events
+            if is_flight_query:
+                flight_keywords = ["flight", "train", "travel", "trip", "departure", "arrival", "airline", "airport"]
+                flight_events = [
+                    e for e in future_events
+                    if any(keyword in e.get("subject", "").lower() for keyword in flight_keywords)
+                ]
+
+                if not flight_events:
+                    response = "I couldn't find any flights or travel events in your calendar. If you have a booking confirmation, you can paste it and I'll add it to your calendar."
+                elif len(flight_events) == 1:
+                    event = flight_events[0]
+                    response = f"Your flight is scheduled for:\n\n{self._format_event_list([event], show_date=True)}"
+                else:
+                    response = f"I found {len(flight_events)} upcoming flights/travel events:\n\n{self._format_event_list(flight_events, show_date=True)}"
+
+                return {
+                    "text": response,
+                    "provider": "action_router",
+                    "task_type": "read_calendar",
+                    "metadata": {
+                        "events_count": len(flight_events),
+                        "date_range": [start_date.isoformat(), end_date.isoformat()],
+                        "provider_id": provider_id,
+                        "flight_query": True
+                    }
+                }
+
+            # Format response for general calendar queries
             if not future_events:
                 date_str = self._format_date_range(start_date, end_date)
                 response = f"You have no upcoming events {date_str}."

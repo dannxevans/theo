@@ -108,7 +108,7 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
     # Read-action keywords (lower priority)
     READ_ACTION_KEYWORDS = {
         "read_calendar": ["calendar", "availability", "available", "free", "busy",
-                         "when am i", "what's on", "whats on", "schedule for"],
+                         "when am i", "what's on", "whats on", "schedule for", "flight", "train", "travel"],
         "read_email": ["email", "inbox", "unread", "check email", "email summary"],
     }
 
