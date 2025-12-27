@@ -4,11 +4,13 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from core.router import route_request, set_provider_registry, set_context_manager
+from core.router import route_request, set_provider_registry, set_context_manager, set_action_router, set_action_registry
 from core.context import ContextManager
 from core.memory import MemoryStore
 from config import Config
 from core.provider_registry import ProviderRegistry
+from core.action_router import ActionRouter
+from actions.action_registry import ActionProviderRegistry
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Response, stream_with_context
 import json
@@ -68,6 +70,12 @@ set_context_manager(context_manager)
 
 # Inject provider registry into router
 set_provider_registry(provider_registry)
+
+# Initialize action system
+action_registry = ActionProviderRegistry(memory)
+action_router = ActionRouter(action_registry, memory)
+set_action_router(action_router)
+set_action_registry(action_registry)
 
 # Seed default intents if none exist
 memory.seed_default_intents("local")
@@ -1406,6 +1414,68 @@ def disconnect_m365():
     logging.info(f"[API] M365 disconnected for user {user['id']}")
 
     return jsonify({"status": "disconnected"})
+
+
+@app.route("/api/calendar/query", methods=["POST"])
+def query_calendar():
+    """
+    Query calendar using natural language.
+
+    Example request:
+    POST /api/calendar/query
+    {
+        "text": "What's on my calendar tomorrow?",
+        "session_id": "session_123"
+    }
+
+    Returns calendar events or error message.
+    """
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    # Get request data
+    payload = request.json
+    text = payload.get("text", "")
+    session_id = payload.get("session_id", "default")
+
+    if not text:
+        return jsonify({"error": "No query text provided"}), 400
+
+    # Build context for router
+    context = {
+        "text": text,
+        "session_id": session_id,
+        "user_id": user["id"],
+        "memory": memory,
+    }
+
+    # Route through main router (will detect calendar intent and route to ActionRouter)
+    try:
+        result = route_request(context)
+
+        # Log to conversation history
+        context_manager.update(session_id, text, result, provider_registry)
+
+        return jsonify(result)
+
+    except Exception as e:
+        logging.error(f"[API] Calendar query failed: {e}")
+        return jsonify({
+            "error": "Calendar query failed",
+            "details": str(e)
+        }), 500
 
 
 def debug_log(message):

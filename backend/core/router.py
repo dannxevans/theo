@@ -5,6 +5,8 @@ from providers.mock import MockProvider
 from providers.anthropic import AnthropicProvider
 from providers.openai import OpenAIProvider
 from core.provider_registry import ProviderRegistry
+from core.action_router import ActionRouter
+from actions.action_registry import ActionProviderRegistry
 import logging
 
 INTENT_TO_PROVIDER_TYPE = {
@@ -23,6 +25,8 @@ PROVIDER_CAPABILITIES = {
 
 provider_registry: Optional[ProviderRegistry] = None
 context_manager: Optional[ContextManager] = None
+action_router: Optional[ActionRouter] = None
+action_registry: Optional[ActionProviderRegistry] = None
 
 
 def _debug(memory: Optional[MemoryStore], msg: str, **context):
@@ -54,14 +58,45 @@ def set_context_manager(manager: ContextManager):
     context_manager = manager
 
 
+def set_action_router(router: ActionRouter):
+    global action_router
+    action_router = router
+
+
+def set_action_registry(registry: ActionProviderRegistry):
+    global action_registry
+    action_registry = registry
+
+
 def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
     """
     Dynamic intent classification based on user-defined intents.
-    Checks intents in priority order (highest first).
+    Checks action intents first (highest priority), then user-defined intents.
     """
     if not text:
         return "general"
 
+    text_l = text.lower()
+
+    # =============================
+    # Priority 1: Action Intents
+    # =============================
+    # These take precedence over conversation intents
+    ACTION_KEYWORDS = {
+        "read_calendar": ["calendar", "availability", "available", "free", "busy", "when am i", "schedule", "what's on", "whats on"],
+        "book_appointment": ["book", "appointment", "schedule me", "reserve", "haircut", "dentist", "meeting"],
+        "manage_email": ["email", "send email", "draft email", "inbox", "unread", "compose"],
+    }
+
+    for action_intent, keywords in ACTION_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in text_l:
+                _debug(memory, f"Matched action intent '{action_intent}' via keyword '{keyword}'")
+                return action_intent
+
+    # =============================
+    # Priority 2: User-Defined Intents
+    # =============================
     # If no memory provided, fall back to general
     if not memory:
         return "general"
@@ -74,8 +109,6 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None) -> str:
 
     if not enabled_intents:
         return "general"  # No intents configured
-
-    text_l = text.lower()
 
     # Check each intent's keywords in priority order
     for intent in enabled_intents:
@@ -393,6 +426,47 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Incoming text: {text}")
     _debug(memory, f"Classified intent: {intent}")
     _debug(memory, f"Forced provider: {forced}")
+
+    # =============================
+    # Action Intent Routing
+    # =============================
+    # Route action intents to ActionRouter instead of LLM providers
+    ACTION_INTENTS = ["read_calendar", "book_appointment", "manage_email"]
+
+    if intent in ACTION_INTENTS:
+        _debug(memory, f"Routing to ActionRouter for intent: {intent}")
+
+        if not action_router:
+            return {
+                "text": "Action system is not initialized. Please contact support.",
+                "provider": "error",
+                "model": None,
+                "task_type": intent,
+                "fallback_reason": "action_router not initialized",
+            }
+
+        # Build action context
+        action_context = {
+            "text": text,
+            "session_id": context.get("session_id"),
+            "user_id": context.get("user_id", 1),
+            "intent": intent,
+        }
+
+        # Route to ActionRouter
+        try:
+            result = action_router.route_action_request(action_context)
+            _debug(memory, f"ActionRouter returned: {result.get('provider')}")
+            return result
+        except Exception as e:
+            logging.error(f"[ROUTER] ActionRouter failed: {e}")
+            return {
+                "text": f"I encountered an error processing your action request: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": intent,
+                "fallback_reason": f"action_router_error: {str(e)}",
+            }
 
     # =============================
     # Explicit memory write handling (Step 2)
