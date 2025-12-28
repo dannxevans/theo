@@ -65,8 +65,8 @@ def test_user(memory):
     Create a test user.
     """
     password_hash = hash_password("testpass123")
-    user_id = memory.create_user("testuser", password_hash, is_admin=False)
-    user = memory.get_user_by_id(user_id)
+    memory.create_user("testuser", password_hash, is_admin=False)
+    user = memory.get_user_by_username("testuser")
 
     return {
         "id": user["id"],
@@ -82,8 +82,8 @@ def admin_user(memory):
     Create a test admin user.
     """
     password_hash = hash_password("adminpass123")
-    user_id = memory.create_user("adminuser", password_hash, is_admin=True)
-    user = memory.get_user_by_id(user_id)
+    memory.create_user("adminuser", password_hash, is_admin=True)
+    user = memory.get_user_by_username("adminuser")
 
     return {
         "id": user["id"],
