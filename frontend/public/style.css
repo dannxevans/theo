@@ -491,13 +491,20 @@ h3 {
   padding: 0.45rem 0.6rem;
   font-size: 0.8rem;
   border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
+  border: none;
+  background: var(--theo-gradient);
+  color: white;
   cursor: pointer;
+  box-shadow: var(--shadow-brand);
 }
 
 .new-session:hover {
-  background: #f3f4f6;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+}
+
+.new-session:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
 }
 
 .session-search {

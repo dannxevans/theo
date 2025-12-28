@@ -1064,26 +1064,26 @@
     {#if activeTab === "routing"}
       <div class="tab-panel">
         <h2>Routing Rules</h2>
-        <p class="subtitle">Assign specific providers to intents (optional).</p>
+        <p class="subtitle">Assign specific AI providers to intents for customized routing.</p>
 
-        {#each intents.filter(i => i.enabled) as intent}
-    <div class="rule">
-      <label>{intent.name}</label>
-
-      <select
-        on:change={(e) => updateRule(intent.id, e.target.value)}
-        value={rules[intent.id] || ""}
-      >
-        <option value="">Auto</option>
-
-        {#each providers as p}
-          <option value={p.id}>
-            {p.name}
-          </option>
-        {/each}
-      </select>
-    </div>
-        {/each}
+        <div class="routing-form">
+          {#each intents.filter(i => i.enabled) as intent}
+            <div class="form-group">
+              <label for="route-{intent.id}">{intent.name}</label>
+              <select
+                id="route-{intent.id}"
+                on:change={(e) => updateRule(intent.id, e.target.value)}
+                value={rules[intent.id] || ""}
+              >
+                <option value="">Auto-select</option>
+                {#each providers as p}
+                  <option value={p.id}>{p.name}</option>
+                {/each}
+              </select>
+              <small>Select a specific provider or leave as auto-select</small>
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
 

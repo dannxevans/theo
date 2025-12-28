@@ -46,6 +46,69 @@
     });
   }
 
+  /**
+   * Format model display: "Name · Type · Routing"
+   * Examples: "GPT-4o · OpenAI · General", "Sonnet-4.5 · Anthropic · Coding"
+   */
+  function formatModelDisplay(provider, model, taskType) {
+    // Extract friendly name from model or provider
+    let modelName = "";
+    let providerType = "";
+
+    // Special cases for non-AI responses (don't show model badge)
+    if (provider === "memory" || provider === "error" || provider === "action_router") {
+      return null;
+    }
+
+    // Determine provider type based on model string
+    if (model && (model.includes("gpt") || model.includes("o1") || model.includes("o3"))) {
+      providerType = "OpenAI";
+      // Extract model version from full model name
+      if (model.includes("gpt-5.2")) modelName = "GPT-5.2";
+      else if (model.includes("gpt-5")) modelName = "GPT-5";
+      else if (model.includes("gpt-4o")) modelName = "GPT-4o";
+      else if (model.includes("gpt-4-turbo")) modelName = "GPT-4 Turbo";
+      else if (model.includes("gpt-4")) modelName = "GPT-4";
+      else if (model.includes("gpt-3.5")) modelName = "GPT-3.5";
+      else if (model.includes("o3")) modelName = "O3";
+      else if (model.includes("o1")) modelName = "O1";
+      else modelName = model;
+    } else if (model && (model.includes("claude") || model.includes("opus") || model.includes("sonnet") || model.includes("haiku"))) {
+      providerType = "Anthropic";
+      // Extract model version from full model name
+      if (model.includes("opus-4-5")) modelName = "Opus-4.5";
+      else if (model.includes("sonnet-4-5")) modelName = "Sonnet-4.5";
+      else if (model.includes("haiku-4-5")) modelName = "Haiku-4.5";
+      else if (model.includes("opus-4")) modelName = "Opus-4";
+      else if (model.includes("sonnet-4")) modelName = "Sonnet-4";
+      else if (model.includes("haiku-4")) modelName = "Haiku-4";
+      else if (model.includes("opus")) modelName = "Opus";
+      else if (model.includes("sonnet")) modelName = "Sonnet";
+      else if (model.includes("haiku")) modelName = "Haiku";
+      else modelName = model;
+    } else {
+      // Fallback - try to determine from provider field
+      if (provider && (provider.includes("openai") || provider.includes("gpt"))) {
+        providerType = "OpenAI";
+        modelName = model || provider || "Unknown";
+      } else if (provider && (provider.includes("claude") || provider.includes("anthropic"))) {
+        providerType = "Anthropic";
+        modelName = model || provider || "Unknown";
+      } else {
+        // Complete fallback for unknown providers
+        providerType = provider || "Unknown";
+        modelName = model || provider || "Unknown";
+      }
+    }
+
+    // Format task type (capitalize first letter)
+    const routing = taskType
+      ? taskType.charAt(0).toUpperCase() + taskType.slice(1).replace(/_/g, " ")
+      : "General";
+
+    return `${modelName} · ${providerType} · ${routing}`;
+  }
+
   let input = "";
   let messages = [];
   let loading = false;
@@ -104,13 +167,21 @@
   function renderMarkdown(text) {
     if (!text) return "";
 
+    // Auto-linkify plain URLs that aren't already in markdown link format
+    const urlRegex = /(?<![(\[])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+    text = text.replace(urlRegex, (url) => {
+      return `[${url}](${url})`;
+    });
+
     marked.setOptions({
       langPrefix: "language-"
     });
 
     const rawHtml = marked.parse(text);
 
-    return DOMPurify.sanitize(rawHtml, {
+    // Post-process to add target="_blank" and rel="noopener noreferrer" to all links
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: [
         "h1","h2","h3","h4","h5","h6",
         "p","strong","em","ul","ol","li",
@@ -123,6 +194,15 @@
         "code": ["class"]
       }
     });
+
+    // Add target="_blank" and rel to all links
+    const links = tempDiv.querySelectorAll('a');
+    links.forEach(link => {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    });
+
+    return tempDiv.innerHTML;
   }
 
   function formatTimestamp(timestamp) {
@@ -587,16 +667,36 @@
                   {/if}
 
                   {#if m.provider}
+                    {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type)}
+                    {@const isActionRouter = m.provider === 'action_router'}
+                    {@const isError = m.provider === 'error'}
+                    {@const formattedAction = m.task_type
+                      ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
+                      : "Action"}
                     <div class="bubble-footer">
-                      <span class="provider-badge">
-                        via {m.provider}
-                        {#if m.model}
-                          · {m.model}
-                        {/if}
-                        {#if m.task_type}
-                          ({m.task_type})
-                        {/if}
-                      </span>
+                      {#if formattedModel}
+                        <span class="provider-badge provider-badge-ai">
+                          via {formattedModel}
+                        </span>
+                      {:else if isActionRouter}
+                        <span class="provider-badge provider-badge-action">
+                          via Action Router · {formattedAction}
+                        </span>
+                      {:else if isError}
+                        <span class="provider-badge provider-badge-error">
+                          Error · {formattedAction}
+                        </span>
+                      {:else}
+                        <span class="provider-badge">
+                          via {m.provider}
+                          {#if m.model}
+                            · {m.model}
+                          {/if}
+                          {#if m.task_type}
+                            ({m.task_type})
+                          {/if}
+                        </span>
+                      {/if}
                       {#if m.fallback_reason}
                         <span class="fallback-reason">
                           {m.fallback_reason}
@@ -681,6 +781,16 @@
 
   :global(.markdown ul) {
     padding-left: 1.25rem;
+  }
+
+  :global(.markdown a) {
+    color: #1f6feb;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  :global(.markdown a:hover) {
+    color: #388bfd;
   }
 
   :global(.markdown pre) {
@@ -833,5 +943,45 @@
   .confirmation-status-final.rejected {
     background: #f8d7da;
     color: #721c24;
+  }
+
+  /* Provider Badge Styling */
+  .provider-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  /* AI responses - baby blue */
+  .provider-badge-ai {
+    background: #DBEAFE;
+    color: #1E40AF;
+  }
+
+  /* Action router responses - amber */
+  .provider-badge-action {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+
+  /* Error responses - red */
+  .provider-badge-error {
+    background: #FEE2E2;
+    color: #991B1B;
+  }
+
+  .bubble-footer {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .fallback-reason {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
   }
 </style>
