@@ -1,0 +1,124 @@
+/* =============================
+   Modal & Dropdown Components
+   Dropdowns, Work Sub-tabs, Tabs
+   ============================= */
+
+/* ============================
+   Dropdown Menu Styles
+   ============================ */
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border: none;
+  background: white;
+  color: var(--gray-700);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: var(--gray-50);
+  color: var(--gray-900);
+}
+
+.dropdown-item.active {
+  background-color: var(--info-50);
+  color: var(--info-700);
+  font-weight: 600;
+}
+
+/* ============================
+   Work Mode Sub-Tabs
+   ============================ */
+
+.work-subtabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: #f9fafb;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.work-subtabs .subtab {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--gray-600);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.work-subtabs .subtab:hover {
+  color: var(--gray-900);
+  background: white;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.work-subtabs .subtab.active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+  font-weight: 600;
+  background: white;
+}
+
+/* ============================
+   Tabs (Settings)
+   ============================ */
+
+@media (max-width: 768px) {
+  .tabs {
+    padding: 0 var(--space-3);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab {
+    white-space: nowrap;
+    font-size: 13px;
+    padding: var(--space-3) var(--space-4);
+  }
+}

@@ -1,0 +1,182 @@
+/* =============================
+   Chat Layout & Messages
+   Chat container, messages, bubbles
+   ============================= */
+
+/* ============================= */
+/* Chat layout (desktop + mobile) */
+/* ============================= */
+
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.chat-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.session-bar,
+.summary {
+  flex-shrink: 0;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ============================= */
+/* Messages */
+/* ============================= */
+
+.message {
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  box-sizing: border-box;
+}
+
+.message user {
+  justify-content: flex-end;
+}
+
+.message.assistant {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 75%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #f4f4f5;
+  word-wrap: break-word;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.message.user .bubble {
+  background: #e5f0ff;
+  margin-left: auto;
+}
+
+.message-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-header strong {
+  font-weight: 600;
+}
+
+.message strong {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  opacity: 0.75;
+}
+
+.timestamp {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.message-meta {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Chat header buttons */
+.chat-header button {
+  min-height: 36px;
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ============================= */
+/* Mobile Chat Adjustments */
+/* ============================= */
+
+@media (max-width: 768px) {
+  /* Message bubbles take more width on mobile */
+  .bubble {
+    max-width: 85%;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Messages container - less padding on mobile */
+  .messages {
+    padding: var(--space-3);
+  }
+
+  /* Chat header buttons */
+  .chat-header button {
+    min-height: 36px;
+    font-size: var(--font-size-xs);
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* ============================= */
+/* Desktop Chat Adjustments */
+/* ============================= */
+
+/* Wide desktop comfort */
+@media (min-width: 1200px) {
+  .bubble {
+    max-width: 900px;
+  }
+
+  .messages {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 769px) {
+  .main {
+    width: 100%;
+    max-width: none;
+  }
+
+  .chat-container {
+    width: 100%;
+    max-width: none;
+  }
+
+  .chat,
+  .chat-inner,
+  .chat-main {
+    width: 100%;
+    max-width: none;
+  }
+}
