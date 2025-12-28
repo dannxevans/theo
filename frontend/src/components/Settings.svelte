@@ -159,6 +159,10 @@
   let passwordSuccess = null;
   let changingPassword = false;
 
+  // Session timeout state
+  let sessionTimeoutHours = parseInt(localStorage.getItem("theo.sessionTimeout")) || 8;
+  let sessionTimeoutStatus = null;
+
   // Health Monitor state
   let healthData = {
     ai_providers: [],
@@ -376,6 +380,24 @@
     } finally {
       changingPassword = false;
     }
+  }
+
+  function saveSessionTimeout() {
+    sessionTimeoutStatus = null;
+
+    // Validation
+    if (!sessionTimeoutHours || sessionTimeoutHours < 1 || sessionTimeoutHours > 168) {
+      sessionTimeoutStatus = "Please enter a timeout between 1 and 168 hours";
+      return;
+    }
+
+    // Save to localStorage
+    localStorage.setItem("theo.sessionTimeout", sessionTimeoutHours.toString());
+    sessionTimeoutStatus = `Session timeout set to ${sessionTimeoutHours} hours. The new timeout will take effect on your next login.`;
+
+    setTimeout(() => {
+      sessionTimeoutStatus = null;
+    }, 5000);
   }
 
   async function saveSystemPrompt() {
@@ -1855,6 +1877,36 @@
           >
             {changingPassword ? "Changing Password..." : "Change Password"}
           </button>
+        </div>
+
+        <!-- Session Timeout Section -->
+        <div class="section">
+          <h3>Session Timeout</h3>
+          <p class="hint">Configure automatic logout after a period of inactivity</p>
+
+          <div class="form-group">
+            <label for="session-timeout">Timeout Duration (hours)</label>
+            <input
+              id="session-timeout"
+              type="number"
+              min="1"
+              max="168"
+              bind:value={sessionTimeoutHours}
+              placeholder="8"
+            />
+            <small>Default: 8 hours. Maximum: 168 hours (1 week)</small>
+          </div>
+
+          <button
+            class="btn-primary"
+            on:click={saveSessionTimeout}
+          >
+            Save Timeout Setting
+          </button>
+
+          {#if sessionTimeoutStatus}
+            <div class="success-message">{sessionTimeoutStatus}</div>
+          {/if}
         </div>
       </div>
     {/if}

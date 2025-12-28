@@ -582,11 +582,25 @@ class ActionRouter:
 
         provider_id, provider = providers[0]
 
-        # Get today's events to find the one to cancel
+        # Parse temporal references from user text
         from datetime import datetime, timedelta
         now = datetime.now()
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_day = start_of_day + timedelta(days=1)
+        user_text_lower = user_text.lower()
+
+        # Determine date range based on user input
+        if "tomorrow" in user_text_lower:
+            start_of_day = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=1)
+        elif "next week" in user_text_lower:
+            start_of_day = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=7)
+        elif "this week" in user_text_lower or "week" in user_text_lower:
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=7)
+        else:
+            # Default to today
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=1)
 
         try:
             events = provider.read_calendar(start_of_day, end_of_day)
@@ -603,8 +617,14 @@ class ActionRouter:
                     break
 
             if not matching_event:
+                time_desc = "today"
+                if "tomorrow" in user_text_lower:
+                    time_desc = "tomorrow"
+                elif "week" in user_text_lower:
+                    time_desc = "this week"
+
                 return {
-                    "text": f"I couldn't find an event matching '{user_text}' in your calendar today. Can you be more specific?",
+                    "text": f"I couldn't find an event matching '{user_text}' in your calendar {time_desc}. Can you be more specific?",
                     "provider": "action_router",
                     "task_type": "cancel_appointment",
                 }
