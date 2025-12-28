@@ -30,15 +30,15 @@ class M365Operations(BaseMemoryOperations):
         with self.engine.begin() as conn:
             # Check if exists
             existing = conn.execute(
-                select(self.tables["m365_credentials"].c.id)
-                .where(self.tables["m365_credentials"].c.user_id == user_id)
+                select(self.m365_credentials.c.id)
+                .where(self.m365_credentials.c.user_id == user_id)
             ).fetchone()
 
             if existing:
                 # Update
                 conn.execute(
-                    update(self.tables["m365_credentials"])
-                    .where(self.tables["m365_credentials"].c.user_id == user_id)
+                    update(self.m365_credentials)
+                    .where(self.m365_credentials.c.user_id == user_id)
                     .values(
                         access_token=access_token,
                         refresh_token=refresh_token,
@@ -54,7 +54,7 @@ class M365Operations(BaseMemoryOperations):
             else:
                 # Insert
                 conn.execute(
-                    insert(self.tables["m365_credentials"]).values(
+                    insert(self.m365_credentials).values(
                         user_id=user_id,
                         access_token=access_token,
                         refresh_token=refresh_token,
@@ -80,8 +80,8 @@ class M365Operations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             row = conn.execute(
-                select(self.tables["m365_credentials"])
-                .where(self.tables["m365_credentials"].c.user_id == user_id)
+                select(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
             ).fetchone()
             return dict(row._mapping) if row else None
 
@@ -95,8 +95,8 @@ class M365Operations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             conn.execute(
-                update(self.tables["m365_credentials"])
-                .where(self.tables["m365_credentials"].c.user_id == user_id)
+                update(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
                 .values(
                     is_valid=False,
                     last_error=error,
@@ -113,6 +113,6 @@ class M365Operations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             conn.execute(
-                delete(self.tables["m365_credentials"])
-                .where(self.tables["m365_credentials"].c.user_id == user_id)
+                delete(self.m365_credentials)
+                .where(self.m365_credentials.c.user_id == user_id)
             )

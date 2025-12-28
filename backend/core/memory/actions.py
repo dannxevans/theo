@@ -43,7 +43,7 @@ class ActionOperations(BaseMemoryOperations):
 
         with self.engine.begin() as conn:
             result = conn.execute(
-                insert(self.tables["actions"]).values(
+                insert(self.actions).values(
                     user_id=user_id,
                     session_id=session_id,
                     action_type=action_type,
@@ -73,7 +73,7 @@ class ActionOperations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             row = conn.execute(
-                select(self.tables["actions"]).where(self.tables["actions"].c.id == action_id)
+                select(self.actions).where(self.actions.c.id == action_id)
             ).fetchone()
             return dict(row._mapping) if row else None
 
@@ -89,10 +89,10 @@ class ActionOperations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             rows = conn.execute(
-                select(self.tables["actions"])
-                .where(self.tables["actions"].c.user_id == user_id)
-                .where(self.tables["actions"].c.status == "pending")
-                .order_by(self.tables["actions"].c.created_at.desc())
+                select(self.actions)
+                .where(self.actions.c.user_id == user_id)
+                .where(self.actions.c.status == "pending")
+                .order_by(self.actions.c.created_at.desc())
             ).fetchall()
             return [dict(row._mapping) for row in rows]
 
@@ -122,8 +122,8 @@ class ActionOperations(BaseMemoryOperations):
                     update_values[key] = value
 
             conn.execute(
-                update(self.tables["actions"])
-                .where(self.tables["actions"].c.id == action_id)
+                update(self.actions)
+                .where(self.actions.c.id == action_id)
                 .values(**update_values)
             )
 
@@ -157,7 +157,7 @@ class ActionOperations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             result = conn.execute(
-                insert(self.tables["action_confirmations"]).values(
+                insert(self.action_confirmations).values(
                     action_id=action_id,
                     confirmation_message=confirmation_message,
                     presented_at=datetime.utcnow(),
@@ -180,16 +180,16 @@ class ActionOperations(BaseMemoryOperations):
         with self.engine.begin() as conn:
             rows = conn.execute(
                 select(
-                    self.tables["actions"],
-                    self.tables["action_confirmations"]
+                    self.actions,
+                    self.action_confirmations
                 )
                 .join(
-                    self.tables["action_confirmations"],
-                    self.tables["actions"].c.id == self.tables["action_confirmations"].c.action_id
+                    self.action_confirmations,
+                    self.actions.c.id == self.action_confirmations.c.action_id
                 )
-                .where(self.tables["actions"].c.user_id == user_id)
-                .where(self.tables["actions"].c.status == "pending")
-                .where(self.tables["action_confirmations"].c.user_response.is_(None))
+                .where(self.actions.c.user_id == user_id)
+                .where(self.actions.c.status == "pending")
+                .where(self.action_confirmations.c.user_response.is_(None))
             ).fetchall()
 
             return [dict(row._mapping) for row in rows]
@@ -205,8 +205,8 @@ class ActionOperations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             conn.execute(
-                update(self.tables["action_confirmations"])
-                .where(self.tables["action_confirmations"].c.action_id == action_id)
+                update(self.action_confirmations)
+                .where(self.action_confirmations.c.action_id == action_id)
                 .values(
                     user_response=user_response,
                     user_response_text=user_response_text,
@@ -226,8 +226,8 @@ class ActionOperations(BaseMemoryOperations):
         """
         with self.engine.begin() as conn:
             row = conn.execute(
-                select(self.tables["action_confirmations"])
-                .where(self.tables["action_confirmations"].c.id == confirmation_id)
+                select(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
             ).fetchone()
 
             if not row:
@@ -267,8 +267,8 @@ class ActionOperations(BaseMemoryOperations):
                 update_values["responded_at"] = kwargs["responded_at"]
 
             conn.execute(
-                update(self.tables["action_confirmations"])
-                .where(self.tables["action_confirmations"].c.id == confirmation_id)
+                update(self.action_confirmations)
+                .where(self.action_confirmations.c.id == confirmation_id)
                 .values(**update_values)
             )
 
@@ -285,11 +285,11 @@ class ActionOperations(BaseMemoryOperations):
             # Find the turn with this confirmation_id in metadata
             rows = conn.execute(
                 select(
-                    self.tables["turns"].c.id,
-                    self.tables["turns"].c.metadata
+                    self.turns.c.id,
+                    self.turns.c.metadata
                 )
-                .where(self.tables["turns"].c.session_id == session_id)
-                .where(self.tables["turns"].c.metadata.isnot(None))
+                .where(self.turns.c.session_id == session_id)
+                .where(self.turns.c.metadata.isnot(None))
             ).fetchall()
 
             for row in rows:
@@ -302,8 +302,8 @@ class ActionOperations(BaseMemoryOperations):
 
                         # Update the turn
                         conn.execute(
-                            update(self.tables["turns"])
-                            .where(self.tables["turns"].c.id == row.id)
+                            update(self.turns)
+                            .where(self.turns.c.id == row.id)
                             .values(metadata=json.dumps(metadata))
                         )
                         logging.info(f"[MEMORY] Updated turn metadata for confirmation {confirmation_id}: approved={approved}")
