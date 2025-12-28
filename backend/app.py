@@ -91,6 +91,37 @@ memory.seed_default_intents("local")
 from auth import init_default_user
 init_default_user(memory)
 
+# Register route blueprints
+from routes.health_routes import health_bp
+from routes.auth_routes import auth_bp
+from routes.session_routes import session_bp
+from routes.message_routes import message_bp
+from routes.memory_routes import memory_bp
+from routes.provider_routes import provider_bp
+from routes.intent_routes import intent_bp
+from routes.routing_routes import routing_bp
+from routes.mode_routes import mode_bp
+from routes.m365_routes import m365_bp
+from routes.service_provider_routes import service_provider_bp
+from routes.settings_routes import settings_bp
+from routes.calendar_routes import calendar_bp
+from routes.confirmation_routes import confirmation_bp
+
+app.register_blueprint(health_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(session_bp)
+app.register_blueprint(message_bp)
+app.register_blueprint(memory_bp)
+app.register_blueprint(provider_bp)
+app.register_blueprint(intent_bp)
+app.register_blueprint(routing_bp)
+app.register_blueprint(mode_bp)
+app.register_blueprint(m365_bp)
+app.register_blueprint(service_provider_bp)
+app.register_blueprint(settings_bp)
+app.register_blueprint(calendar_bp)
+app.register_blueprint(confirmation_bp)
+
 @app.route("/api/health")
 def api_health():
     return {"status": "ok", "service": "THEO"}
