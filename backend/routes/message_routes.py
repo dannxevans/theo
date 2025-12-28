@@ -75,6 +75,8 @@ def stream_chat_sse(session_id):
             router_context["text"] = text
             router_context["session_id"] = session_id
             router_context["memory"] = memory
+            if user_id:
+                router_context["user_id"] = user_id
             if forced_provider:
                 router_context["forced_provider"] = forced_provider
 
