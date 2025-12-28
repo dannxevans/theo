@@ -25,6 +25,8 @@ from .providers import ProviderOperations
 from .users import UserOperations
 from .modes import ModeOperations
 from .service_providers import ServiceProviderOperations
+from .m365 import M365Operations
+from .actions import ActionOperations
 
 
 class MemoryStore(LegacyMemoryStore):
@@ -85,6 +87,8 @@ class MemoryStore(LegacyMemoryStore):
         self._user_ops = UserOperations(tables, self.Session, self.engine)
         self._mode_ops = ModeOperations(tables, self.Session, self.engine)
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
+        self._m365_ops = M365Operations(tables, self.Session, self.engine)
+        self._action_ops = ActionOperations(tables, self.Session, self.engine)
 
     # =============================
     # Memory Operations (delegated)
@@ -416,13 +420,80 @@ class MemoryStore(LegacyMemoryStore):
         return self._service_provider_ops.delete_service_provider(provider_id, user_id)
 
     # =============================
-    # Remaining methods inherited from LegacyMemoryStore
+    # M365 Operations (delegated)
     # =============================
-    # The following methods are still using the legacy implementation:
-    # - M365 Credentials API (4 methods): store_m365_credentials, get_m365_credentials, etc.
-    # - Actions API (4 methods): create_action, get_action, etc.
-    # - Confirmations API (5 methods): create_confirmation, get_pending_confirmations, etc.
-    #
-    # Total: ~13 methods still using legacy implementation
-    # (70 methods extracted: 11 memories, 10 intents, 13 sessions, 13 providers, 11 users, 8 modes, 6 service_providers)
-    # These will be extracted in future iterations following the same pattern
+
+    def store_m365_credentials(self, user_id, access_token, refresh_token,
+                                expires_at, scope=None, tenant_id=None, upn=None):
+        """Store M365 OAuth credentials."""
+        return self._m365_ops.store_m365_credentials(
+            user_id, access_token, refresh_token, expires_at, scope, tenant_id, upn
+        )
+
+    def get_m365_credentials(self, user_id):
+        """Get M365 credentials for a user."""
+        return self._m365_ops.get_m365_credentials(user_id)
+
+    def invalidate_m365_credentials(self, user_id, error=None):
+        """Mark M365 credentials as invalid."""
+        return self._m365_ops.invalidate_m365_credentials(user_id, error)
+
+    def delete_m365_credentials(self, user_id):
+        """Delete M365 credentials for a user."""
+        return self._m365_ops.delete_m365_credentials(user_id)
+
+    # =============================
+    # Action Operations (delegated)
+    # =============================
+
+    def create_action(self, user_id, session_id, action_type, category,
+                      intent_summary, service_provider_id=None, **kwargs):
+        """Create a new action."""
+        return self._action_ops.create_action(
+            user_id, session_id, action_type, category,
+            intent_summary, service_provider_id, **kwargs
+        )
+
+    def get_action(self, action_id):
+        """Get an action by ID."""
+        return self._action_ops.get_action(action_id)
+
+    def get_pending_actions(self, user_id):
+        """Get all pending actions for a user."""
+        return self._action_ops.get_pending_actions(user_id)
+
+    def update_action_status(self, action_id, status, **kwargs):
+        """Update action status and related fields."""
+        return self._action_ops.update_action_status(action_id, status, **kwargs)
+
+    def get_action_by_id(self, action_id):
+        """Get an action by ID (alias for get_action)."""
+        return self._action_ops.get_action_by_id(action_id)
+
+    # =============================
+    # Confirmation Operations (delegated)
+    # =============================
+
+    def create_confirmation(self, action_id, confirmation_message, expires_at):
+        """Create a confirmation request for an action."""
+        return self._action_ops.create_confirmation(action_id, confirmation_message, expires_at)
+
+    def get_pending_confirmations(self, user_id):
+        """Get all pending confirmations for a user."""
+        return self._action_ops.get_pending_confirmations(user_id)
+
+    def update_confirmation_response(self, action_id, user_response, user_response_text=None):
+        """Update confirmation with user response."""
+        return self._action_ops.update_confirmation_response(action_id, user_response, user_response_text)
+
+    def get_confirmation_by_id(self, confirmation_id):
+        """Get a confirmation by ID with computed status."""
+        return self._action_ops.get_confirmation_by_id(confirmation_id)
+
+    def update_confirmation_status(self, confirmation_id, status, **kwargs):
+        """Update confirmation status."""
+        return self._action_ops.update_confirmation_status(confirmation_id, status, **kwargs)
+
+    def update_turn_metadata(self, session_id, confirmation_id, approved):
+        """Update the metadata of a turn to reflect approval/rejection status."""
+        return self._action_ops.update_turn_metadata(session_id, confirmation_id, approved)
