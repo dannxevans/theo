@@ -16,9 +16,8 @@ def list_providers():
     List all AI providers.
     Returns: Array of provider objects (without API keys for security)
     """
-    from core.provider_registry import ProviderRegistry
+    from app import provider_registry
 
-    provider_registry = ProviderRegistry.get_instance()
     providers = provider_registry.list()
 
     # Never expose API keys
@@ -43,12 +42,8 @@ def upsert_provider():
     Request body: { "id": "...", "name": "...", "type": "...", "model": "...", "api_key": "...", ... }
     Returns: { "status": "ok" }
     """
-    from core.provider_registry import ProviderRegistry
-    from core.memory import MemoryStore
-    from config import Config
+    from app import provider_registry, memory
 
-    provider_registry = ProviderRegistry.get_instance()
-    memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
 
     provider_registry.upsert({
@@ -73,12 +68,7 @@ def delete_provider(provider_id):
     Delete an AI provider.
     Returns: { "status": "ok" }
     """
-    from core.provider_registry import ProviderRegistry
-    from core.memory import MemoryStore
-    from config import Config
-
-    provider_registry = ProviderRegistry.get_instance()
-    memory = MemoryStore(Config.DATABASE_URL)
+    from app import provider_registry, memory
 
     provider_registry.delete(provider_id)
 
@@ -94,10 +84,8 @@ def get_provider_health():
     Get health summary for all providers.
     Returns: Health summary object with provider metrics
     """
-    from core.memory import MemoryStore
-    from config import Config
+    from app import memory
 
-    memory = MemoryStore(Config.DATABASE_URL)
     summary = memory.get_provider_health_summary()
     
     return jsonify(summary)
@@ -109,10 +97,8 @@ def get_provider_metadata_endpoint(provider_id):
     Get metadata for a specific provider.
     Returns: Provider metadata object
     """
-    from core.memory import MemoryStore
-    from config import Config
+    from app import memory
 
-    memory = MemoryStore(Config.DATABASE_URL)
     metadata = memory.get_provider_metadata(provider_id)
     
     if not metadata:
@@ -128,10 +114,8 @@ def update_provider_metadata_endpoint(provider_id):
     Request body: { "cost_per_1k_input": N, "cost_per_1k_output": N }
     Returns: { "status": "ok" }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    from app import memory
 
-    memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
     
     memory.init_provider_metadata(
