@@ -1,7 +1,3 @@
-<svelte:head>
-  <link rel="stylesheet" href="/style.css" />
-</svelte:head>
-
 <script>
   
   import DOMPurify from "dompurify";

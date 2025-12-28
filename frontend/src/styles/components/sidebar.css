@@ -1,0 +1,190 @@
+/* =============================
+   Sidebar Navigation
+   Sidebar, session list, mobile behavior
+   ============================= */
+
+/* ============================
+   Sidebar
+   ============================ */
+
+.sidebar {
+  border-right: 1px solid #e5e7eb;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0.75rem 0.75rem 0.5rem 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ============================
+   Sidebar backdrop
+   ============================ */
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ============================
+   Hamburger button (desktop-first: hidden)
+   ============================ */
+
+.hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #374151;
+}
+
+.hamburger:hover {
+  color: #111827;
+}
+
+.hamburger-btn {
+  display: none;
+}
+
+/* ============================
+   Mobile Layout (≤ 768px)
+   ============================ */
+
+@media (max-width: 768px) {
+  .shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 30;
+  }
+
+  .sidebar.open + .sidebar-backdrop {
+    display: block;
+  }
+
+  /* Allow hamburger only on mobile */
+  .hamburger {
+    display: inline-flex !important;
+    position: relative;
+    top: 0;
+  }
+
+  .hamburger-btn {
+    display: inline-flex !important;
+    position: relative;
+    top: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* App layout becomes single column */
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Sidebar becomes off-canvas */
+  .sidebar {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+
+    width: 85%;
+    max-width: 320px;
+
+    background: #ffffff;
+    z-index: 40;
+
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Backdrop only when sidebar open */
+  .sidebar.open + .sidebar-backdrop {
+    display: block;
+  }
+
+  /* Header spacing */
+  .header {
+    height: 56px;
+    padding: 0 var(--space-3);
+  }
+
+  .header .logo {
+    height: 28px;
+  }
+
+  /* Pills in header should be touch-friendly */
+  .btn-pill {
+    min-height: 36px;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Settings adjustments */
+  .settings h1 {
+    font-size: var(--font-size-xl);
+    padding: var(--space-4);
+  }
+}
+
+/* ============================
+   Desktop (≥ 769px)
+   ============================ */
+
+@media (min-width: 769px) {
+  /* Ensure hamburger NEVER appears */
+  .hamburger-btn {
+    display: none !important;
+  }
+
+  /* Sidebar behaves normally */
+  .sidebar {
+    position: relative;
+    transform: none;
+    height: auto;
+  }
+
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .hamburger-btn {
+    display: none !important;
+  }
+}
