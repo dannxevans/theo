@@ -10,3 +10,7 @@ anthropic
 eventlet
 gunicorn
 boto3
+pytest
+pytest-cov
+pytest-mock
+pytest-flask
