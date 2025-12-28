@@ -677,8 +677,14 @@ def generate_session_title(session_id):
     # Use a provider to generate the title
     try:
         # Build minimal context for title generation
-        title_prompt = f"""Based on this conversation, generate a short, descriptive title (maximum 6 words).
-Only respond with the title, nothing else.
+        title_prompt = f"""Based on this conversation, generate a concise, descriptive title.
+
+Requirements:
+- Maximum 50 characters
+- Be specific and informative
+- Use proper capitalization
+- Do NOT include quotes or punctuation at the end
+- Respond ONLY with the title, nothing else
 
 Conversation:
 {conversation_text}
@@ -699,9 +705,20 @@ Title:"""
         # Clean up the title
         # Remove quotes if present
         generated_title = generated_title.strip('"').strip("'").strip()
-        # Limit length
-        if len(generated_title) > 60:
-            generated_title = generated_title[:57] + "..."
+
+        # Remove trailing punctuation except for necessary ones
+        while generated_title and generated_title[-1] in '.,:;!?':
+            generated_title = generated_title[:-1].strip()
+
+        # Limit length intelligently - if too long, truncate at word boundary
+        if len(generated_title) > 50:
+            # Try to truncate at last complete word before 47 chars
+            truncated = generated_title[:47]
+            last_space = truncated.rfind(' ')
+            if last_space > 30:  # Only truncate at word if we keep enough
+                generated_title = truncated[:last_space] + "..."
+            else:
+                generated_title = truncated + "..."
 
         # Save the title
         memory.save_session_title(session_id, generated_title)

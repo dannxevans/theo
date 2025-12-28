@@ -167,13 +167,21 @@
   function renderMarkdown(text) {
     if (!text) return "";
 
+    // Auto-linkify plain URLs that aren't already in markdown link format
+    const urlRegex = /(?<![(\[])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+    text = text.replace(urlRegex, (url) => {
+      return `[${url}](${url})`;
+    });
+
     marked.setOptions({
       langPrefix: "language-"
     });
 
     const rawHtml = marked.parse(text);
 
-    return DOMPurify.sanitize(rawHtml, {
+    // Post-process to add target="_blank" and rel="noopener noreferrer" to all links
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: [
         "h1","h2","h3","h4","h5","h6",
         "p","strong","em","ul","ol","li",
@@ -186,6 +194,15 @@
         "code": ["class"]
       }
     });
+
+    // Add target="_blank" and rel to all links
+    const links = tempDiv.querySelectorAll('a');
+    links.forEach(link => {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    });
+
+    return tempDiv.innerHTML;
   }
 
   function formatTimestamp(timestamp) {
@@ -764,6 +781,16 @@
 
   :global(.markdown ul) {
     padding-left: 1.25rem;
+  }
+
+  :global(.markdown a) {
+    color: #1f6feb;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  :global(.markdown a:hover) {
+    color: #388bfd;
   }
 
   :global(.markdown pre) {
