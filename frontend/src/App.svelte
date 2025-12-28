@@ -36,10 +36,54 @@
     }
   }
 
+  // Session timeout management
+  let sessionTimeoutId = null;
+  const DEFAULT_TIMEOUT_HOURS = 8;
+
+  function startSessionTimeout() {
+    // Clear any existing timeout
+    if (sessionTimeoutId) {
+      clearTimeout(sessionTimeoutId);
+    }
+
+    // Get timeout setting from localStorage (in hours)
+    const timeoutHours = parseInt(localStorage.getItem("theo.sessionTimeout")) || DEFAULT_TIMEOUT_HOURS;
+    const timeoutMs = timeoutHours * 60 * 60 * 1000;
+
+    sessionTimeoutId = setTimeout(async () => {
+      alert(`Your session has expired after ${timeoutHours} hours of inactivity. Please log in again.`);
+      await handleLogout();
+    }, timeoutMs);
+  }
+
+  function resetSessionTimeout() {
+    if (isAuthenticated) {
+      startSessionTimeout();
+    }
+  }
+
+  // Reset timeout on user activity
+  function handleUserActivity() {
+    resetSessionTimeout();
+  }
+
   onMount(() => {
     document.addEventListener('click', handleClickOutside);
+    document.addEventListener('mousemove', handleUserActivity);
+    document.addEventListener('keypress', handleUserActivity);
+
+    // Start timeout if authenticated
+    if (isAuthenticated) {
+      startSessionTimeout();
+    }
+
     return () => {
       document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousemove', handleUserActivity);
+      document.removeEventListener('keypress', handleUserActivity);
+      if (sessionTimeoutId) {
+        clearTimeout(sessionTimeoutId);
+      }
     };
   });
   function openSidebar() {
@@ -140,9 +184,14 @@ async function loadUserMode() {
 async function setMode(mode) {
   if (mode === currentMode) return; // Already in this mode
 
+  const previousMode = currentMode;
+
   try {
     await setUserMode(mode);
     currentMode = mode;
+
+    // Create a new session when switching modes to separate contexts
+    newSession();
 
     // Load last active subtab from localStorage when switching to work mode
     if (mode === "work") {
@@ -161,6 +210,9 @@ function handleLogin(token, user) {
   currentUser = user;
   loadSessions();
   loadUserMode();
+
+  // Start session timeout
+  startSessionTimeout();
 
   // Load last active work subtab
   const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");

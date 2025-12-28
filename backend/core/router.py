@@ -121,31 +121,39 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
     if memory and user_id:
         from core.confirmation_manager import ConfirmationManager
         import logging
+        import re
+
         conf_manager = ConfirmationManager(memory)
 
         # Only check confirmation keywords if there are pending confirmations
         pending = conf_manager.get_pending_confirmations(user_id)
-        logging.info(f"[ROUTER] Checking confirmations for user {user_id}: {len(pending) if pending else 0} pending")
+        logging.info(f"[ROUTER] user_id={user_id}, text='{text}', text_l='{text_l}', pending confirmations: {len(pending) if pending else 0}")
+
         if pending:
-            import re
+            logging.info(f"[ROUTER] Checking confirmation keywords against text: '{text_l}'")
             for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
+                logging.info(f"[ROUTER] Checking intent '{confirmation_intent}' with keywords: {keywords}")
                 for keyword in keywords:
                     # Use word boundaries for common words to avoid false matches
                     if keyword in ["no", "yes", "ok"]:
                         # For very common words, require them as standalone words
                         pattern = rf'\b{re.escape(keyword)}\b'
-                        if re.search(pattern, text_l):
-                            import logging
-                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                        match = re.search(pattern, text_l)
+                        logging.info(f"[ROUTER] Testing keyword '{keyword}' with pattern '{pattern}': match={match is not None}")
+                        if match:
+                            logging.info(f"[ROUTER] ✓ MATCHED confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
                             _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
                             return confirmation_intent
                     else:
                         # For specific phrases, use substring match
-                        if keyword in text_l:
-                            import logging
-                            logging.info(f"[ROUTER] Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}' with pending confirmations")
+                        is_match = keyword in text_l
+                        logging.info(f"[ROUTER] Testing keyword '{keyword}' in text: match={is_match}")
+                        if is_match:
+                            logging.info(f"[ROUTER] ✓ MATCHED confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
                             _debug(memory, f"Matched confirmation intent '{confirmation_intent}' via keyword '{keyword}'")
                             return confirmation_intent
+
+            logging.info(f"[ROUTER] No confirmation keywords matched for text: '{text_l}'")
 
     # Check for generic verbs that need calendar context (add, create, make)
     generic_calendar_verbs = ["add", "create", "make", "put"]

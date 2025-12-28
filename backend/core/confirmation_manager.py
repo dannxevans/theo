@@ -36,13 +36,13 @@ class ConfirmationManager:
     ensuring no write operations happen without explicit user consent.
     """
 
-    def __init__(self, memory_store, action_router):
+    def __init__(self, memory_store, action_router=None):
         """
         Initialize confirmation manager.
 
         Args:
             memory_store: MemoryStore instance for persistence
-            action_router: ActionRouter instance for executing approved actions
+            action_router: ActionRouter instance for executing approved actions (optional for read-only operations)
         """
         self.memory = memory_store
         self.action_router = action_router
