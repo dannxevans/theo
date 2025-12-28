@@ -46,7 +46,7 @@ class ActionRouter:
         """
         self.action_registry = action_registry
         self.memory = memory_store
-        self.confirmation_manager = confirmation_manager
+        self._confirmation_manager = confirmation_manager
 
         # Initialize specialized handlers
         self.calendar_handlers = CalendarHandlers(
@@ -64,6 +64,29 @@ class ActionRouter:
             memory_store,
             confirmation_manager
         )
+
+    @property
+    def confirmation_manager(self):
+        """Get confirmation manager."""
+        return self._confirmation_manager
+
+    @confirmation_manager.setter
+    def confirmation_manager(self, value):
+        """
+        Set confirmation manager and update all handlers.
+
+        This ensures that when confirmation_manager is set after initialization,
+        all handlers receive the updated reference.
+        """
+        self._confirmation_manager = value
+
+        # Update all handlers with the new confirmation manager
+        if hasattr(self, 'calendar_handlers'):
+            self.calendar_handlers.confirmation_manager = value
+        if hasattr(self, 'email_handlers'):
+            self.email_handlers.confirmation_manager = value
+        if hasattr(self, 'confirmation_handlers'):
+            self.confirmation_handlers.confirmation_manager = value
 
     def route_action_request(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
