@@ -157,8 +157,17 @@ export async function deleteSessionApi(sessionId) {
 }
 
 export async function getSessionMessages(sessionId) {
+  // Add cache-busting timestamp to prevent browser caching
+  const timestamp = Date.now();
   const response = await fetch(
-    `${API_BASE}/api/sessions/${sessionId}/messages`
+    `${API_BASE}/api/sessions/${sessionId}/messages?_=${timestamp}`,
+    {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    }
   );
 
   if (!response.ok) {
@@ -169,6 +178,141 @@ export async function getSessionMessages(sessionId) {
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 }
+
+export async function exportSession(sessionId, format = "json") {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/export?format=${format}`
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to export session");
+  }
+
+  // Trigger download
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `conversation_${sessionId}.${format === "markdown" ? "md" : "json"}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export async function forkSession(sessionId, turnIndex = null, title = null) {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/fork`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        turn_index: turnIndex,
+        title: title
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to fork session");
+  }
+
+  return response.json();
+}
+
+export async function generateSessionTitle(sessionId) {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/generate-title`,
+    {
+      method: "POST"
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to generate session title");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Intent Management API
+// =============================
+
+export async function getIntents() {
+  const response = await fetch(`${API_BASE}/api/intents`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load intents");
+  }
+
+  return response.json();
+}
+
+export async function getIntent(intentId) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load intent");
+  }
+
+  return response.json();
+}
+
+export async function createIntent(intent) {
+  const response = await fetch(`${API_BASE}/api/intents`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(intent)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to create intent");
+  }
+
+  return response.json();
+}
+
+export async function updateIntent(intentId, updates) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(updates)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update intent");
+  }
+
+  return response.json();
+}
+
+export async function deleteIntent(intentId) {
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete intent");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Routing Preferences API
 // =============================
@@ -252,15 +396,55 @@ export async function setDebugFlag(enabled) {
   return response.json();
 }
 
+// =============================
+// System Prompt Configuration API
+// =============================
+
+export async function getSystemPromptConfig() {
+  const response = await fetch(`${API_BASE}/api/settings/system-prompt`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load system prompt config");
+  }
+
+  return response.json();
+}
+
+export async function updateSystemPromptConfig(config) {
+  const response = await fetch(`${API_BASE}/api/settings/system-prompt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update system prompt config");
+  }
+
+  return response.json();
+}
+
 /**
  * Stream a chat response via Server-Sent Events (SSE).
  * This is intentionally separate from sendMessage() so we can
  * run Socket.IO and SSE side-by-side during migration.
  */
-export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, onError }) {
+export function streamMessage({ text, sessionId, forcedProvider, workSubtab, onToken, onEnd, onError }) {
   const params = new URLSearchParams({ text });
-  if (forcedModel) {
-    params.append("forced_model", forcedModel);
+  if (forcedProvider) {
+    params.append("forced_provider", forcedProvider);
+  }
+  if (workSubtab) {
+    params.append("work_subtab", workSubtab);
+  }
+  // Add auth token to query params since EventSource doesn't support custom headers
+  const token = getAuthToken();
+  if (token) {
+    params.append("token", token);
   }
   const url = `${API_BASE}/api/stream/${sessionId}?${params.toString()}`;
 
@@ -301,4 +485,440 @@ export function streamMessage({ text, sessionId, forcedModel, onToken, onEnd, on
   return () => {
     source.close();
   };
+}
+
+// =============================
+// Step 2: Structured Memory API
+// =============================
+
+export async function getMemories(params = {}) {
+  const queryString = new URLSearchParams();
+  if (params.type) queryString.append("type", params.type);
+  if (params.limit) queryString.append("limit", params.limit);
+
+  const url = `${API_BASE}/api/memories${queryString.toString() ? "?" + queryString.toString() : ""}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load memories");
+  }
+
+  return response.json();
+}
+
+export async function createMemory({ type, key, value, pinned }) {
+  const response = await fetch(`${API_BASE}/api/memories`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      type,
+      key,
+      value,
+      pinned
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to create memory");
+  }
+
+  return response.json();
+}
+
+export async function deleteMemory(memoryId) {
+  const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete memory");
+  }
+
+  return response.json();
+}
+
+export async function pinMemory(memoryId, pinned) {
+  const response = await fetch(`${API_BASE}/api/memories/${memoryId}/pin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      pinned
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to pin memory");
+  }
+
+  return response.json();
+}
+
+export async function getRelevantMemories(query) {
+  const response = await fetch(`${API_BASE}/api/memories/relevant?q=${encodeURIComponent(query)}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get relevant memories");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Step 3: Provider Intelligence API
+// =============================
+
+export async function getProviderHealth() {
+  const response = await fetch(`${API_BASE}/api/providers/health`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get provider health");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Authentication API
+// =============================
+
+function getAuthToken() {
+  return localStorage.getItem("auth_token");
+}
+
+function getAuthHeaders() {
+  const token = getAuthToken();
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
+export async function login(username, password) {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Login failed");
+  }
+
+  return response.json();
+}
+
+export async function logout() {
+  const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Logout failed");
+  }
+
+  return response.json();
+}
+
+export async function verifySession() {
+  const response = await fetch(`${API_BASE}/api/auth/verify`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    return { valid: false };
+  }
+
+  return response.json();
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const response = await fetch(`${API_BASE}/api/auth/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to change password");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Mode Management
+// =============================
+
+export async function getUserMode() {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get user mode");
+  }
+
+  return response.json();
+}
+
+export async function setUserMode(mode) {
+  const response = await fetch(`${API_BASE}/api/mode`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ mode })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to set mode");
+  }
+
+  return response.json();
+}
+
+export async function getAllModeSettings() {
+  const response = await fetch(`${API_BASE}/api/mode/settings`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function getModeSettings(mode) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get mode settings");
+  }
+
+  return response.json();
+}
+
+export async function updateModeSettings(mode, settings) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/${mode}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(settings)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update mode settings");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Work Mode Sub-Tab Management
+// =============================
+
+export async function getWorkSubtabConfig(subtab) {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtab/${subtab}`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get work subtab config");
+  }
+
+  return response.json();
+}
+
+export async function updateWorkSubtabConfig(subtab, config) {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtab/${subtab}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update work subtab config");
+  }
+
+  return response.json();
+}
+
+export async function getAllWorkSubtabConfigs() {
+  const response = await fetch(`${API_BASE}/api/mode/work/subtabs`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get all work subtab configs");
+  }
+
+  return response.json();
+}
+
+// =============================
+// M365 Integration
+// =============================
+
+export async function startM365Auth() {
+  const response = await fetch(`${API_BASE}/api/m365/auth/start`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    }
+  });
+
+  // Return JSON even on error so we can show configuration instructions
+  const data = await response.json();
+
+  if (!response.ok) {
+    return data; // Return error object with instructions
+  }
+
+  return data;
+}
+
+export async function pollM365Auth(deviceCode) {
+  const response = await fetch(`${API_BASE}/api/m365/auth/poll`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ device_code: deviceCode })
+  });
+
+  const data = await response.json();
+
+  // Backend returns 200 for success, 202 for pending, 400+ for errors
+  if (response.ok || response.status === 202) {
+    return data;
+  }
+
+  // Error case
+  throw new Error(data.error || "Failed to poll M365 authentication");
+}
+
+export async function getM365Status() {
+  const response = await fetch(`${API_BASE}/api/m365/status`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get M365 status");
+  }
+
+  return response.json();
+}
+
+export async function disconnectM365() {
+  const response = await fetch(`${API_BASE}/api/m365/disconnect`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to disconnect M365");
+  }
+
+  return response.json();
+}
+
+// =============================
+// Confirmation Workflow
+// =============================
+
+export async function getPendingConfirmations() {
+  const response = await fetch(`${API_BASE}/api/confirmations/pending`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get pending confirmations");
+  }
+
+  return response.json();
+}
+
+export async function approveConfirmation(confirmationId) {
+  const response = await fetch(`${API_BASE}/api/confirmations/${confirmationId}/approve`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to approve confirmation");
+  }
+
+  return response.json();
+}
+
+export async function rejectConfirmation(confirmationId, reason = null) {
+  const response = await fetch(`${API_BASE}/api/confirmations/${confirmationId}/reject`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ reason })
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to reject confirmation");
+  }
+
+  return response.json();
 }

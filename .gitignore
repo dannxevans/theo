@@ -5,6 +5,11 @@ __pycache__/
 
 # Node
 node_modules/
+dist/
+build/
+data/
+.vite/
+*.local
 
 # Env / secrets
 .env
@@ -13,7 +18,9 @@ node_modules/
 backend/data/
 *.sqlite
 *.sqlite3
+data/theo.db
+backend.log
+*.log
 
 # OS
 .DS_Store
-data/theo.db

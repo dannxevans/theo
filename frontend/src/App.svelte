@@ -5,12 +5,19 @@
 <script>
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
-  import Providers from "./components/Providers.svelte";
   import Settings from "./components/Settings.svelte";
-  import { getSessions, deleteSessionApi } from "./lib/api.js";
+  import Login from "./components/Login.svelte";
+  import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode, getWorkSubtabConfig } from "./lib/api.js";
 
-  let showProviders = false;
+  let isAuthenticated = false;
+  let currentUser = null;
   let showSettings = false;
+  let currentMode = "personal"; // "work" or "personal"
+  let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
+
+  // Dropdown state
+  let modeDropdownOpen = false;
+  let settingsDropdownOpen = false;
 
   // Mobile sidebar toggle state
   let sidebarOpen = false;
@@ -19,6 +26,66 @@
       document.body.classList.toggle("no-scroll", sidebarOpen);
     }
   }
+
+  // Close dropdowns when clicking outside
+  function handleClickOutside(event) {
+    const target = event.target;
+    if (!target.closest('.dropdown')) {
+      modeDropdownOpen = false;
+      settingsDropdownOpen = false;
+    }
+  }
+
+  // Session timeout management
+  let sessionTimeoutId = null;
+  const DEFAULT_TIMEOUT_HOURS = 8;
+
+  function startSessionTimeout() {
+    // Clear any existing timeout
+    if (sessionTimeoutId) {
+      clearTimeout(sessionTimeoutId);
+    }
+
+    // Get timeout setting from localStorage (in hours)
+    const timeoutHours = parseInt(localStorage.getItem("theo.sessionTimeout")) || DEFAULT_TIMEOUT_HOURS;
+    const timeoutMs = timeoutHours * 60 * 60 * 1000;
+
+    sessionTimeoutId = setTimeout(async () => {
+      alert(`Your session has expired after ${timeoutHours} hours of inactivity. Please log in again.`);
+      await handleLogout();
+    }, timeoutMs);
+  }
+
+  function resetSessionTimeout() {
+    if (isAuthenticated) {
+      startSessionTimeout();
+    }
+  }
+
+  // Reset timeout on user activity
+  function handleUserActivity() {
+    resetSessionTimeout();
+  }
+
+  onMount(() => {
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('mousemove', handleUserActivity);
+    document.addEventListener('keypress', handleUserActivity);
+
+    // Start timeout if authenticated
+    if (isAuthenticated) {
+      startSessionTimeout();
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousemove', handleUserActivity);
+      document.removeEventListener('keypress', handleUserActivity);
+      if (sessionTimeoutId) {
+        clearTimeout(sessionTimeoutId);
+      }
+    };
+  });
   function openSidebar() {
     sidebarOpen = true;
   }
@@ -49,6 +116,39 @@
   }
 
 onMount(async () => {
+  // Check authentication first
+  try {
+    const result = await verifySession();
+    if (result.valid) {
+      isAuthenticated = true;
+      currentUser = result.user;
+      await loadSessions();
+      await loadUserMode();
+    }
+  } catch (err) {
+    console.error("Session verification failed", err);
+    isAuthenticated = false;
+  }
+
+  // Listen for session title generation events
+  window.addEventListener("sessionTitleGenerated", async (e) => {
+    const { sessionId, title } = e.detail;
+    // Refresh sessions list to show new title
+    try {
+      const updatedSessions = await getSessions();
+      sessions = updatedSessions.filter(hasContent);
+    } catch (err) {
+      console.error("Failed to refresh sessions after title generation:", err);
+    }
+  });
+
+  // Listen for work subtab changes from Chat component
+  window.addEventListener("workSubtabChanged", (e) => {
+    activeWorkSubtab = e.detail.subtab;
+  });
+});
+
+async function loadSessions() {
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
@@ -69,7 +169,71 @@ onMount(async () => {
     console.error("Failed to load sessions", err);
     sessions = [];
   }
-});
+}
+
+async function loadUserMode() {
+  try {
+    const modeConfig = await getUserMode();
+    currentMode = modeConfig.active_mode || "personal";
+  } catch (err) {
+    console.error("Failed to load user mode", err);
+    currentMode = "personal";
+  }
+}
+
+async function setMode(mode) {
+  if (mode === currentMode) return; // Already in this mode
+
+  const previousMode = currentMode;
+
+  try {
+    await setUserMode(mode);
+    currentMode = mode;
+
+    // Create a new session when switching modes to separate contexts
+    newSession();
+
+    // Load last active subtab from localStorage when switching to work mode
+    if (mode === "work") {
+      const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");
+      if (savedSubtab && ["conversation", "email", "code"].includes(savedSubtab)) {
+        activeWorkSubtab = savedSubtab;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to switch mode", err);
+  }
+}
+
+function handleLogin(token, user) {
+  isAuthenticated = true;
+  currentUser = user;
+  loadSessions();
+  loadUserMode();
+
+  // Start session timeout
+  startSessionTimeout();
+
+  // Load last active work subtab
+  const savedSubtab = localStorage.getItem("theo.activeWorkSubtab");
+  if (savedSubtab && ["conversation", "email", "code"].includes(savedSubtab)) {
+    activeWorkSubtab = savedSubtab;
+  }
+}
+
+async function handleLogout() {
+  try {
+    await logout();
+  } catch (err) {
+    console.error("Logout failed", err);
+  } finally {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    isAuthenticated = false;
+    currentUser = null;
+    sessions = [];
+  }
+}
 
   function selectSession(id) {
     activeSessionId = id;
@@ -149,6 +313,9 @@ onMount(async () => {
 </script>
 
 <main class="app-layout app-root">
+  {#if !isAuthenticated}
+    <Login onLogin={handleLogin} />
+  {:else}
   <header class="header">
     <div class="header-left">
       <button class="hamburger" on:click={openSidebar}>☰</button>
@@ -156,35 +323,74 @@ onMount(async () => {
         src="/logo.svg"
         alt="THEO"
         class="logo"
+        on:click={() => { showSettings = false; }}
+        style="cursor: pointer;"
+        title="Go to Chat"
       />
     </div>
 
     <div class="header-right">
-      <button
-        class="btn-pill"
-        class:active={!showProviders && !showSettings}
-        on:click={() => { showProviders = false; showSettings = false; }}
-      >
-        Chat
-      </button>
+      <div class="dropdown" class:open={modeDropdownOpen}>
+        <button
+          class="btn-pill btn-mode"
+          class:mode-work={currentMode === "work"}
+          class:mode-personal={currentMode === "personal"}
+          on:click={() => { modeDropdownOpen = !modeDropdownOpen; }}
+        >
+          {currentMode === "work" ? "Work Mode" : "Personal Mode"}
+        </button>
+        {#if modeDropdownOpen}
+          <div class="dropdown-content">
+            <button
+              class="dropdown-item"
+              class:active={currentMode === "personal"}
+              on:click={() => { setMode("personal"); modeDropdownOpen = false; }}
+            >
+              🏠 Personal
+            </button>
+            <button
+              class="dropdown-item"
+              class:active={currentMode === "work"}
+              on:click={() => { setMode("work"); modeDropdownOpen = false; }}
+            >
+              💼 Work
+            </button>
+          </div>
+        {/if}
+      </div>
 
       <button
         class="btn-pill"
-        class:active={showProviders}
-        on:click={() => { showProviders = true; showSettings = false; }}
+        class:active={!showSettings}
+        on:click={() => { showSettings = false; }}
       >
-        Providers
+        Home
       </button>
 
-      <button
-        class="btn-pill"
-        class:active={showSettings}
-        on:click={() => { showSettings = true; showProviders = false; }}
-      >
-        Settings
-      </button>
+      <div class="dropdown" class:open={settingsDropdownOpen}>
+        <button class="btn-pill" on:click={() => { settingsDropdownOpen = !settingsDropdownOpen; }}>
+          Menu
+        </button>
+        {#if settingsDropdownOpen}
+          <div class="dropdown-content">
+            <button
+              class="dropdown-item"
+              on:click={() => { showSettings = true; settingsDropdownOpen = false; }}
+            >
+              Settings
+            </button>
+            <button
+              class="dropdown-item"
+              on:click={() => { handleLogout(); settingsDropdownOpen = false; }}
+            >
+              Logout
+            </button>
+          </div>
+        {/if}
+      </div>
     </div>
   </header>
+
 <div class="app-body">
 
   <div class="shell layout-shell">
@@ -245,15 +451,14 @@ onMount(async () => {
 
     <section class="main">
       <div class="chat-main">
-        {#if showProviders}
-          <Providers />
-        {:else if showSettings}
+        {#if showSettings}
           <Settings />
         {:else}
-          <Chat sessionId={activeSessionId} />
+          <Chat sessionId={activeSessionId} currentMode={currentMode} activeWorkSubtab={activeWorkSubtab} />
         {/if}
       </div>
     </section>
   </div>
   </div>
+  {/if}
 </main>
