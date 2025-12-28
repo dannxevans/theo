@@ -102,11 +102,19 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
                         "wednesday", "thursday", "friday", "saturday", "sunday", "am", "pm"]
 
     # Write-action keywords (high priority)
+    # Email keywords checked FIRST to avoid false matches with generic words
+    EMAIL_KEYWORDS = ["send email", "draft email", "compose", "write email", "email to", "send an email", "reply to", "reply", "respond to"]
+
     WRITE_ACTION_KEYWORDS = {
         "book_appointment": ["schedule", "book", "set up", "arrange", "appointment", "schedule me", "reserve"],
-        "update_appointment": ["move", "reschedule", "change time", "update"],
+        "update_appointment": ["move", "reschedule", "change time"],
         "cancel_appointment": ["cancel", "delete", "remove"],
-        "compose_email": ["send email", "draft email", "compose", "write email", "email to", "send an email", "reply to", "reply", "respond to"],
+        "compose_email": EMAIL_KEYWORDS,
+    }
+
+    # Generic appointment words that need calendar context
+    APPOINTMENT_GENERIC_KEYWORDS = {
+        "update_appointment": ["update"],
     }
 
     # Read-action keywords (lower priority)
@@ -155,6 +163,13 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
 
             logging.info(f"[ROUTER] No confirmation keywords matched for text: '{text_l}'")
 
+    # Check email keywords FIRST (before other write actions)
+    # This prevents false matches with generic words like "update", "reply", etc.
+    for keyword in EMAIL_KEYWORDS:
+        if keyword in text_l:
+            _debug(memory, f"Matched compose_email via keyword '{keyword}'")
+            return "compose_email"
+
     # Check for generic verbs that need calendar context (add, create, make)
     generic_calendar_verbs = ["add", "create", "make", "put"]
     for verb in generic_calendar_verbs:
@@ -171,6 +186,15 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
             if keyword in text_l:
                 _debug(memory, f"Matched write action intent '{action_intent}' via keyword '{keyword}'")
                 return action_intent
+
+    # Check generic appointment keywords ONLY with calendar context
+    has_calendar_context = any(ctx_word in text_l for ctx_word in CALENDAR_CONTEXT)
+    if has_calendar_context:
+        for action_intent, keywords in APPOINTMENT_GENERIC_KEYWORDS.items():
+            for keyword in keywords:
+                if keyword in text_l:
+                    _debug(memory, f"Matched {action_intent} via generic keyword '{keyword}' with calendar context")
+                    return action_intent
 
     # Then check for read actions (calendar, availability, etc.)
     for action_intent, keywords in READ_ACTION_KEYWORDS.items():
