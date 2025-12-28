@@ -2,25 +2,62 @@
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Python test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+*.cover
+.hypothesis/
 
 # Node
 node_modules/
 dist/
 build/
-data/
 .vite/
 *.local
 
+# Frontend test artifacts
+coverage/
+.nyc_output/
+
 # Env / secrets
 .env
+.env.local
+.env.*.local
 
-# THEO runtime data (persistent on Unraid)
+# THEO runtime data
 backend/data/
 *.sqlite
 *.sqlite3
+*.db
 data/theo.db
 backend.log
 *.log
 
+# Backup files (should not be committed)
+*.backup
+*_backup.py
+*_old.py
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 # OS
 .DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

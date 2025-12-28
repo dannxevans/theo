@@ -1,6 +1,23 @@
 # THEO Design System
 
-This document outlines the design system used across the THEO application. All design tokens are defined as CSS custom properties in `/frontend/public/style.css`.
+This document outlines the design system used across the THEO application. All design tokens are defined as CSS custom properties in `/frontend/src/styles/variables.css`.
+
+## CSS Architecture
+
+The THEO application uses a modular CSS architecture:
+
+- **`/frontend/src/styles/index.css`** - Main entry point that imports all modules
+- **`/frontend/src/styles/variables.css`** - Design tokens (colors, spacing, typography)
+- **`/frontend/src/styles/global.css`** - Global styles, resets, and layout
+- **`/frontend/src/styles/components/`** - Component-specific styles:
+  - `buttons.css` - Button variants and styles
+  - `forms.css` - Form inputs, selects, textareas
+  - `cards.css` - Card components and badges
+  - `modals.css` - Dropdowns, modals, tabs
+  - `sidebar.css` - Sidebar navigation
+  - `chat.css` - Chat layout and messages
+  - `health-monitor.css` - Health monitoring components
+- **`/frontend/src/styles/utilities.css`** - Utility classes
 
 ## Colors
 

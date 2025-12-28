@@ -1,0 +1,24 @@
+[run]
+source = .
+omit =
+    */venv/*
+    */tests/*
+    */migrations/*
+    */__pycache__/*
+    */site-packages/*
+    test_*.py
+    conftest.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+precision = 2
+show_missing = True
+skip_covered = False

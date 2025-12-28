@@ -1,7 +1,3 @@
-<svelte:head>
-  <link rel="stylesheet" href="/style.css" />
-</svelte:head>
-
 <script>
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
