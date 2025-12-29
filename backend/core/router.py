@@ -4,11 +4,27 @@ from typing import Optional, Iterable
 from providers.mock import MockProvider
 from providers.anthropic import AnthropicProvider
 from providers.openai import OpenAIProvider
+from providers.grok import XAIProvider
+from providers.mistral import MistralProvider
+from providers.gemini import GoogleProvider
 from core.provider_registry import ProviderRegistry
 from core.action_router import ActionRouter
 from actions.action_registry import ActionProviderRegistry
 from core.intent_classifier import classify_intent_enhanced
 import logging
+
+
+def _debug_log(memory: Optional[MemoryStore], message: str):
+    """Log debug messages only if debug mode is enabled in user preferences."""
+    if not memory:
+        return
+    try:
+        prefs = memory.get_all("local")
+        enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
+        if enabled:
+            logging.info(f"[DEBUG] {message}")
+    except Exception:
+        pass  # Silently fail if we can't check debug preference
 
 INTENT_TO_PROVIDER_TYPE = {
     "coding": "anthropic",
@@ -21,6 +37,9 @@ INTENT_TO_PROVIDER_TYPE = {
 PROVIDER_CAPABILITIES = {
     "openai": {"general", "planning", "creative", "coding", "reasoning"},
     "anthropic": {"general", "coding", "reasoning", "planning", "creative"},
+    "xai": {"general", "coding", "reasoning", "planning", "creative"},
+    "mistral": {"general", "coding", "reasoning", "planning", "creative"},
+    "google": {"general", "coding", "reasoning", "planning", "creative"},
     "mock": {"general", "coding", "reasoning", "planning", "creative"},
 }
 
@@ -365,9 +384,12 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
         return True, None
 
     if forced_provider and provider_registry:
+        _debug_log(memory, f"[ROUTER] Forced provider requested: {forced_provider}")
         provider_by_id = provider_registry.get(forced_provider)
+        _debug_log(memory, f"[ROUTER] Provider by ID lookup result: {provider_by_id}")
         if provider_by_id:
             healthy, reason = is_provider_healthy(provider_by_id.get("id"))
+            _debug_log(memory, f"[ROUTER] Provider health check: healthy={healthy}, reason={reason}")
             if healthy:
                 selected_provider = provider_by_id
                 routing_explanation.append(f"User forced provider: {forced_provider}")
@@ -375,7 +397,9 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
                 fallback_reason = f"Forced provider {forced_provider} unavailable: {reason}"
                 routing_explanation.append(fallback_reason)
         else:
+            _debug_log(memory, f"[ROUTER] Provider not found by ID, trying model lookup")
             provider_by_model = provider_registry.get_by_model(forced_provider)
+            _debug_log(memory, f"[ROUTER] Provider by model lookup result: {provider_by_model}")
             if provider_by_model:
                 healthy, reason = is_provider_healthy(provider_by_model.get("id"))
                 if healthy:
@@ -384,6 +408,8 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
                 else:
                     fallback_reason = f"Forced model {forced_provider} unavailable: {reason}"
                     routing_explanation.append(fallback_reason)
+            else:
+                _debug_log(memory, f"[ROUTER] Forced provider '{forced_provider}' not found by ID or model")
 
     if not selected_provider and memory:
         routed = memory.get_routing_provider("local", intent)
@@ -508,6 +534,24 @@ def instantiate_provider(provider_cfg):
             base_url=provider_cfg.get("base_url"),
             model=provider_cfg.get("model"),
         )
+    if ptype == "xai":
+        return XAIProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+        )
+    if ptype == "mistral":
+        return MistralProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+        )
+    if ptype == "google":
+        return GoogleProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+        )
     return MockProvider()
 
 
@@ -623,6 +667,8 @@ def route_request(context: dict, stream: bool = False):
 
     provider_cfg = select_provider(intent, memory, forced)
 
+    logging.info(f"[ROUTER] Selected provider config: id={provider_cfg.get('id')}, type={provider_cfg.get('type')}, model={provider_cfg.get('model')}")
+
     # Step 1.5: Add routing decision audit record
     import json
 
@@ -641,7 +687,13 @@ def route_request(context: dict, stream: bool = False):
             json.dumps(routing_decision),
         )
 
-    provider = instantiate_provider(provider_cfg)
+    _debug_log(memory, f"[ROUTER] About to instantiate provider type: {provider_cfg.get('type')}")
+    try:
+        provider = instantiate_provider(provider_cfg)
+        _debug_log(memory, f"[ROUTER] Provider instantiated successfully")
+    except Exception as e:
+        logging.error(f"[ROUTER] Failed to instantiate provider: {e}")
+        raise
 
     fallback_reason = provider_cfg.get("fallback_reason", None)
     if fallback_reason:
@@ -682,6 +734,7 @@ def route_request(context: dict, stream: bool = False):
     session_id = context.get("session_id", "default")
 
     try:
+        _debug_log(memory, f"[ROUTER] About to call provider.chat() for {provider_cfg['id']} (type: {provider_cfg.get('type')}, model: {provider_cfg.get('model')})")
         raw = provider.chat(
             system=system_prompt,
             messages=messages,
