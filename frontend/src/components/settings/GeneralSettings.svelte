@@ -32,7 +32,7 @@
   <h2>System Prompt Configuration</h2>
   <p class="subtitle">Customize how THEO responds and behaves.</p>
 
-  <div class="system-prompt-form">
+  <div class="section">
     <div class="form-group">
       <label for="persona-name">Persona Name</label>
       <input
@@ -77,6 +77,12 @@
       <small>Any extra instructions or preferences for your AI assistant</small>
     </div>
 
+    {#if promptSaveStatus}
+      <div class="save-status" class:success={promptSaveStatus.includes("success")} class:error={promptSaveStatus.includes("Error")}>
+        {promptSaveStatus}
+      </div>
+    {/if}
+
     <div class="form-actions">
       <button
         class="btn-primary"
@@ -86,19 +92,13 @@
         {savingPrompt ? "Saving..." : "Save Settings"}
       </button>
     </div>
-
-    {#if promptSaveStatus}
-      <div class="save-status" class:success={promptSaveStatus.includes("success")} class:error={promptSaveStatus.includes("Error")}>
-        {promptSaveStatus}
-      </div>
-    {/if}
   </div>
 </div>
 
 <style>
   /* All styles now imported from global CSS:
      - .tab-panel from settings.css
-     - .system-prompt-form from settings.css
+     - .section from settings.css
      - .form-group from forms.css
      - .form-actions from settings.css
      - .save-status from settings.css

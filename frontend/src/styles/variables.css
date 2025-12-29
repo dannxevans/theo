@@ -136,7 +136,7 @@
    Dark Mode Theme
    ============================= */
 
-[data-theme="dark"] {
+.dark {
   /* Dark Mode Backgrounds */
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;

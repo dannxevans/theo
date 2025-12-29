@@ -181,7 +181,7 @@
 </script>
 
 <div class="personal-actions">
-  <h2>Personal Assistant</h2>
+  <h2>Integrations</h2>
 
   <!-- M365 Connection Section -->
   <div class="section">

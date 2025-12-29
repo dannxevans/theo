@@ -117,19 +117,22 @@
 </script>
 
 <div class="ai-providers-settings">
-  <h2>Providers</h2>
-  <p class="subtitle">Manage AI provider configurations and health status.</p>
-
-  <button class="btn-primary" on:click={() => {
-    if (showAddProviderForm) {
-      cancelProviderForm();
-    } else {
-      showAddProviderForm = true;
-      dispatch("reload");
-    }
-  }}>
-    {showAddProviderForm ? "Cancel" : "+ Add Provider"}
-  </button>
+  <div class="page-header">
+    <div>
+      <h2>Providers</h2>
+      <p class="subtitle">Manage AI provider configurations and health status.</p>
+    </div>
+    <button class="btn-primary" on:click={() => {
+      if (showAddProviderForm) {
+        cancelProviderForm();
+      } else {
+        showAddProviderForm = true;
+        dispatch("reload");
+      }
+    }}>
+      {showAddProviderForm ? "Cancel" : "+ Add Provider"}
+    </button>
+  </div>
 
   {#if showAddProviderForm}
     <div class="add-form">
@@ -214,49 +217,40 @@
 </div>
 
 <style>
-  .ai-providers-settings {
-    width: 100%;
+  /* Global styles used (.form-group, .form-actions imported from forms.css/.section from settings.css)
+     Only component-specific styles below */
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+    gap: var(--space-4);
   }
 
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
+  .page-header h2 {
+    margin: 0 0 var(--space-2) 0;
   }
 
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
+  .page-header .subtitle {
+    margin: 0;
   }
 
-  .btn-primary {
-    margin-bottom: var(--space-4);
-  }
-
-  .btn-small.btn-danger {
-    color: var(--error-500);
-    border-color: var(--error-500);
-  }
-
-  .btn-small.btn-danger:hover {
-    background: var(--error-500);
-    color: white;
-  }
-
+  /* Form container */
   .add-form {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
-    padding: var(--space-6);
+    padding: var(--space-5);
     margin-bottom: var(--space-6);
   }
 
   .add-form h3 {
-    margin-top: 0;
-    margin-bottom: var(--space-4);
+    margin: 0 0 var(--space-4) 0;
     color: var(--text-primary);
   }
 
+  /* Change .form-row to use .form-group instead for consistency */
   .form-row {
     margin-bottom: var(--space-4);
   }
@@ -264,54 +258,16 @@
   .form-row label {
     display: block;
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: 600;
     margin-bottom: var(--space-1);
     color: var(--text-primary);
-  }
-
-  .form-row input[type="text"],
-  .form-row input[type="password"],
-  .form-row select {
-    width: 100%;
-    max-width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-row input[type="text"]:focus,
-  .form-row input[type="password"]:focus,
-  .form-row select:focus {
-    outline: none;
-    border-color: var(--border-focus);
   }
 
   .form-row input[type="checkbox"] {
     margin-right: var(--space-2);
   }
 
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
-  }
-
-  .save-status {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-  }
-
-  .save-status.error {
-    background: var(--error-50);
-    color: #721c24;
-    border: 1px solid var(--error-500);
-  }
-
+  /* Provider card styling (unique to this page) */
   .providers-list {
     display: flex;
     flex-direction: column;
@@ -367,33 +323,5 @@
   .provider-actions {
     display: flex;
     gap: var(--space-2);
-  }
-
-  .btn-small {
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--border-secondary);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .btn-small:hover:not(:disabled) {
-    background: var(--bg-hover);
-    border-color: var(--border-primary);
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: var(--space-12) var(--space-4);
-    color: var(--text-secondary);
-  }
-
-  .empty-state .hint {
-    font-size: var(--font-size-sm);
-    margin-top: var(--space-2);
-    opacity: 0.7;
   }
 </style>

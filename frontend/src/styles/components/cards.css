@@ -24,7 +24,8 @@
 }
 
 .session-row.active {
-  background: #dbeafe;
+  background: var(--bg-active);
+  border-left: 3px solid var(--theo-indigo);
   border-radius: 4px;
 }
 
@@ -155,11 +156,12 @@
 
 /* Dark mode updates for cards */
 .session-row.active {
-  background: var(--theo-indigo);
+  background: var(--bg-active);
+  border-left: 3px solid var(--theo-indigo);
 }
 
 .session-row.active .session-item {
-  color: white;
+  color: var(--text-primary);
 }
 
 .session-item:hover {

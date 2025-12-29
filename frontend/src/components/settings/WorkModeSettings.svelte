@@ -351,122 +351,13 @@
 </div>
 
 <style>
-  .work-mode-settings {
-    width: 100%;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .section {
-    margin-bottom: var(--space-6);
-    padding: var(--space-5);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
-  }
-
-  .section:last-child {
-    margin-bottom: 0;
-  }
-
-  .subsection {
-    margin-top: var(--space-6);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border-primary);
-  }
-
-  .subsection:first-child {
-    border-top: none;
-    padding-top: 0;
-    margin-top: 0;
-  }
-
-  h3 {
-    margin-bottom: var(--space-4);
-    color: var(--text-primary);
-  }
-
-  h4 {
-    margin-bottom: var(--space-3);
-    color: var(--text-primary);
-  }
-
-  .hint {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    margin-top: var(--space-1);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"],
-  .form-group select,
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"]:focus,
-  .form-group select:focus,
-  .form-group textarea:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .form-group p.hint {
-    display: block;
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .success-message {
-    padding: var(--space-3);
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-    border-radius: var(--radius-md);
-    color: #065f46;
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .status-message {
-    padding: var(--space-3);
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-    border-radius: var(--radius-md);
-    color: #065f46;
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-3);
-  }
-
-  .btn-primary {
-    margin-bottom: var(--space-4);
-  }
+  /* Component-specific styles only - all form/section styles imported from global CSS:
+     - .form-group from forms.css
+     - .section from settings.css
+     - .subsection from forms.css
+     - .success-message from forms.css
+     - .hint from forms.css
+  */
 
   /* Checkbox styling */
   .checkbox-label {
@@ -482,7 +373,7 @@
     cursor: pointer;
   }
 
-  /* PII Configuration */
+  /* PII Configuration (unique to Work Mode) */
   .pii-config-options {
     margin-top: var(--space-4);
     padding: var(--space-4);

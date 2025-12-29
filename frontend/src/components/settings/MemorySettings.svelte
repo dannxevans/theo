@@ -235,7 +235,7 @@
     background: var(--bg-tertiary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
-    padding: var(--space-6);
+    padding: var(--space-5);
     margin-bottom: var(--space-6);
   }
 

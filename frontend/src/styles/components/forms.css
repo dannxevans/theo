@@ -23,6 +23,7 @@
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],
+.form-group input[type="url"],
 .form-group select,
 .form-group textarea {
   width: 100%;
@@ -33,6 +34,7 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   transition: border-color 0.15s;
+  box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -79,7 +81,7 @@
 
 .status-message {
   margin: var(--space-3) 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
 }
@@ -106,6 +108,27 @@
   background: var(--status-info-bg);
   color: var(--status-info-text);
   border: 1px solid var(--status-info-border);
+}
+
+/* Standalone success/error message classes (for backwards compatibility) */
+.success-message {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--status-success-bg);
+  border: 1px solid var(--status-success-border);
+  border-radius: var(--radius-md);
+  color: var(--status-success-text);
+  font-size: var(--font-size-sm);
+}
+
+.error-message {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--status-error-bg);
+  border: 1px solid var(--status-error-border);
+  border-radius: var(--radius-md);
+  color: var(--status-error-text);
+  font-size: var(--font-size-sm);
 }
 
 /* Session search input */
