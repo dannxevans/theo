@@ -226,13 +226,26 @@ class IntentClassifier:
 
         # Read calendar
         read_calendar_keywords = [
-            "what's on my calendar", "check my calendar", "my availability",
-            "when am i free", "what's on", "schedule for"
+            "what's on my calendar", "what's in my calendar", "whats on my calendar",
+            "whats in my calendar", "check my calendar", "my availability",
+            "when am i free", "what's on", "schedule for", "what do i have",
+            "any meetings", "any appointments"
         ]
 
         for keyword in read_calendar_keywords:
             if keyword in text_l:
                 return "read_calendar", 0.85
+
+        # Read email/inbox
+        read_email_keywords = [
+            "what's in my inbox", "whats in my inbox", "check my inbox",
+            "check my email", "read my email", "any emails", "any new emails",
+            "show me my emails", "what emails", "inbox messages"
+        ]
+
+        for keyword in read_email_keywords:
+            if keyword in text_l:
+                return "read_email", 0.85
 
         # Check user-defined intents (if memory available)
         if self.memory:
