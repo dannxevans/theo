@@ -168,9 +168,9 @@ h3 {
 }
 
 .logo-button {
-  background: none;
-  border: none;
-  padding: 0;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
   cursor: pointer;
   display: flex;
   align-items: center;
