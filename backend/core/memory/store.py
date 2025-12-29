@@ -1,23 +1,14 @@
 """
 Main MemoryStore class.
 
-Delegates to specialized operation modules while maintaining backwards
-compatibility with existing code.
-
-This is the new modular version that inherits from the legacy implementation
-and overrides methods with modular implementations as they are extracted.
+Delegates to specialized operation modules using a clean modular architecture.
+All table definitions are centralized in schema.py.
 """
 
-import sys
-import os
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.orm import sessionmaker
 
-# Import the legacy MemoryStore class temporarily for backwards compatibility
-# Add the backend directory to path so we can import memory_legacy from core/
-backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
-from core.memory_legacy import MemoryStore as LegacyMemoryStore
-
+from .schema import create_schema
 from .memories import MemoryOperations
 from .intents import IntentOperations
 from .sessions import SessionOperations
@@ -29,17 +20,20 @@ from .m365 import M365Operations
 from .actions import ActionOperations
 
 
-class MemoryStore(LegacyMemoryStore):
+class MemoryStore:
     """
-    Modular MemoryStore - Refactored version.
+    Modular MemoryStore - Clean architecture with centralized schema.
 
-    Inherits from LegacyMemoryStore for backwards compatibility while
-    overriding methods to use the new modular architecture.
-
-    New modules:
+    Delegates operations to specialized modules:
     - memories.py: Memory and preference operations
     - intents.py: Intent and routing operations
-    - (more to be added: sessions, providers, users, modes, etc.)
+    - sessions.py: Session and conversation management
+    - providers.py: AI provider management
+    - users.py: User and authentication operations
+    - modes.py: Work/Personal mode configuration
+    - service_providers.py: External service provider integration
+    - m365.py: Microsoft 365 integration
+    - actions.py: Action and confirmation system
     """
 
     def __init__(self, db_url):
@@ -49,35 +43,43 @@ class MemoryStore(LegacyMemoryStore):
         Args:
             db_url: SQLAlchemy database URL
         """
-        # Call parent init to set up all tables and legacy functionality
-        super().__init__(db_url)
+        # Create engine and metadata
+        self.engine = create_engine(db_url)
+        self.meta = MetaData()
 
-        # Build tables dict for new modules
-        tables = {
-            "users": self.users,
-            "auth_sessions": self.auth_sessions,
-            "user_mode_config": self.user_mode_config,
-            "mode_settings": self.mode_settings,
-            "work_mode_subtab_config": self.work_mode_subtab_config,
-            "debug_settings": self.debug_settings,
-            "preferences": self.preferences,
-            "system_prompt_config": self.system_prompt_config,
-            "memories": self.memories,
-            "intents": self.intents,
-            "routing_preferences": self.routing_preferences,
-            "provider_metadata": self.provider_metadata,
-            "request_logs": self.request_logs,
-            "providers": self.providers,
-            "sessions": self.sessions,
-            "summaries": self.summaries,
-            "turns": self.turns,
-            "session_providers": self.session_providers,
-            "service_providers": self.service_providers,
-            "actions": self.actions,
-            "action_confirmations": self.action_confirmations,
-            "m365_credentials": self.m365_credentials,
-            "calendar_events_cache": self.calendar_events_cache,
-        }
+        # Create all table definitions from centralized schema
+        tables = create_schema(self.meta)
+
+        # Assign tables as instance attributes for compatibility
+        self.users = tables["users"]
+        self.auth_sessions = tables["auth_sessions"]
+        self.user_mode_config = tables["user_mode_config"]
+        self.mode_settings = tables["mode_settings"]
+        self.work_mode_subtab_config = tables["work_mode_subtab_config"]
+        self.debug_settings = tables["debug_settings"]
+        self.preferences = tables["preferences"]
+        self.system_prompt_config = tables["system_prompt_config"]
+        self.memories = tables["memories"]
+        self.intents = tables["intents"]
+        self.routing_preferences = tables["routing_preferences"]
+        self.provider_metadata = tables["provider_metadata"]
+        self.request_logs = tables["request_logs"]
+        self.providers = tables["providers"]
+        self.sessions = tables["sessions"]
+        self.summaries = tables["summaries"]
+        self.turns = tables["turns"]
+        self.session_providers = tables["session_providers"]
+        self.service_providers = tables["service_providers"]
+        self.actions = tables["actions"]
+        self.action_confirmations = tables["action_confirmations"]
+        self.m365_credentials = tables["m365_credentials"]
+        self.calendar_events_cache = tables["calendar_events_cache"]
+
+        # Create all tables
+        self.meta.create_all(self.engine)
+
+        # Create session maker
+        self.Session = sessionmaker(bind=self.engine)
 
         # Initialize specialized operation modules
         self._memory_ops = MemoryOperations(tables, self.Session, self.engine)

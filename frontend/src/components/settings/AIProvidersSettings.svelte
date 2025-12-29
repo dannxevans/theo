@@ -224,7 +224,7 @@
   }
 
   .subtitle {
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
@@ -244,8 +244,8 @@
   }
 
   .add-form {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-6);
     margin-bottom: var(--space-6);
@@ -254,6 +254,7 @@
   .add-form h3 {
     margin-top: 0;
     margin-bottom: var(--space-4);
+    color: var(--text-primary);
   }
 
   .form-row {
@@ -265,6 +266,7 @@
     font-size: var(--font-size-sm);
     font-weight: 500;
     margin-bottom: var(--space-1);
+    color: var(--text-primary);
   }
 
   .form-row input[type="text"],
@@ -273,9 +275,18 @@
     width: 100%;
     max-width: 100%;
     padding: var(--space-2);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .form-row input[type="text"]:focus,
+  .form-row input[type="password"]:focus,
+  .form-row select:focus {
+    outline: none;
+    border-color: var(--border-focus);
   }
 
   .form-row input[type="checkbox"] {
@@ -309,10 +320,10 @@
   }
 
   .provider-card {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
-    background: white;
+    background: var(--bg-tertiary);
   }
 
   .provider-header {
@@ -325,6 +336,7 @@
   .provider-header h3 {
     margin: 0;
     font-size: var(--font-size-lg);
+    color: var(--text-primary);
   }
 
   .health-badge {
@@ -338,6 +350,7 @@
   .provider-details {
     margin-bottom: var(--space-4);
     font-size: var(--font-size-sm);
+    color: var(--text-primary);
   }
 
   .provider-details div {
@@ -348,7 +361,7 @@
     display: flex;
     gap: var(--space-4);
     margin-top: var(--space-2);
-    color: var(--gray-500);
+    color: var(--text-secondary);
   }
 
   .provider-actions {
@@ -359,22 +372,23 @@
   .btn-small {
     padding: 6px 12px;
     font-size: var(--font-size-sm);
-    border: 1px solid var(--gray-300);
-    background: white;
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .btn-small:hover:not(:disabled) {
-    background: var(--gray-50);
-    border-color: var(--gray-400);
+    background: var(--bg-hover);
+    border-color: var(--border-primary);
   }
 
   .empty-state {
     text-align: center;
     padding: var(--space-12) var(--space-4);
-    color: var(--gray-500);
+    color: var(--text-secondary);
   }
 
   .empty-state .hint {

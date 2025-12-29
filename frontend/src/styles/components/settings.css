@@ -1,0 +1,112 @@
+/* =============================
+   Settings Page Components
+   Sections, Tabs, Panels
+   ============================= */
+
+/* ============================
+   Section Container
+   ============================ */
+
+.section {
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section h2,
+.section h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.section .subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+/* ============================
+   Tab Panel
+   ============================ */
+
+.tab-panel {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.tab-panel h2 {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.tab-panel .subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+/* ============================
+   Settings Form Containers
+   ============================ */
+
+.settings-form,
+.system-prompt-form,
+.routing-form,
+.intent-form {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.routing-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ============================
+   Save Status Indicators
+   ============================ */
+
+.save-status,
+.success-message,
+.error-message {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+.save-status.success,
+.success-message {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
+}
+
+.save-status.error,
+.error-message {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
+}
+
+/* ============================
+   Form Actions
+   ============================ */
+
+.form-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}

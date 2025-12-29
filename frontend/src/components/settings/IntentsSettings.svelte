@@ -208,7 +208,7 @@
               {intent.name}
               <span class="intent-id">({intent.id})</span>
               {#if !intent.enabled}
-                <span class="badge-disabled">Disabled</span>
+                <span class="status-badge status-badge--error">Disabled</span>
               {/if}
             </h4>
             {#if intent.description}
@@ -258,14 +258,14 @@
   }
 
   .subtitle {
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
 
   .intent-form {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-5);
     margin-bottom: var(--space-6);
@@ -274,41 +274,10 @@
   .intent-form h3 {
     margin-top: 0;
     margin-bottom: var(--space-4);
+    color: var(--text-primary);
   }
 
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-  }
-
-  .form-group input[type="text"],
-  .form-group input[type="number"],
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--gray-500);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
-  }
+  /* Form styles now imported from forms.css */
 
   .intents-list {
     display: flex;
@@ -318,15 +287,15 @@
   }
 
   .intent-card {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
-    background: white;
+    background: var(--bg-tertiary);
   }
 
   .intent-card.disabled {
     opacity: 0.6;
-    background: var(--gray-50);
+    background: var(--bg-secondary);
   }
 
   .intent-header {
@@ -341,53 +310,47 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    color: var(--text-primary);
   }
 
   .intent-id {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     font-weight: normal;
   }
 
-  .badge-disabled {
-    background: var(--error-500);
-    color: white;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: normal;
-  }
 
   .intent-description {
     margin: 0;
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
   }
 
   .intent-priority {
-    background: var(--gray-100);
+    background: var(--bg-active);
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--text-primary);
   }
 
   .intent-keywords {
-    background: var(--gray-50);
+    background: var(--bg-secondary);
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-3);
+    color: var(--text-primary);
   }
 
   .intent-keywords.empty {
     font-style: italic;
-    color: var(--gray-500);
+    color: var(--text-secondary);
   }
 
   .intent-keywords strong {
-    color: var(--gray-700);
+    color: var(--text-primary);
   }
 
   .intent-actions {

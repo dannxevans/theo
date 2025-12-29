@@ -188,17 +188,17 @@
     <h3>Microsoft 365 Connection</h3>
 
     {#if m365Connected}
-      <div class="connection-status connected">
-        <span class="status-icon">✓</span>
+      <div class="status-card status-card--success connection-status">
+        <span class="status-card__icon">✓</span>
         <div class="status-info">
-          <div class="status-label">Connected to Microsoft 365</div>
+          <div class="status-card__title">Connected to Microsoft 365</div>
           {#if m365Status?.expires_at}
-            <div class="status-detail">
+            <div class="status-card__text">
               Token expires: {new Date(m365Status.expires_at).toLocaleString()}
             </div>
           {/if}
         </div>
-        <button class="btn-disconnect" on:click={handleDisconnect}>
+        <button class="btn-danger" on:click={handleDisconnect}>
           Disconnect
         </button>
       </div>
@@ -227,7 +227,7 @@
           </ol>
           <p class="auth-waiting">Waiting for authorization...</p>
         </div>
-        <button class="btn-cancel" on:click={cancelAuth}>Cancel</button>
+        <button class="btn-secondary" on:click={cancelAuth}>Cancel</button>
       </div>
     {:else}
       <div class="connection-status disconnected">
@@ -238,7 +238,7 @@
             Connect your Microsoft 365 account to access calendar and email
           </div>
         </div>
-        <button class="btn-connect" on:click={handleConnect}>
+        <button class="btn-info" on:click={handleConnect}>
           Connect Microsoft 365
         </button>
       </div>
@@ -251,31 +251,31 @@
       <h3>Pending Confirmations</h3>
 
       {#if pendingConfirmations.length === 0}
-        <p class="no-confirmations">No pending actions</p>
+        <p class="empty-state">No pending actions</p>
       {:else}
         <div class="confirmations-list">
           {#each pendingConfirmations as confirmation}
-            <div class="confirmation-card">
-              <div class="confirmation-header">
-                <span class="confirmation-type">{confirmation.category || confirmation.action_type}</span>
+            <div class="card">
+              <div class="card__header">
+                <span class="status-badge status-badge--info">{confirmation.category || confirmation.action_type}</span>
                 <span class="confirmation-expires">
                   Expires in {formatExpiresAt(confirmation.expires_at)}
                 </span>
               </div>
 
-              <div class="confirmation-message">
+              <div class="card__body">
                 {confirmation.message}
               </div>
 
               <div class="confirmation-actions">
                 <button
-                  class="btn-approve"
+                  class="btn-success"
                   on:click={() => handleApprove(confirmation.confirmation_id)}
                 >
                   ✓ Approve
                 </button>
                 <button
-                  class="btn-reject"
+                  class="btn-danger"
                   on:click={() => handleReject(confirmation.confirmation_id)}
                 >
                   × Reject
@@ -300,98 +300,25 @@
     font-size: 1.75rem;
     font-weight: 600;
     margin-bottom: 2rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
 
   h3 {
     font-size: 1.25rem;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: #333;
+    color: var(--text-primary);
   }
 
-  .section {
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
+  /* Component-specific layout overrides */
   .connection-status {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem;
-    border-radius: 6px;
-  }
-
-  .connection-status.connected {
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-  }
-
-  .connection-status.disconnected {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-  }
-
-  .status-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
   }
 
   .status-info {
     flex: 1;
-  }
-
-  .status-label {
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 0.25rem;
-  }
-
-  .status-detail {
-    font-size: 0.875rem;
-    color: #666;
-  }
-
-  .btn-connect,
-  .btn-disconnect,
-  .btn-cancel {
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-  }
-
-  .btn-connect {
-    background: #3b82f6;
-    color: white;
-  }
-
-  .btn-connect:hover {
-    background: #2563eb;
-  }
-
-  .btn-disconnect {
-    background: #ef4444;
-    color: white;
-  }
-
-  .btn-disconnect:hover {
-    background: #dc2626;
-  }
-
-  .btn-cancel {
-    background: #6b7280;
-    color: white;
-  }
-
-  .btn-cancel:hover {
-    background: #4b5563;
   }
 
   .auth-flow {
@@ -400,7 +327,7 @@
 
   .auth-instructions h4 {
     margin-bottom: 1rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
 
   .auth-instructions ol {
@@ -411,37 +338,31 @@
   .auth-instructions li {
     margin-bottom: 0.75rem;
     line-height: 1.5;
+    color: var(--text-primary);
   }
 
   .verification-link {
-    color: #3b82f6;
+    color: var(--info-500);
     text-decoration: underline;
     font-weight: 500;
   }
 
   .user-code {
     display: inline-block;
-    background: #f3f4f6;
+    background: var(--bg-secondary);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-family: monospace;
     font-size: 1.125rem;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text-primary);
     letter-spacing: 0.1em;
   }
 
   .auth-waiting {
     margin-top: 1rem;
     font-style: italic;
-    color: #666;
-  }
-
-  .no-confirmations {
-    color: #666;
-    font-style: italic;
-    padding: 1rem;
-    text-align: center;
+    color: var(--text-secondary);
   }
 
   .confirmations-list {
@@ -450,40 +371,9 @@
     gap: 1rem;
   }
 
-  .confirmation-card {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 1rem;
-    background: #fafafa;
-  }
-
-  .confirmation-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-  }
-
-  .confirmation-type {
-    background: #3b82f6;
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
   .confirmation-expires {
     font-size: 0.875rem;
-    color: #666;
-  }
-
-  .confirmation-message {
-    margin-bottom: 1rem;
-    color: #1a1a1a;
-    font-size: 1rem;
-    line-height: 1.5;
+    color: var(--text-secondary);
   }
 
   .confirmation-actions {
@@ -491,32 +381,16 @@
     gap: 0.75rem;
   }
 
-  .btn-approve,
-  .btn-reject {
+  .confirmation-actions button {
     flex: 1;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
   }
 
-  .btn-approve {
-    background: #10b981;
-    color: white;
-  }
-
-  .btn-approve:hover {
-    background: #059669;
-  }
-
-  .btn-reject {
-    background: #ef4444;
-    color: white;
-  }
-
-  .btn-reject:hover {
-    background: #dc2626;
-  }
+  /* All other styles now imported from global CSS:
+     - .section from settings.css
+     - .status-card, .status-card--success from utilities.css
+     - .card, .card__header, .card__body from utilities.css
+     - .status-badge, .status-badge--info from utilities.css
+     - .empty-state from utilities.css
+     - .btn-info, .btn-danger, .btn-secondary, .btn-success from buttons.css
+  */
 </style>

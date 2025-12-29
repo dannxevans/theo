@@ -104,7 +104,7 @@
 
 .timestamp {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: normal;
 }
 
@@ -179,4 +179,60 @@
     width: 100%;
     max-width: none;
   }
+}
+/* Chat bubble updates for dark mode */
+.bubble {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.message.user .bubble {
+  background: var(--theo-indigo);
+  color: white;
+}
+
+/* Session bar */
+.session-bar {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-primary);
+}
+
+/* Summary */
+.summary {
+  background: var(--bg-tertiary);
+  border-left: 4px solid var(--theo-indigo);
+  color: var(--text-primary);
+}
+
+/* Session items */
+.session-row.active {
+  background: var(--theo-indigo);
+  color: white;
+}
+
+.session-item:hover {
+  background: var(--bg-hover);
+}
+
+/* Input area */
+.input {
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-primary);
+}
+
+/* Session search */
+.session-search {
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Subsection */
+.subsection {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+}
+
+.subsection h4 {
+  color: var(--text-primary);
 }

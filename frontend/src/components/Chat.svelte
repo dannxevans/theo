@@ -320,10 +320,11 @@
         metadata: t.metadata || null
       }));
 
-      // Track unique providers used in this session
+      // Track unique AI providers used in this session (exclude system providers)
+      const excludedProviders = ['action_router', 'error', 'memory'];
       usedProviders = new Set(
         messages
-          .filter(m => m.provider)
+          .filter(m => m.provider && !excludedProviders.includes(m.provider))
           .map(m => m.provider)
       );
 
@@ -855,8 +856,8 @@
   .confirmation-widget {
     margin-top: 1rem;
     padding: 1rem;
-    background: #f8f9fa;
-    border: 2px solid #007bff;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--theo-blue);
     border-radius: 8px;
   }
 
@@ -870,18 +871,18 @@
   .confirmation-icon {
     font-weight: 600;
     font-size: 0.9rem;
-    color: #007bff;
+    color: var(--theo-blue);
   }
 
   .confirmation-expires {
     font-size: 0.85rem;
-    color: #6c757d;
+    color: var(--text-secondary);
   }
 
   .confirmation-message {
     margin-bottom: 1rem;
     font-size: 0.95rem;
-    color: #495057;
+    color: var(--text-primary);
   }
 
   .confirmation-actions {
@@ -933,30 +934,46 @@
   }
 
   .confirmation-status.approved {
-    background: #d4edda;
-    color: #155724;
+    background: var(--status-success-bg);
+    color: var(--status-success-text);
   }
 
   .confirmation-status.rejected {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--status-error-bg);
+    color: var(--status-error-text);
   }
 
   /* Completed state styling */
   .confirmation-widget.approved {
-    border-color: #28a745;
-    background: #f0f9f4;
+    border-color: var(--success-500);
+    background: var(--success-50);
+  }
+
+  .confirmation-widget.approved .confirmation-icon {
+    color: var(--success-600);
+  }
+
+  .confirmation-widget.approved .confirmation-result {
+    color: var(--success-600);
   }
 
   .confirmation-widget.rejected {
-    border-color: #dc3545;
-    background: #fef5f6;
+    border-color: var(--error-500);
+    background: var(--error-50);
+  }
+
+  .confirmation-widget.rejected .confirmation-icon {
+    color: var(--error-600);
+  }
+
+  .confirmation-widget.rejected .confirmation-result {
+    color: var(--error-600);
   }
 
   .confirmation-result {
     margin-bottom: 0.75rem;
     font-size: 0.95rem;
-    color: #495057;
+    color: var(--text-primary);
     line-height: 1.5;
   }
 
@@ -969,13 +986,13 @@
   }
 
   .confirmation-status-final.approved {
-    background: #d4edda;
-    color: #155724;
+    background: var(--success-500);
+    color: white;
   }
 
   .confirmation-status-final.rejected {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--error-500);
+    color: white;
   }
 
   /* Provider Badge Styling */
@@ -986,22 +1003,22 @@
     display: inline-block;
   }
 
-  /* AI responses - baby blue */
+  /* AI responses - blue */
   .provider-badge-ai {
-    background: #DBEAFE;
-    color: #1E40AF;
+    background: var(--info-100);
+    color: var(--info-700);
   }
 
   /* Action router responses - amber */
   .provider-badge-action {
-    background: #FEF3C7;
-    color: #92400E;
+    background: var(--warning-100);
+    color: var(--warning-600);
   }
 
   /* Error responses - red */
   .provider-badge-error {
-    background: #FEE2E2;
-    color: #991B1B;
+    background: var(--error-100);
+    color: var(--error-700);
   }
 
   .bubble-footer {

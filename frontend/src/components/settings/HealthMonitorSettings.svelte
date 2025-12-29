@@ -348,7 +348,7 @@
   }
 
   .subtitle {
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
@@ -362,30 +362,33 @@
 
   .section {
     margin-bottom: var(--space-6);
-    padding-bottom: var(--space-6);
-    border-bottom: 1px solid var(--gray-200);
+    padding: var(--space-5);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
   }
 
   .section:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
   }
 
   h3 {
     margin-bottom: var(--space-2);
+    color: var(--text-primary);
   }
 
   .hint {
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-tertiary);
     margin-bottom: var(--space-4);
   }
 
   .error-message {
     padding: var(--space-3);
-    background: #FEE2E2;
-    border: 1px solid #F87171;
+    background: var(--error-50);
+    border: 1px solid var(--error-500);
     border-radius: 4px;
-    color: #991B1B;
+    color: var(--error-700);
     margin-bottom: var(--space-4);
   }
 
@@ -397,10 +400,10 @@
   }
 
   .health-card {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-primary);
     border-radius: 8px;
     padding: var(--space-4);
-    background: white;
+    background: var(--bg-tertiary);
     transition: box-shadow 0.2s;
   }
 
@@ -414,13 +417,13 @@
     align-items: center;
     margin-bottom: var(--space-3);
     padding-bottom: var(--space-2);
-    border-bottom: 1px solid var(--gray-100);
+    border-bottom: 1px solid var(--border-secondary);
   }
 
   .health-card-header h4 {
     margin: 0;
     font-size: var(--font-size-lg);
-    color: var(--gray-800);
+    color: var(--text-primary);
   }
 
   .health-badge {
@@ -446,19 +449,19 @@
   }
 
   .health-badge.badge-inactive {
-    background: var(--gray-100);
-    color: var(--gray-600);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
   }
 
   .health-badge.badge-unknown {
-    background: var(--gray-100);
-    color: var(--gray-500);
+    background: var(--bg-secondary);
+    color: var(--text-tertiary);
   }
 
   .health-card-body p {
     margin: var(--space-2) 0;
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
   }
 
   .metric-group {
@@ -467,7 +470,7 @@
 
   .success-rate-bar {
     height: 8px;
-    background: var(--gray-200);
+    background: var(--bg-secondary);
     border-radius: 4px;
     overflow: hidden;
     margin: var(--space-2) 0;
@@ -492,7 +495,7 @@
 
   .metric-small {
     font-size: var(--font-size-xs);
-    color: var(--gray-600);
+    color: var(--text-secondary);
     margin: var(--space-1) 0;
   }
 
@@ -522,7 +525,7 @@
   .empty-state {
     text-align: center;
     padding: var(--space-8);
-    color: var(--gray-500);
+    color: var(--text-tertiary);
     font-style: italic;
   }
 
@@ -543,14 +546,15 @@
   .capability-list li {
     margin: var(--space-1) 0;
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
   }
 
   .btn-small {
     padding: 6px 12px;
     font-size: var(--font-size-sm);
-    border: 1px solid var(--gray-300);
-    background: white;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
@@ -558,8 +562,13 @@
   }
 
   .btn-small:hover:not(:disabled) {
-    background: var(--gray-50);
-    border-color: var(--gray-400);
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
+  }
+
+  .btn-small:focus {
+    outline: none;
+    border-color: var(--border-focus);
   }
 
   .btn-small:disabled {

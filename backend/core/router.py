@@ -7,6 +7,7 @@ from providers.openai import OpenAIProvider
 from core.provider_registry import ProviderRegistry
 from core.action_router import ActionRouter
 from actions.action_registry import ActionProviderRegistry
+from core.intent_classifier import classify_intent_enhanced
 import logging
 
 INTENT_TO_PROVIDER_TYPE = {
@@ -528,7 +529,15 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
-    intent = classify_intent(text, memory, user_id=context.get("user_id"))
+    # Use enhanced intent classification with mode and subtab awareness
+    intent = classify_intent_enhanced(
+        text=text,
+        memory=memory,
+        user_id=context.get("user_id"),
+        mode=context.get("mode"),
+        subtab=context.get("subtab"),
+        provider_registry=provider_registry
+    )
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)
@@ -544,6 +553,20 @@ def route_request(context: dict, stream: bool = False):
 
     if intent in ACTION_INTENTS:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")
+
+        # Block personal actions (M365 calendar/email) in work mode
+        PERSONAL_ACTIONS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "read_email", "compose_email"]
+        current_mode = context.get("mode", "personal")
+
+        if current_mode == "work" and intent in PERSONAL_ACTIONS:
+            _debug(memory, f"Blocked personal action '{intent}' in work mode")
+            return {
+                "text": "Calendar and email actions are not available in Work mode. These are personal actions. Please switch to Personal mode to use these features.",
+                "provider": "error",
+                "model": None,
+                "task_type": intent,
+                "fallback_reason": "personal_action_in_work_mode",
+            }
 
         if not action_router:
             return {
