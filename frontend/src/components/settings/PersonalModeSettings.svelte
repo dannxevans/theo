@@ -85,76 +85,11 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .section {
-    margin-bottom: var(--space-6);
-    padding: var(--space-5);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
-  }
-
-  .section:last-child {
-    margin-bottom: 0;
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group select,
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group select:focus,
-  .form-group textarea:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .hint {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-sm);
-    margin-top: var(--space-1);
-  }
-
-  .success-message {
-    padding: var(--space-3);
-    background: var(--status-success-bg);
-    border: 1px solid var(--status-success-border);
-    border-radius: var(--radius-md);
-    color: var(--status-success-text);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .section from settings.css
+     - .form-group from forms.css
+     - .success-message from settings.css
+     - .hint from forms.css
+  */
 </style>

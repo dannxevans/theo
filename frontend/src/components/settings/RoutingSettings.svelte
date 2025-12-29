@@ -46,62 +46,9 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .routing-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group select {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group select:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .routing-form from settings.css
+     - .form-group from forms.css
+  */
 </style>

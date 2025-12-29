@@ -19,6 +19,7 @@
 @import './components/modals.css';
 @import './components/sidebar.css';
 @import './components/chat.css';
+@import './components/settings.css';
 @import './components/health-monitor.css';
 
 /* 4. Utility Classes - Last to allow overrides */

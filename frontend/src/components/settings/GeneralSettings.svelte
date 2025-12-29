@@ -96,88 +96,11 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .system-prompt-form {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    margin-bottom: var(--space-6);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"],
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"]:focus,
-  .form-group textarea:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
-  }
-
-  .save-status {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-  }
-
-  .save-status.success {
-    background: var(--status-success-bg);
-    color: var(--status-success-text);
-    border: 1px solid var(--status-success-border);
-  }
-
-  .save-status.error {
-    background: var(--status-error-bg);
-    color: var(--status-error-text);
-    border: 1px solid var(--status-error-border);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .system-prompt-form from settings.css
+     - .form-group from forms.css
+     - .form-actions from settings.css
+     - .save-status from settings.css
+  */
 </style>

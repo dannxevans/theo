@@ -188,12 +188,12 @@
     <h3>Microsoft 365 Connection</h3>
 
     {#if m365Connected}
-      <div class="connection-status connected">
-        <span class="status-icon">✓</span>
+      <div class="status-card status-card--success connection-status">
+        <span class="status-card__icon">✓</span>
         <div class="status-info">
-          <div class="status-label">Connected to Microsoft 365</div>
+          <div class="status-card__title">Connected to Microsoft 365</div>
           {#if m365Status?.expires_at}
-            <div class="status-detail">
+            <div class="status-card__text">
               Token expires: {new Date(m365Status.expires_at).toLocaleString()}
             </div>
           {/if}
@@ -322,50 +322,10 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem;
-    border-radius: 6px;
-  }
-
-  .connection-status.connected {
-    background: var(--success-50);
-    border: 1px solid var(--success-500);
-  }
-
-  .connection-status.connected .status-icon {
-    color: var(--success-600);
-  }
-
-  .connection-status.connected .status-label {
-    color: var(--success-600);
-  }
-
-  .connection-status.connected .status-detail {
-    color: var(--success-600);
-  }
-
-  .connection-status.disconnected {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-secondary);
-  }
-
-  .status-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
   }
 
   .status-info {
     flex: 1;
-  }
-
-  .status-label {
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.25rem;
-  }
-
-  .status-detail {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
   }
 
   .btn-connect,
