@@ -84,6 +84,35 @@
       else if (model.includes("sonnet")) modelName = "Sonnet";
       else if (model.includes("haiku")) modelName = "Haiku";
       else modelName = model;
+    } else if (model && model.includes("grok")) {
+      providerType = "xAI";
+      if (model.includes("grok-beta")) modelName = "Grok Beta";
+      else if (model.includes("grok-vision")) modelName = "Grok Vision";
+      else if (model.includes("grok-2")) modelName = "Grok-2";
+      else if (model.includes("grok-4")) modelName = "Grok-4";
+      else if (model.includes("grok-3")) modelName = "Grok-3";
+      else modelName = model;
+    } else if (model && (model.includes("mistral") || model.includes("magistral"))) {
+      providerType = "Mistral";
+      if (model.includes("mistral-large")) modelName = "Mistral Large";
+      else if (model.includes("mistral-medium")) modelName = "Mistral Medium";
+      else if (model.includes("mistral-small")) modelName = "Mistral Small";
+      else if (model.includes("magistral-medium")) modelName = "Magistral Medium";
+      else if (model.includes("magistral-small")) modelName = "Magistral Small";
+      else if (model.includes("codestral")) modelName = "Codestral";
+      else modelName = model;
+    } else if (model && model.includes("gemini")) {
+      providerType = "Google";
+      if (model.includes("gemini-3-pro")) modelName = "Gemini 3 Pro";
+      else if (model.includes("gemini-3-flash")) modelName = "Gemini 3 Flash";
+      else if (model.includes("gemini-2.5-pro")) modelName = "Gemini 2.5 Pro";
+      else if (model.includes("gemini-2.5-flash-lite")) modelName = "Gemini 2.5 Flash Lite";
+      else if (model.includes("gemini-2.5-flash")) modelName = "Gemini 2.5 Flash";
+      else if (model.includes("gemini-2.0-flash-lite")) modelName = "Gemini 2.0 Flash Lite";
+      else if (model.includes("gemini-2.0-flash")) modelName = "Gemini 2.0 Flash";
+      else if (model.includes("gemini-1.5-pro")) modelName = "Gemini 1.5 Pro";
+      else if (model.includes("gemini-1.5-flash")) modelName = "Gemini 1.5 Flash";
+      else modelName = model;
     } else {
       // Fallback - try to determine from provider field
       if (provider && (provider.includes("openai") || provider.includes("gpt"))) {

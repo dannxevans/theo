@@ -298,6 +298,28 @@ class ProviderOperations(BaseMemoryOperations):
 
             return summary
 
+    def reset_provider_health(self, provider_id):
+        """
+        Reset health metrics for a provider to healthy state.
+        Clears failure counts, circuit breaker, and sets status to healthy.
+
+        Args:
+            provider_id: Provider identifier
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                update(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+                .values(
+                    total_requests=0,
+                    failed_requests=0,
+                    health_status="healthy",
+                    circuit_breaker_open=False,
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            conn.commit()
+
     def estimate_cost(self, provider_id, input_tokens, output_tokens):
         """
         Estimate cost for a request in micro-dollars.
