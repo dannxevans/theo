@@ -17,7 +17,7 @@
   right: 0;
   top: 100%;
   margin-top: 4px;
-  background-color: white;
+  background-color: var(--bg-primary);
   min-width: 160px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: var(--radius-lg);
@@ -44,7 +44,7 @@
   padding: var(--space-3) var(--space-4);
   text-align: left;
   border: none;
-  background: white;
+  background: var(--bg-primary);
   color: var(--gray-700);
   font-size: var(--font-size-sm);
   font-weight: 500;
@@ -76,7 +76,7 @@
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-bottom: 1px solid var(--gray-200);
 }
 
@@ -94,7 +94,7 @@
 
 .work-subtabs .subtab:hover {
   color: var(--gray-900);
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
@@ -102,7 +102,7 @@
   color: #4f46e5;
   border-bottom-color: #4f46e5;
   font-weight: 600;
-  background: white;
+  background: var(--bg-primary);
 }
 
 /* ============================
@@ -121,4 +121,30 @@
     font-size: 13px;
     padding: var(--space-3) var(--space-4);
   }
+}
+
+/* Dark mode fixes for work subtabs */
+.work-subtabs {
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.work-subtabs .subtab {
+  color: var(--text-secondary);
+}
+
+.work-subtabs .subtab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.work-subtabs .subtab.active {
+  color: var(--theo-indigo);
+  border-bottom-color: var(--theo-indigo);
+  background: var(--bg-elevated);
+}
+
+/* Dark mode - use bright blue for better contrast */
+[data-theme="dark"] .work-subtabs .subtab.active {
+  color: var(--theo-blue);
+  border-bottom-color: var(--theo-blue);
 }

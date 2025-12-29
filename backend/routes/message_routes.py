@@ -110,6 +110,11 @@ def stream_chat_sse(session_id):
                 if current_mode == "work":
                     work_subtab = request.args.get("work_subtab", "conversation")
                     logging.info(f"[MODE] Work mode - subtab: {work_subtab}")
+
+                    # Add mode and subtab to router_context for intent classification
+                    router_context["mode"] = current_mode
+                    router_context["subtab"] = work_subtab
+
                     subtab_config = memory.get_work_subtab_config(user_id, work_subtab)
 
                     context_prefix = None
@@ -159,6 +164,7 @@ def stream_chat_sse(session_id):
                         logging.info(f"[MODE] Set mode context only for work mode: {mode_context_prefix[:100]}")
                 else:
                     # Not in work mode, just apply mode context if available
+                    router_context["mode"] = current_mode  # Add mode even for personal
                     if mode_context_prefix:
                         router_context["subtab_context_prefix"] = mode_context_prefix
                         logging.info(f"[MODE] Set subtab_context_prefix for {current_mode} mode: {mode_context_prefix[:100]}")

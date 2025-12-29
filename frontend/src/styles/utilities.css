@@ -1,7 +1,423 @@
 /* =============================
-   Utility Classes
-   Helper classes for common patterns
+   THEO Utility Classes
+   Reusable component patterns
    ============================= */
 
-/* Currently no specific utility classes defined */
-/* Add utility classes here as needed (e.g., .text-center, .mt-4, etc.) */
+/* =============================
+   Status Badges
+   ============================= */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.status-badge--success {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+}
+
+.status-badge--warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border-color: var(--status-warning-border);
+}
+
+.status-badge--error {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+}
+
+.status-badge--info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  border-color: var(--status-info-border);
+}
+
+.status-badge--neutral {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-secondary);
+}
+
+/* =============================
+   Status Cards
+   ============================= */
+
+.status-card {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+}
+
+.status-card--success {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
+
+.status-card--success .status-card__title,
+.status-card--success .status-card__text,
+.status-card--success .status-card__icon {
+  color: var(--status-success-text);
+}
+
+.status-card--warning {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+}
+
+.status-card--warning .status-card__title,
+.status-card--warning .status-card__text,
+.status-card--warning .status-card__icon {
+  color: var(--status-warning-text);
+}
+
+.status-card--error {
+  background: var(--status-error-bg);
+  border-color: var(--status-error-border);
+}
+
+.status-card--error .status-card__title,
+.status-card--error .status-card__text,
+.status-card--error .status-card__icon {
+  color: var(--status-error-text);
+}
+
+.status-card--info {
+  background: var(--status-info-bg);
+  border-color: var(--status-info-border);
+}
+
+.status-card--info .status-card__title,
+.status-card--info .status-card__text,
+.status-card--info .status-card__icon {
+  color: var(--status-info-text);
+}
+
+.status-card__title {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.status-card__text {
+  font-size: var(--font-size-sm);
+}
+
+.status-card__icon {
+  font-size: 1.5rem;
+}
+
+/* =============================
+   Form Inputs (Standardized)
+   ============================= */
+
+.input-field {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-secondary);
+}
+
+.input-field::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Textarea variant */
+.input-field--textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Select variant */
+.input-field--select {
+  cursor: pointer;
+}
+
+/* =============================
+   Form Groups
+   ============================= */
+
+.form-group {
+  margin-bottom: var(--space-4);
+}
+
+.form-group__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.form-group__hint {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.form-group__error {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--status-error-text);
+}
+
+/* =============================
+   Cards
+   ============================= */
+
+.card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.card__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.card__body {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* =============================
+   Sections (Settings pages)
+   ============================= */
+
+.section {
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section__title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.section__subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+/* =============================
+   Empty States
+   ============================= */
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.empty-state__icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.5;
+}
+
+.empty-state__text {
+  font-size: var(--font-size-base);
+}
+
+/* =============================
+   Provider Badges
+   ============================= */
+
+.provider-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.provider-badge--ai {
+  background: var(--info-100);
+  color: var(--info-700);
+}
+
+.provider-badge--action {
+  background: var(--warning-100);
+  color: var(--warning-600);
+}
+
+.provider-badge--error {
+  background: var(--error-100);
+  color: var(--error-700);
+}
+
+.provider-badge--default {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* =============================
+   Alert Component
+   Inline notifications and messages
+   ============================= */
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.alert__icon {
+  flex-shrink: 0;
+  font-size: var(--font-size-lg);
+}
+
+.alert__content {
+  flex: 1;
+}
+
+.alert__title {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.alert__message {
+  color: inherit;
+  opacity: 0.9;
+}
+
+/* Alert Variants */
+.alert--success {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+}
+
+.alert--warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border-color: var(--status-warning-border);
+}
+
+.alert--error {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+}
+
+.alert--info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  border-color: var(--status-info-border);
+}
+
+/* =============================
+   Modal Utilities
+   Standardized modal headers, bodies, footers
+   ============================= */
+
+.modal__header {
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal__close {
+  background: none;
+  border: none;
+  font-size: var(--font-size-2xl);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+
+.modal__close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal__body {
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.modal__footer {
+  padding: var(--space-5);
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  background: var(--bg-secondary);
+}

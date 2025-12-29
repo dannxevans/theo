@@ -11,6 +11,7 @@
   import WorkModeSettings from "./WorkModeSettings.svelte";
   import PersonalModeSettings from "./PersonalModeSettings.svelte";
   import AccountSettings from "./AccountSettings.svelte";
+  import ThemeSettings from "./ThemeSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -294,6 +295,9 @@
       <button class="tab" class:active={activeTab === "memory"} on:click={() => activeTab = "memory"}>
         Memory
       </button>
+      <button class="tab" class:active={activeTab === "theme"} on:click={() => activeTab = "theme"}>
+        Theme
+      </button>
     {/if}
 
     {#if activeCategory === "operating-modes"}
@@ -348,6 +352,10 @@
         bind:filterType
         on:reload={() => loadMemories()}
       />
+    {/if}
+
+    {#if activeTab === "theme"}
+      <ThemeSettings />
     {/if}
 
     {#if activeTab === "ai-providers"}
@@ -409,15 +417,16 @@
   h1 {
     padding: var(--space-5) var(--space-6);
     margin: 0;
-    border-bottom: 1px solid var(--gray-200);
-    background: var(--gray-50);
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
     font-size: var(--font-size-2xl);
+    color: var(--text-primary);
   }
 
   .category-tabs {
     display: flex;
-    background: var(--gray-100);
-    border-bottom: 1px solid var(--gray-300);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
     padding: 0 var(--space-6);
     gap: var(--space-2);
   }
@@ -429,26 +438,26 @@
     cursor: pointer;
     font-size: var(--font-size-base);
     font-weight: 600;
-    color: var(--gray-600);
+    color: var(--text-secondary);
     border-bottom: 3px solid transparent;
     transition: all 0.2s;
   }
 
   .category-tab:hover {
-    color: var(--gray-800);
-    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+    background: var(--bg-hover);
   }
 
   .category-tab.active {
-    color: var(--info-600);
-    border-bottom-color: var(--info-600);
-    background: var(--gray-50);
+    color: var(--theo-blue);
+    border-bottom-color: var(--theo-blue);
+    background: var(--bg-tertiary);
   }
 
   .tabs {
     display: flex;
-    background: var(--gray-50);
-    border-bottom: 2px solid var(--gray-200);
+    background: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-primary);
     padding: 0 var(--space-6);
     gap: var(--space-1);
   }
@@ -460,20 +469,20 @@
     cursor: pointer;
     font-size: var(--font-size-sm);
     font-weight: 500;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     border-bottom: 3px solid transparent;
     transition: all 0.2s;
   }
 
   .tab:hover {
-    color: var(--gray-700);
-    background: rgba(0, 0, 0, 0.03);
+    color: var(--text-primary);
+    background: var(--bg-hover);
   }
 
   .tab.active {
-    color: var(--info-500);
-    border-bottom-color: var(--info-500);
-    background: white;
+    color: var(--theo-blue);
+    border-bottom-color: var(--theo-blue);
+    background: var(--bg-primary);
   }
 
   .tab-content {

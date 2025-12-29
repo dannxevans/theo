@@ -85,65 +85,11 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--gray-600);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .section {
-    margin-bottom: var(--space-6);
-    padding-bottom: var(--space-6);
-    border-bottom: 1px solid var(--gray-200);
-  }
-
-  .section:last-child {
-    border-bottom: none;
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-  }
-
-  .form-group select,
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-  }
-
-  .hint {
-    color: var(--gray-600);
-    font-size: var(--font-size-sm);
-    margin-top: var(--space-1);
-  }
-
-  .success-message {
-    padding: var(--space-3);
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-    border-radius: var(--radius-md);
-    color: #065f46;
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .section from settings.css
+     - .form-group from forms.css
+     - .success-message from settings.css
+     - .hint from forms.css
+  */
 </style>

@@ -4,7 +4,7 @@
    ============================= */
 
 :root {
-  /* Brand Colors */
+  /* Brand Colors (consistent across themes) */
   --theo-blue: #38BDF8;
   --theo-indigo: #6366F1;
   --theo-violet: #A855F7;
@@ -15,7 +15,7 @@
     var(--theo-violet) 100%
   );
 
-  /* Neutral Colors */
+  /* Neutral Colors (base palette) */
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -27,19 +27,70 @@
   --gray-800: #1f2937;
   --gray-900: #111827;
 
-  /* Semantic Colors */
+  /* Theme Colors (Light Mode Default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f3f4f6;
+  --bg-active: #e5e7eb;
+
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
+
+  --border-primary: #e5e7eb;
+  --border-secondary: #d1d5db;
+  --border-focus: var(--theo-indigo);
+
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  /* Semantic Color Palette */
   --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
   --success-500: #10b981;
   --success-600: #059669;
+  --success-700: #047857;
+
   --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
   --warning-500: #f59e0b;
   --warning-600: #d97706;
+
   --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-200: #fecaca;
+  --error-300: #fca5a5;
   --error-500: #ef4444;
   --error-600: #dc2626;
+  --error-700: #b91c1c;
+
   --info-50: #eff6ff;
+  --info-100: #dbeafe;
   --info-500: #3b82f6;
   --info-600: #2563eb;
+  --info-700: #1d4ed8;
+
+  /* Semantic Status Tokens (theme-aware) */
+  --status-success-bg: var(--success-50);
+  --status-success-border: var(--success-500);
+  --status-success-text: var(--success-600);
+
+  --status-warning-bg: var(--warning-50);
+  --status-warning-border: var(--warning-500);
+  --status-warning-text: var(--warning-600);
+
+  --status-error-bg: var(--error-50);
+  --status-error-border: var(--error-500);
+  --status-error-text: var(--error-600);
+
+  --status-info-bg: var(--info-50);
+  --status-info-border: var(--info-500);
+  --status-info-text: var(--info-600);
 
   /* Spacing Scale (based on 4px grid) */
   --space-1: 0.25rem;  /* 4px */
@@ -60,9 +111,9 @@
   --radius-full: 999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+  --shadow-md: 0 4px 6px -1px var(--shadow-color);
+  --shadow-lg: 0 10px 15px -3px var(--shadow-color);
   --shadow-brand: 0 4px 12px rgba(99, 102, 241, 0.35);
 
   /* Typography */
@@ -79,4 +130,266 @@
   --z-modal-backdrop: 30;
   --z-modal: 40;
   --z-toast: 50;
+}
+
+/* =============================
+   Dark Mode Theme
+   ============================= */
+
+[data-theme="dark"] {
+  /* Dark Mode Backgrounds */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #1e293b;
+  --bg-hover: #334155;
+  --bg-active: #475569;
+
+  /* Dark Mode Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #0f172a;
+
+  /* Dark Mode Borders */
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --border-focus: var(--theo-blue);
+
+  /* Dark Mode Shadows */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+
+  /* Adjusted brand colors for dark mode */
+  --shadow-brand: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+/* =============================
+   THEME PRESETS
+   Additional color schemes beyond light/dark
+   ============================= */
+
+/* Cyberpunk Theme - Neon and high contrast */
+[data-theme="cyberpunk"] {
+  /* Brand colors - Neon cyan and magenta */
+  --theo-indigo: #00f0ff;
+  --theo-purple: #ff00ff;
+  --theo-blue: #00d9ff;
+  --theo-gradient: linear-gradient(135deg, #00f0ff 0%, #ff00ff 100%);
+  --shadow-brand: 0 4px 12px rgba(0, 240, 255, 0.4);
+
+  /* Base colors - Dark with neon accents */
+  --bg-primary: #0a0e27;
+  --bg-secondary: #151937;
+  --bg-tertiary: #1e2342;
+  --bg-hover: #252b4f;
+  --bg-active: #2d3459;
+
+  /* Text - High contrast */
+  --text-primary: #e0f2fe;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  /* Borders - Neon glow */
+  --border-primary: #2d3459;
+  --border-secondary: #252b4f;
+  --border-focus: #00f0ff;
+
+  /* Shadows - Neon glow effects */
+  --shadow-sm: 0 1px 3px rgba(0, 240, 255, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 240, 255, 0.3);
+  --shadow-lg: 0 10px 25px rgba(0, 240, 255, 0.4);
+  --shadow-color: rgba(0, 240, 255, 0.3);
+  --overlay-bg: rgba(10, 14, 39, 0.9);
+
+  /* Semantic colors - Neon variants */
+  --success-50: #0d1f1a;
+  --success-100: #1a3f35;
+  --success-500: #00ff9f;
+  --success-600: #00e68a;
+  --success-700: #00cc7a;
+
+  --warning-50: #2a1f0a;
+  --warning-100: #4a3515;
+  --warning-500: #ffcc00;
+  --warning-600: #e6b800;
+
+  --error-50: #2a0a14;
+  --error-100: #4a1528;
+  --error-500: #ff0055;
+  --error-600: #e6004d;
+  --error-700: #cc0044;
+
+  --info-50: #0a1f2a;
+  --info-100: #153f4a;
+  --info-500: #00d9ff;
+  --info-600: #00c2e6;
+  --info-700: #00abc9;
+
+  /* Status tokens */
+  --status-success-bg: var(--success-50);
+  --status-success-border: var(--success-500);
+  --status-success-text: var(--success-500);
+
+  --status-warning-bg: var(--warning-50);
+  --status-warning-border: var(--warning-500);
+  --status-warning-text: var(--warning-500);
+
+  --status-error-bg: var(--error-50);
+  --status-error-border: var(--error-500);
+  --status-error-text: var(--error-500);
+
+  --status-info-bg: var(--info-50);
+  --status-info-border: var(--info-500);
+  --status-info-text: var(--info-500);
+}
+
+/* Nature Theme - Earthy greens and natural tones */
+[data-theme="nature"] {
+  /* Brand colors - Forest greens */
+  --theo-indigo: #2d6a4f;
+  --theo-purple: #52b788;
+  --theo-blue: #40916c;
+  --theo-gradient: linear-gradient(135deg, #2d6a4f 0%, #52b788 100%);
+  --shadow-brand: 0 4px 12px rgba(45, 106, 79, 0.3);
+
+  /* Base colors - Natural tones */
+  --bg-primary: #f8faf7;
+  --bg-secondary: #e8f3ea;
+  --bg-tertiary: #d8f3dc;
+  --bg-hover: #c7e9c0;
+  --bg-active: #b7e4c7;
+
+  /* Text - Earth tones */
+  --text-primary: #1b4332;
+  --text-secondary: #2d6a4f;
+  --text-tertiary: #52b788;
+
+  /* Borders - Natural greens */
+  --border-primary: #b7e4c7;
+  --border-secondary: #c7e9c0;
+  --border-focus: #2d6a4f;
+
+  /* Shadows - Soft and natural */
+  --shadow-sm: 0 1px 3px rgba(45, 106, 79, 0.1);
+  --shadow-md: 0 4px 6px rgba(45, 106, 79, 0.15);
+  --shadow-lg: 0 10px 25px rgba(45, 106, 79, 0.2);
+  --shadow-color: rgba(45, 106, 79, 0.15);
+  --overlay-bg: rgba(27, 67, 50, 0.5);
+
+  /* Semantic colors - Nature inspired */
+  --success-50: #d8f3dc;
+  --success-100: #b7e4c7;
+  --success-500: #40916c;
+  --success-600: #2d6a4f;
+  --success-700: #1b4332;
+
+  --warning-50: #fff4e6;
+  --warning-100: #ffe0b2;
+  --warning-500: #fb8500;
+  --warning-600: #dc7500;
+
+  --error-50: #ffe5e5;
+  --error-100: #ffcccc;
+  --error-500: #e63946;
+  --error-600: #c92a2a;
+  --error-700: #a61e1e;
+
+  --info-50: #e7f5ff;
+  --info-100: #d0ebff;
+  --info-500: #4a7c59;
+  --info-600: #386641;
+  --info-700: #2d5336;
+
+  /* Status tokens */
+  --status-success-bg: var(--success-50);
+  --status-success-border: var(--success-500);
+  --status-success-text: var(--success-700);
+
+  --status-warning-bg: var(--warning-50);
+  --status-warning-border: var(--warning-500);
+  --status-warning-text: var(--warning-600);
+
+  --status-error-bg: var(--error-50);
+  --status-error-border: var(--error-500);
+  --status-error-text: var(--error-700);
+
+  --status-info-bg: var(--info-50);
+  --status-info-border: var(--info-500);
+  --status-info-text: var(--info-700);
+}
+
+/* Corporate Theme - Professional blues and grays */
+[data-theme="corporate"] {
+  /* Brand colors - Corporate blues */
+  --theo-indigo: #1e3a8a;
+  --theo-purple: #3730a3;
+  --theo-blue: #1e40af;
+  --theo-gradient: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+  --shadow-brand: 0 4px 12px rgba(30, 58, 138, 0.3);
+
+  /* Base colors - Clean and professional */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #e2e8f0;
+  --bg-active: #cbd5e1;
+
+  /* Text - Professional grays */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+
+  /* Borders - Subtle grays */
+  --border-primary: #e2e8f0;
+  --border-secondary: #cbd5e1;
+  --border-focus: #1e40af;
+
+  /* Shadows - Subtle and clean */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.12);
+  --shadow-color: rgba(15, 23, 42, 0.1);
+  --overlay-bg: rgba(15, 23, 42, 0.5);
+
+  /* Semantic colors - Professional palette */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-500: #16a34a;
+  --success-600: #15803d;
+  --success-700: #166534;
+
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-500: #eab308;
+  --warning-600: #ca8a04;
+
+  --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-500: #dc2626;
+  --error-600: #b91c1c;
+  --error-700: #991b1b;
+
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-500: #2563eb;
+  --info-600: #1d4ed8;
+  --info-700: #1e40af;
+
+  /* Status tokens */
+  --status-success-bg: var(--success-50);
+  --status-success-border: var(--success-500);
+  --status-success-text: var(--success-600);
+
+  --status-warning-bg: var(--warning-50);
+  --status-warning-border: var(--warning-500);
+  --status-warning-text: var(--warning-600);
+
+  --status-error-bg: var(--error-50);
+  --status-error-border: var(--error-500);
+  --status-error-text: var(--error-600);
+
+  --status-info-bg: var(--info-50);
+  --status-info-border: var(--info-500);
+  --status-info-text: var(--info-600);
 }

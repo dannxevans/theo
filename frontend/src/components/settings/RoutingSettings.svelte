@@ -46,50 +46,9 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--gray-600);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .routing-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-  }
-
-  .form-group select {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--gray-500);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .routing-form from settings.css
+     - .form-group from forms.css
+  */
 </style>

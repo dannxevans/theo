@@ -96,79 +96,11 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--gray-600);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .system-prompt-form {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    margin-bottom: var(--space-6);
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-  }
-
-  .form-group input[type="text"],
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--gray-500);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
-  }
-
-  .save-status {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-  }
-
-  .save-status.success {
-    background: var(--success-50);
-    color: #155724;
-    border: 1px solid var(--success-500);
-  }
-
-  .save-status.error {
-    background: var(--error-50);
-    color: #721c24;
-    border: 1px solid var(--error-500);
-  }
+  /* All styles now imported from global CSS:
+     - .tab-panel from settings.css
+     - .system-prompt-form from settings.css
+     - .form-group from forms.css
+     - .form-actions from settings.css
+     - .save-status from settings.css
+  */
 </style>

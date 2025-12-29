@@ -4,35 +4,108 @@
    ============================= */
 
 /* ============================
+   Standardized Form Groups
+   ============================ */
+
+.form-group {
+  margin-bottom: var(--space-4);
+}
+
+.form-group label {
+  display: block;
+  width: auto;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.form-group small,
+.form-group .hint {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  margin-top: var(--space-1);
+}
+
+/* ============================
    Settings Subsections
    ============================ */
 
 .subsection {
   margin-top: var(--space-6);
   padding: var(--space-4);
-  background: var(--gray-50);
+  background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--border-primary);
 }
 
 .subsection h4 {
   margin: 0 0 var(--space-4) 0;
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--gray-800);
+  color: var(--text-primary);
 }
 
 .subsection .btn-primary {
   margin-top: var(--space-4);
 }
 
+/* ============================
+   Status Messages
+   ============================ */
+
 .status-message {
   margin: var(--space-3) 0;
   padding: var(--space-2) var(--space-3);
-  background: var(--success-50);
-  color: var(--success-600);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
+}
+
+.status-message.success {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
+}
+
+.status-message.error {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
+}
+
+.status-message.warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border: 1px solid var(--status-warning-border);
+}
+
+.status-message.info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  border: 1px solid var(--status-info-border);
 }
 
 /* Session search input */
@@ -128,4 +201,86 @@
     min-height: 44px;
     font-size: var(--font-size-base);
   }
+}
+
+/* Dark mode updates for forms */
+.input {
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.session-search {
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.subsection {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+}
+
+.subsection h4 {
+  color: var(--text-primary);
+}
+
+textarea {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+textarea:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+
+select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+/* Input placeholder styling */
+.input textarea::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.8;
+}
+
+.input textarea {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+/* Comprehensive settings dark mode support */
+.form-group label,
+.form-row label {
+  color: var(--text-primary);
+}
+
+.form-group input,
+.form-group select,
+.form-row input,
+.form-row select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-row input:focus,
+.form-row select:focus {
+  border-color: var(--border-focus);
+}
+
+label {
+  color: var(--text-primary);
+}
+
+/* Make input area match chat header background */
+.input {
+  background: var(--bg-tertiary) !important;
+  border-top: 1px solid var(--border-primary);
 }

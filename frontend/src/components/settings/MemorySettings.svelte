@@ -173,7 +173,7 @@
       {#each memories as mem (mem.id)}
         <div class="memory-item" class:pinned={mem.pinned}>
           <div class="memory-header-row">
-            <span class="memory-type" style="background-color: {getTypeColor(mem.type)}">
+            <span class="status-badge status-badge--info">
               {mem.type}
             </span>
             {#if mem.pinned}
@@ -232,42 +232,20 @@
   }
 
   .add-form {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-6);
     margin-bottom: var(--space-6);
   }
 
+  /* Form styles now using .form-group from forms.css */
   .form-row {
     margin-bottom: var(--space-4);
   }
 
-  .form-row label {
-    display: block;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    margin-bottom: var(--space-1);
-  }
-
-  .form-row input[type="text"],
-  .form-row select {
-    width: 100%;
-    max-width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-  }
-
   .form-row input[type="checkbox"] {
     margin-right: var(--space-2);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
   }
 
   .filter-bar {
@@ -279,8 +257,9 @@
 
   .filter-bar button {
     padding: var(--space-2) var(--space-4);
-    border: 1px solid var(--gray-300);
-    background: white;
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     border-radius: var(--radius-md);
     cursor: pointer;
     font-size: var(--font-size-sm);
@@ -288,7 +267,7 @@
   }
 
   .filter-bar button:hover {
-    background: var(--gray-100);
+    background: var(--bg-hover);
   }
 
   .filter-bar button.active {
@@ -301,7 +280,7 @@
   .empty-state {
     text-align: center;
     padding: var(--space-12) var(--space-4);
-    color: var(--gray-500);
+    color: var(--text-secondary);
   }
 
   .empty-state .hint {
@@ -317,10 +296,10 @@
   }
 
   .memory-item {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
-    background: white;
+    background: var(--bg-tertiary);
     transition: box-shadow 0.2s;
   }
 
@@ -330,7 +309,7 @@
 
   .memory-item.pinned {
     border-color: var(--warning-500);
-    background: var(--warning-50);
+    background: var(--warning-100);
   }
 
   .memory-header-row {
@@ -341,14 +320,7 @@
     flex-wrap: wrap;
   }
 
-  .memory-type {
-    font-size: var(--font-size-xs);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    color: white;
-    font-weight: 500;
-    text-transform: uppercase;
-  }
+  /* .memory-type replaced with .status-badge--info utility */
 
   .pin-badge {
     font-size: var(--font-size-xs);
@@ -358,7 +330,7 @@
 
   .memory-score {
     font-size: var(--font-size-xs);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-left: auto;
   }
 
@@ -366,15 +338,16 @@
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-2);
     line-height: 1.5;
+    color: var(--text-primary);
   }
 
   .memory-content strong {
-    color: var(--gray-900);
+    color: var(--text-primary);
   }
 
   .memory-meta {
     font-size: var(--font-size-xs);
-    color: var(--gray-400);
+    color: var(--text-tertiary);
     display: flex;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
@@ -390,15 +363,16 @@
   .btn-delete {
     padding: var(--space-1) var(--space-3);
     font-size: var(--font-size-xs);
-    border: 1px solid var(--gray-300);
-    background: white;
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .btn-pin:hover {
-    background: #fef3c7;
+    background: var(--warning-100);
     border-color: var(--warning-500);
   }
 
