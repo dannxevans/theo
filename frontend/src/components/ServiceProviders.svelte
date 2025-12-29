@@ -210,7 +210,7 @@
     </div>
 
     {#if error}
-        <div class="error">{error}</div>
+        <div class="error-message">{error}</div>
     {/if}
 
     {#if loading}
@@ -242,7 +242,7 @@
                         <p><strong>Category:</strong> {provider.category}</p>
                         <p><strong>Type:</strong> {provider.provider_type === 'manual' ? 'Manual Booking' : 'API Integration'}</p>
                         {#if provider.preferred_for_category}
-                            <span class="badge">Preferred</span>
+                            <span class="status-badge status-badge--success">Preferred</span>
                         {/if}
                         {#if getBookingUrl(provider)}
                             <p><strong>Booking URL:</strong> <a href={getBookingUrl(provider)} target="_blank">Open</a></p>
@@ -341,12 +341,6 @@
         margin-bottom: 20px;
     }
 
-    .empty-state {
-        text-align: center;
-        padding: 40px;
-        color: var(--text-tertiary);
-    }
-
     .providers-list {
         display: grid;
         gap: 15px;
@@ -383,51 +377,6 @@
         color: var(--text-secondary);
     }
 
-    .badge {
-        display: inline-block;
-        padding: 2px 8px;
-        background: #4CAF50;
-        color: white;
-        border-radius: 12px;
-        font-size: 0.8em;
-        margin-left: 10px;
-    }
-
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    }
-
-    .modal {
-        background: var(--bg-primary);
-        border-radius: 8px;
-        width: 90%;
-        max-width: 600px;
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-
-    .modal-header {
-        padding: 20px;
-        border-bottom: 1px solid var(--border-primary);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .modal-header h2 {
-        margin: 0;
-        color: var(--text-primary);
-    }
-
     .close-btn {
         background: none;
         border: none;
@@ -437,44 +386,6 @@
         width: 30px;
         height: 30px;
         color: var(--text-primary);
-    }
-
-    .modal-body {
-        padding: 20px;
-    }
-
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
-    .form-group input,
-    .form-group select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid var(--border-primary);
-        border-radius: 4px;
-        background: var(--bg-secondary);
-        color: var(--text-primary);
-    }
-
-    .form-group input:focus,
-    .form-group select:focus {
-        outline: none;
-        border-color: var(--border-focus);
-    }
-
-    .form-group small {
-        display: block;
-        margin-top: 5px;
-        color: var(--text-tertiary);
-        font-size: 0.85em;
     }
 
     .form-row {
@@ -493,56 +404,18 @@
         width: auto;
     }
 
-    .modal-footer {
-        padding: 20px;
-        border-top: 1px solid var(--border-primary);
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-
-    .btn-primary, .btn-secondary, .btn-small, .btn-danger {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .btn-primary {
-        background: #007bff;
-        color: white;
-    }
-
-    .btn-secondary {
-        background: #6c757d;
-        color: white;
-    }
-
-    .btn-small {
-        padding: 4px 12px;
-        font-size: 13px;
-        background: #007bff;
-        color: white;
-    }
-
-    .btn-danger {
-        background: #dc3545;
-        color: white;
-    }
-
-    .error {
-        padding: 10px;
-        background: #fee;
-        border: 1px solid #fcc;
-        border-radius: 4px;
-        color: #c00;
-        margin-bottom: 15px;
-    }
-
     .loading {
         text-align: center;
         padding: 40px;
-        color: #666;
+        color: var(--text-secondary);
     }
+
+    /* All other styles now imported from global CSS:
+       - .empty-state from utilities.css
+       - .status-badge--success from utilities.css
+       - .modal-overlay, .modal, .modal-header, .modal-body, .modal-footer from modals.css
+       - .form-group from forms.css
+       - .btn-primary, .btn-secondary, .btn-small, .btn-danger from buttons.css
+       - .error-message from settings.css
+    */
 </style>

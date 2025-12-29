@@ -208,7 +208,7 @@
               {intent.name}
               <span class="intent-id">({intent.id})</span>
               {#if !intent.enabled}
-                <span class="badge-disabled">Disabled</span>
+                <span class="status-badge status-badge--error">Disabled</span>
               {/if}
             </h4>
             {#if intent.description}
@@ -277,49 +277,7 @@
     color: var(--text-primary);
   }
 
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"],
-  .form-group input[type="number"],
-  .form-group textarea {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="text"]:focus,
-  .form-group input[type="number"]:focus,
-  .form-group textarea:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
-  }
+  /* Form styles now imported from forms.css */
 
   .intents-list {
     display: flex;
@@ -361,14 +319,6 @@
     font-weight: normal;
   }
 
-  .badge-disabled {
-    background: var(--error-500);
-    color: white;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: normal;
-  }
 
   .intent-description {
     margin: 0;

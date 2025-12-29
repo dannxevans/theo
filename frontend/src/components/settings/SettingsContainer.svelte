@@ -11,6 +11,7 @@
   import WorkModeSettings from "./WorkModeSettings.svelte";
   import PersonalModeSettings from "./PersonalModeSettings.svelte";
   import AccountSettings from "./AccountSettings.svelte";
+  import ThemeSettings from "./ThemeSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -294,6 +295,9 @@
       <button class="tab" class:active={activeTab === "memory"} on:click={() => activeTab = "memory"}>
         Memory
       </button>
+      <button class="tab" class:active={activeTab === "theme"} on:click={() => activeTab = "theme"}>
+        Theme
+      </button>
     {/if}
 
     {#if activeCategory === "operating-modes"}
@@ -348,6 +352,10 @@
         bind:filterType
         on:reload={() => loadMemories()}
       />
+    {/if}
+
+    {#if activeTab === "theme"}
+      <ThemeSettings />
     {/if}
 
     {#if activeTab === "ai-providers"}

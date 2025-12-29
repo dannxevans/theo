@@ -173,7 +173,7 @@
       {#each memories as mem (mem.id)}
         <div class="memory-item" class:pinned={mem.pinned}>
           <div class="memory-header-row">
-            <span class="memory-type" style="background-color: {getTypeColor(mem.type)}">
+            <span class="status-badge status-badge--info">
               {mem.type}
             </span>
             {#if mem.pinned}
@@ -239,44 +239,13 @@
     margin-bottom: var(--space-6);
   }
 
+  /* Form styles now using .form-group from forms.css */
   .form-row {
     margin-bottom: var(--space-4);
   }
 
-  .form-row label {
-    display: block;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    margin-bottom: var(--space-1);
-    color: var(--text-primary);
-  }
-
-  .form-row input[type="text"],
-  .form-row select {
-    width: 100%;
-    max-width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-row input[type="text"]:focus,
-  .form-row select:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
   .form-row input[type="checkbox"] {
     margin-right: var(--space-2);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-5);
   }
 
   .filter-bar {
@@ -351,14 +320,7 @@
     flex-wrap: wrap;
   }
 
-  .memory-type {
-    font-size: var(--font-size-xs);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    color: white;
-    font-weight: 500;
-    text-transform: uppercase;
-  }
+  /* .memory-type replaced with .status-badge--info utility */
 
   .pin-badge {
     font-size: var(--font-size-xs);
