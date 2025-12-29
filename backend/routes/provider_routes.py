@@ -117,11 +117,26 @@ def update_provider_metadata_endpoint(provider_id):
     from app import memory
 
     data = request.json
-    
+
     memory.init_provider_metadata(
         provider_id,
         cost_per_1k_input=data.get("cost_per_1k_input", 0),
         cost_per_1k_output=data.get("cost_per_1k_output", 0),
     )
-    
+
+    return jsonify({"status": "ok"})
+
+
+@provider_bp.route("/<provider_id>/health/reset", methods=["POST"])
+def reset_provider_health(provider_id):
+    """
+    Reset health metrics for a provider.
+    Clears all failure counts and circuit breaker status.
+    Returns: { "status": "ok" }
+    """
+    from app import memory
+
+    # Reset health metrics to healthy state
+    memory.reset_provider_health(provider_id)
+
     return jsonify({"status": "ok"})

@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { upsertProvider, deleteProvider as deleteProviderApi } from "../../lib/api";
+  import { upsertProvider, deleteProvider as deleteProviderApi, resetProviderHealth } from "../../lib/api";
 
   export let providersList = [];
   export let healthSummary = {};
@@ -67,6 +67,27 @@
         suitableForOfficial: true,
         notes: 'Data processed in US data centers. Anthropic has strong privacy commitments but data leaves UK jurisdiction.',
         recommendation: 'Suitable for OFFICIAL. Monitor for UK/EU hosting options as they become available.'
+      },
+      'xai': {
+        dataLocation: 'United States',
+        riskLevel: 'MEDIUM',
+        suitableForOfficial: true,
+        notes: 'Data processed in US data centers. xAI (Grok) has enterprise-grade security but data leaves UK jurisdiction.',
+        recommendation: 'Suitable for OFFICIAL. Review xAI\'s data protection policies for compliance requirements.'
+      },
+      'mistral': {
+        dataLocation: 'European Union (France)',
+        riskLevel: 'LOW',
+        suitableForOfficial: true,
+        notes: 'Data processed in EU data centers. GDPR compliant. Mistral AI is based in France.',
+        recommendation: 'Recommended for OFFICIAL. EU-based provider with strong data protection standards.'
+      },
+      'google': {
+        dataLocation: 'United States / Global',
+        riskLevel: 'MEDIUM',
+        suitableForOfficial: true,
+        notes: 'Data processed globally. Google has enterprise-grade security and compliance certifications but data may leave UK jurisdiction.',
+        recommendation: 'Suitable for OFFICIAL. Consider Google Cloud UK regions for enhanced data residency.'
       },
       'openrouter': {
         dataLocation: 'Various (depends on model)',
@@ -163,6 +184,19 @@
     showAddProviderForm = true;
   }
 
+  async function handleResetHealth(providerId) {
+    if (!confirm(`Reset health metrics for "${providerId}"?`)) {
+      return;
+    }
+
+    try {
+      await resetProviderHealth(providerId);
+      dispatch("reload");
+    } catch (e) {
+      alert(`Failed to reset health: ${e.message}`);
+    }
+  }
+
   function cancelProviderForm() {
     showAddProviderForm = false;
     editingProvider = null;
@@ -214,6 +248,9 @@
           <option value="">Select type...</option>
           <option value="anthropic">Anthropic</option>
           <option value="openai">OpenAI</option>
+          <option value="xai">xAI</option>
+          <option value="mistral">Mistral</option>
+          <option value="google">Google</option>
           <option value="openrouter">OpenRouter</option>
           <option value="mock">Mock (for testing)</option>
         </select>
@@ -302,6 +339,9 @@
 
           <div class="provider-actions">
             <button class="btn-small" on:click={() => editProvider(p)}>Edit</button>
+            {#if getHealthStats(p.id) && (getHealthStats(p.id).failureRate > 0 || healthSummary[p.id]?.circuit_breaker_open)}
+              <button class="btn-small btn-warning" on:click={() => handleResetHealth(p.id)}>Reset Health</button>
+            {/if}
             <button class="btn-small btn-danger" on:click={() => handleDeleteProvider(p.id)}>Delete</button>
           </div>
         </div>

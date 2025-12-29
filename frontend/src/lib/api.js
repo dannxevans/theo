@@ -587,6 +587,22 @@ export async function getProviderHealth() {
   return response.json();
 }
 
+export async function resetProviderHealth(providerId) {
+  const response = await fetch(`${API_BASE}/api/providers/${providerId}/health/reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to reset provider health");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Authentication API
 // =============================
