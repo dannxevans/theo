@@ -68,6 +68,7 @@ def list_sessions():
             "title": s.get("title"),
             "mode": s.get("mode", "personal"),
             "summary": s.get("summary"),
+            "updated_at": s.get("updated_at").isoformat() if s.get("updated_at") else None,
         })
 
     return jsonify(response)

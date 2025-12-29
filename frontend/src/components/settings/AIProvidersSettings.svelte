@@ -116,7 +116,7 @@
   }
 </script>
 
-<div class="ai-providers-settings">
+<div class="tab-panel">
   <div class="page-header">
     <div>
       <h2>Providers</h2>
@@ -137,34 +137,40 @@
   {#if showAddProviderForm}
     <div class="add-form">
       <h3>{editingProvider ? "Edit Provider" : "New Provider"}</h3>
-      <div class="form-row">
-        <label>ID <input type="text" bind:value={providerForm.id} placeholder="e.g., anthropic-claude" disabled={!!editingProvider}/></label>
+      <div class="form-group">
+        <label for="provider-id">ID</label>
+        <input id="provider-id" type="text" bind:value={providerForm.id} placeholder="e.g., anthropic-claude" disabled={!!editingProvider}/>
       </div>
-      <div class="form-row">
-        <label>Name <input type="text" bind:value={providerForm.name} placeholder="e.g., Anthropic Claude"/></label>
+      <div class="form-group">
+        <label for="provider-name">Name</label>
+        <input id="provider-name" type="text" bind:value={providerForm.name} placeholder="e.g., Anthropic Claude"/>
       </div>
-      <div class="form-row">
-        <label>Type
-          <select bind:value={providerForm.type}>
-            <option value="">Select type...</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="openai">OpenAI</option>
-            <option value="openrouter">OpenRouter</option>
-            <option value="mock">Mock (for testing)</option>
-          </select>
+      <div class="form-group">
+        <label for="provider-type">Type</label>
+        <select id="provider-type" bind:value={providerForm.type}>
+          <option value="">Select type...</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="mock">Mock (for testing)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="provider-model">Model</label>
+        <input id="provider-model" type="text" bind:value={providerForm.model} placeholder="e.g., claude-3-5-sonnet-20241022"/>
+      </div>
+      <div class="form-group">
+        <label for="provider-base-url">Base URL (optional)</label>
+        <input id="provider-base-url" type="text" bind:value={providerForm.base_url} placeholder="Custom API endpoint"/>
+      </div>
+      <div class="form-group">
+        <label for="provider-api-key">API Key (leave empty to keep existing)</label>
+        <input id="provider-api-key" type="password" bind:value={providerForm.api_key} placeholder="sk-..."/>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" bind:checked={providerForm.enabled}/> Enabled
         </label>
-      </div>
-      <div class="form-row">
-        <label>Model <input type="text" bind:value={providerForm.model} placeholder="e.g., claude-3-5-sonnet-20241022"/></label>
-      </div>
-      <div class="form-row">
-        <label>Base URL (optional) <input type="text" bind:value={providerForm.base_url} placeholder="Custom API endpoint"/></label>
-      </div>
-      <div class="form-row">
-        <label>API Key (leave empty to keep existing) <input type="password" bind:value={providerForm.api_key} placeholder="sk-..."/></label>
-      </div>
-      <div class="form-row">
-        <label><input type="checkbox" bind:checked={providerForm.enabled}/> Enabled</label>
       </div>
       <div class="form-actions">
         <button class="btn-primary" on:click={saveProvider}>{editingProvider ? "Update" : "Save"}</button>
@@ -241,7 +247,7 @@
     background: var(--bg-tertiary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
-    padding: var(--space-5);
+    padding: var(--space-5) var(--space-6);
     margin-bottom: var(--space-6);
   }
 
@@ -250,21 +256,18 @@
     color: var(--text-primary);
   }
 
-  /* Change .form-row to use .form-group instead for consistency */
-  .form-row {
-    margin-bottom: var(--space-4);
+  /* Checkbox styling */
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+    font-weight: 500;
   }
 
-  .form-row label {
-    display: block;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    margin-bottom: var(--space-1);
-    color: var(--text-primary);
-  }
-
-  .form-row input[type="checkbox"] {
-    margin-right: var(--space-2);
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
   }
 
   /* Provider card styling (unique to this page) */

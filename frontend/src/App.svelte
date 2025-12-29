@@ -275,6 +275,7 @@ async function handleLogout() {
       activeSessionId = id;
       localStorage.setItem(SESSION_STORAGE_KEY, id);
       sidebarOpen = false;
+      showSettings = false; // Navigate to chat view
       // Chat will detect mode mismatch and disable input
       return;
     }
@@ -283,6 +284,7 @@ async function handleLogout() {
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
     sidebarOpen = false;
+    showSettings = false; // Navigate to chat view
   }
 
   function newSession() {
@@ -316,14 +318,28 @@ async function handleLogout() {
     }
   }
 
+  function sessionModePrefix(session) {
+    return session.mode === "work" ? "Work:" : "Personal:";
+  }
+
   function sessionLabel(session) {
     if (session.title && session.title.trim()) {
       return session.title.slice(0, 60);
-    }
-    if (session.summary && session.summary.trim()) {
+    } else if (session.summary && session.summary.trim()) {
       return session.summary.slice(0, 60);
+    } else {
+      return "New chat";
     }
-    return "New chat";
+  }
+
+  function formatSessionTime(dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes} ${ampm}`;
   }
 
   function sessionMatches(session) {
@@ -468,7 +484,10 @@ async function handleLogout() {
               class="session-item"
               on:click={() => selectSession(s.id)}
             >
-              {sessionLabel(s)}
+              <div class="session-label">
+                <span class="session-mode">{sessionModePrefix(s)}</span> {sessionLabel(s)}
+              </div>
+              <div class="session-time">{formatSessionTime(s.updated_at)}</div>
             </button>
 
             {#if confirmDeleteId === s.id}

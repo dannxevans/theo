@@ -134,8 +134,8 @@
 /* Session search input */
 .session-search {
   margin: 0 0.75rem 0.6rem 0.75rem;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.8rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   height: auto;
