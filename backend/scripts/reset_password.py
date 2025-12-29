@@ -3,16 +3,22 @@
 Password Reset Utility for THEO
 
 Usage:
-    python reset_password.py <username> <new_password>
+    python backend/scripts/reset_password.py <username> <new_password>
 
 Example:
-    python reset_password.py admin mynewpassword
+    python backend/scripts/reset_password.py admin mynewpassword
 
 This script allows you to reset a user's password directly via the database.
 Useful when you've forgotten your password and can't log in.
 """
 
 import sys
+import os
+
+# Add backend directory to path
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
+
 from core.memory import MemoryStore
 from config import Config
 from auth import hash_password
