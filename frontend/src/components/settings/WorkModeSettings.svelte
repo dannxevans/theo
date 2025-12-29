@@ -10,11 +10,13 @@
   export let codeSubtabConfig = {
     language: "servicenow_javascript",
     framework: "",
-    additional_context: ""
+    additional_context: "",
+    preferred_provider_id: null
   };
   export let emailSubtabConfig = {
     tone: "professional",
-    signature: ""
+    signature: "",
+    preferred_provider_id: null
   };
   export let providers = [];
 
@@ -297,6 +299,17 @@
         ></textarea>
       </div>
 
+      <div class="form-group">
+        <label for="code-preferred-provider">Preferred Provider (optional)</label>
+        <select id="code-preferred-provider" bind:value={codeSubtabConfig.preferred_provider_id}>
+          <option value={null}>Auto (use Work Mode default)</option>
+          {#each providers as p}
+            <option value={p.id}>{p.name}</option>
+          {/each}
+        </select>
+        <p class="hint">Override the Work Mode provider for code development tasks</p>
+      </div>
+
       {#if codeSubtabSaveStatus}
         <p class="status-message">{codeSubtabSaveStatus}</p>
       {/if}
@@ -333,6 +346,17 @@
           rows="3"
         ></textarea>
         <p class="hint">This signature will be suggested when rewriting emails</p>
+      </div>
+
+      <div class="form-group">
+        <label for="email-preferred-provider">Preferred Provider (optional)</label>
+        <select id="email-preferred-provider" bind:value={emailSubtabConfig.preferred_provider_id}>
+          <option value={null}>Auto (use Work Mode default)</option>
+          {#each providers as p}
+            <option value={p.id}>{p.name}</option>
+          {/each}
+        </select>
+        <p class="hint">Override the Work Mode provider for email rewriting tasks</p>
       </div>
 
       {#if emailSubtabSaveStatus}
