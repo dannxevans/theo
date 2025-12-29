@@ -150,7 +150,7 @@
       modeSwitchNotification = {
         fromMode,
         toMode,
-        message: `Switching from ${fromMode} to ${toMode} mode. Creating new chat...`
+        message: `Switching from ${fromMode} to ${toMode} mode.`
       };
 
       // Clear notification after 3 seconds
@@ -585,14 +585,14 @@
       <!-- Mode Switch Notification -->
       {#if modeSwitchNotification}
         <div class="mode-switch-notification">
-          <strong>Mode Switching:</strong> {modeSwitchNotification.message}
+          {modeSwitchNotification.message}
         </div>
       {/if}
 
       <!-- Mode Lock Warning -->
       {#if isModeLocked}
         <div class="mode-lock-warning">
-          <strong>⚠️ Mode Mismatch:</strong> This is a {sessionMode} chat. To continue, switch to {sessionMode} mode.
+          This is a {sessionMode} chat. To continue, switch to {sessionMode} mode.
         </div>
       {/if}
 
