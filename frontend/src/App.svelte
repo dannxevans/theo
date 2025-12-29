@@ -65,8 +65,8 @@
 
   onMount(() => {
     document.addEventListener('click', handleClickOutside);
-    document.addEventListener('mousemove', handleUserActivity);
-    document.addEventListener('keypress', handleUserActivity);
+    document.addEventListener('click', handleUserActivity);
+    document.addEventListener('keydown', handleUserActivity);
 
     // Start timeout if authenticated
     if (isAuthenticated) {
@@ -75,8 +75,8 @@
 
     return () => {
       document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('mousemove', handleUserActivity);
-      document.removeEventListener('keypress', handleUserActivity);
+      document.removeEventListener('click', handleUserActivity);
+      document.removeEventListener('keydown', handleUserActivity);
       if (sessionTimeoutId) {
         clearTimeout(sessionTimeoutId);
       }
