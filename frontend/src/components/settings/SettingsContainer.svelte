@@ -35,26 +35,57 @@
   // Active tab state
   let activeCategory = "general"; // general, operating-modes, accounts, health
   let activeTab = "general"; // Changes based on category
+  let openDropdown = null; // Track which dropdown is open
 
-  // Helper function to switch category and set default tab
-  function switchCategory(category) {
+  // Helper function to switch category and optionally set a specific tab
+  function switchCategory(category, specificTab = null) {
     activeCategory = category;
-    // Set default tab for each category
-    switch (category) {
-      case "general":
-        activeTab = "general";
-        break;
-      case "operating-modes":
-        activeTab = "personal";
-        break;
-      case "accounts":
-        activeTab = "theo-account";
-        break;
-      case "health":
-        activeTab = "health-monitor";
-        break;
-      default:
-        activeTab = "general";
+
+    // If a specific tab is provided, use it; otherwise set default tab for category
+    if (specificTab) {
+      activeTab = specificTab;
+    } else {
+      // Set default tab for each category
+      switch (category) {
+        case "general":
+          activeTab = "general";
+          break;
+        case "operating-modes":
+          activeTab = "personal";
+          break;
+        case "accounts":
+          activeTab = "theo-account";
+          break;
+        case "health":
+          activeTab = "health-monitor";
+          break;
+        default:
+          activeTab = "general";
+      }
+    }
+    // Close dropdowns when switching category
+    openDropdown = null;
+  }
+
+  // Toggle dropdown open/close
+  function toggleDropdown(category) {
+    if (openDropdown === category) {
+      openDropdown = null;
+    } else {
+      openDropdown = category;
+    }
+  }
+
+  // Select a tab and close dropdown
+  function selectTab(tab) {
+    activeTab = tab;
+    openDropdown = null;
+  }
+
+  // Close dropdown when clicking outside
+  function handleClickOutside(event) {
+    if (!event.target.closest('.category-dropdown')) {
+      openDropdown = null;
     }
   }
 
@@ -236,11 +267,15 @@
     // Set up auto-refresh for health data (every 30 seconds)
     const healthRefreshInterval = setInterval(loadHealthData, 30000);
 
+    // Add click outside listener
+    document.addEventListener('click', handleClickOutside);
+
     // Cleanup on unmount
     return () => {
       if (healthRefreshInterval) {
         clearInterval(healthRefreshInterval);
       }
+      document.removeEventListener('click', handleClickOutside);
     };
   });
 </script>
@@ -248,87 +283,127 @@
 <div class="settings">
   <h1>Settings</h1>
 
-  <!-- Category Navigation -->
+  <!-- Category Navigation with Dropdowns -->
   <div class="category-tabs">
-    <button
-      class="category-tab"
-      class:active={activeCategory === "general"}
-      on:click={() => switchCategory("general")}
-    >
-      General
-    </button>
-    <button
-      class="category-tab"
-      class:active={activeCategory === "operating-modes"}
-      on:click={() => switchCategory("operating-modes")}
-    >
-      Operating Modes
-    </button>
-    <button
-      class="category-tab"
-      class:active={activeCategory === "accounts"}
-      on:click={() => switchCategory("accounts")}
-    >
-      Accounts
-    </button>
-    <button
-      class="category-tab"
-      class:active={activeCategory === "health"}
-      on:click={() => switchCategory("health")}
-    >
-      Health
-    </button>
+    <!-- General Dropdown -->
+    <div class="category-dropdown" class:open={openDropdown === "general"}>
+      <button
+        class="category-tab"
+        class:active={activeCategory === "general"}
+        on:click={() => toggleDropdown("general")}
+      >
+        General
+        <span class="dropdown-arrow">{openDropdown === "general" ? "▲" : "▼"}</span>
+      </button>
+      {#if openDropdown === "general"}
+        <div class="dropdown-menu">
+          <button class="dropdown-item" class:active={activeTab === "general"} on:click={() => switchCategory("general", "general")}>
+            General Settings
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "intents"} on:click={() => switchCategory("general", "intents")}>
+            Intents
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "routing"} on:click={() => switchCategory("general", "routing")}>
+            Routing
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "memory"} on:click={() => switchCategory("general", "memory")}>
+            Memory
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "theme"} on:click={() => switchCategory("general", "theme")}>
+            Theme
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Operating Modes Dropdown -->
+    <div class="category-dropdown" class:open={openDropdown === "operating-modes"}>
+      <button
+        class="category-tab"
+        class:active={activeCategory === "operating-modes"}
+        on:click={() => toggleDropdown("operating-modes")}
+      >
+        Operating Modes
+        <span class="dropdown-arrow">{openDropdown === "operating-modes" ? "▲" : "▼"}</span>
+      </button>
+      {#if openDropdown === "operating-modes"}
+        <div class="dropdown-menu">
+          <button class="dropdown-item" class:active={activeTab === "personal"} on:click={() => switchCategory("operating-modes", "personal")}>
+            Personal Mode
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "work"} on:click={() => switchCategory("operating-modes", "work")}>
+            Work Mode
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Accounts Dropdown -->
+    <div class="category-dropdown" class:open={openDropdown === "accounts"}>
+      <button
+        class="category-tab"
+        class:active={activeCategory === "accounts"}
+        on:click={() => toggleDropdown("accounts")}
+      >
+        Accounts
+        <span class="dropdown-arrow">{openDropdown === "accounts" ? "▲" : "▼"}</span>
+      </button>
+      {#if openDropdown === "accounts"}
+        <div class="dropdown-menu">
+          <button class="dropdown-item" class:active={activeTab === "theo-account"} on:click={() => switchCategory("accounts", "theo-account")}>
+            THEO Account
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "ai-providers"} on:click={() => switchCategory("accounts", "ai-providers")}>
+            AI Providers
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "integrations"} on:click={() => switchCategory("accounts", "integrations")}>
+            Integrations
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "service-providers"} on:click={() => switchCategory("accounts", "service-providers")}>
+            Service Providers
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Health Dropdown -->
+    <div class="category-dropdown" class:open={openDropdown === "health"}>
+      <button
+        class="category-tab"
+        class:active={activeCategory === "health"}
+        on:click={() => toggleDropdown("health")}
+      >
+        Health
+        <span class="dropdown-arrow">{openDropdown === "health" ? "▲" : "▼"}</span>
+      </button>
+      {#if openDropdown === "health"}
+        <div class="dropdown-menu">
+          <button class="dropdown-item" class:active={activeTab === "health-monitor"} on:click={() => switchCategory("health", "health-monitor")}>
+            Health Monitor
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
 
-  <!-- Sub-tab Navigation -->
-  <div class="tabs">
-    {#if activeCategory === "general"}
-      <button class="tab" class:active={activeTab === "general"} on:click={() => activeTab = "general"}>
-        General
-      </button>
-      <button class="tab" class:active={activeTab === "intents"} on:click={() => activeTab = "intents"}>
-        Intents
-      </button>
-      <button class="tab" class:active={activeTab === "routing"} on:click={() => activeTab = "routing"}>
-        Routing
-      </button>
-      <button class="tab" class:active={activeTab === "memory"} on:click={() => activeTab = "memory"}>
-        Memory
-      </button>
-      <button class="tab" class:active={activeTab === "theme"} on:click={() => activeTab = "theme"}>
-        Theme
-      </button>
-    {/if}
-
-    {#if activeCategory === "operating-modes"}
-      <button class="tab" class:active={activeTab === "personal"} on:click={() => activeTab = "personal"}>
-        Personal
-      </button>
-      <button class="tab" class:active={activeTab === "work"} on:click={() => activeTab = "work"}>
-        Work
-      </button>
-    {/if}
-
-    {#if activeCategory === "accounts"}
-      <button class="tab" class:active={activeTab === "theo-account"} on:click={() => activeTab = "theo-account"}>
-        THEO Account
-      </button>
-      <button class="tab" class:active={activeTab === "ai-providers"} on:click={() => activeTab = "ai-providers"}>
-        AI Providers
-      </button>
-      <button class="tab" class:active={activeTab === "integrations"} on:click={() => activeTab = "integrations"}>
-        Integrations
-      </button>
-      <button class="tab" class:active={activeTab === "service-providers"} on:click={() => activeTab = "service-providers"}>
-        Service Providers
-      </button>
-    {/if}
-
-    {#if activeCategory === "health"}
-      <button class="tab" class:active={activeTab === "health-monitor"} on:click={() => activeTab = "health-monitor"}>
-        Health Monitor
-      </button>
-    {/if}
+  <!-- Current Page Breadcrumb -->
+  <div class="page-breadcrumb">
+    <span class="breadcrumb-category">{activeCategory === "general" ? "General" : activeCategory === "operating-modes" ? "Operating Modes" : activeCategory === "accounts" ? "Accounts" : "Health"}</span>
+    <span class="breadcrumb-separator">›</span>
+    <span class="breadcrumb-page">
+      {#if activeTab === "general"}General Settings{/if}
+      {#if activeTab === "intents"}Intents{/if}
+      {#if activeTab === "routing"}Routing{/if}
+      {#if activeTab === "memory"}Memory{/if}
+      {#if activeTab === "theme"}Theme{/if}
+      {#if activeTab === "personal"}🏠 Personal Mode{/if}
+      {#if activeTab === "work"}💼 Work Mode{/if}
+      {#if activeTab === "theo-account"}THEO Account{/if}
+      {#if activeTab === "ai-providers"}AI Providers{/if}
+      {#if activeTab === "integrations"}Integrations{/if}
+      {#if activeTab === "service-providers"}Service Providers{/if}
+      {#if activeTab === "health-monitor"}Health Monitor{/if}
+    </span>
   </div>
 
   <!-- Tab Content -->
@@ -431,6 +506,10 @@
     gap: var(--space-2);
   }
 
+  .category-dropdown {
+    position: relative;
+  }
+
   .category-tab {
     padding: var(--space-4) var(--space-6);
     border: none;
@@ -441,6 +520,9 @@
     color: var(--text-secondary);
     border-bottom: 3px solid transparent;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .category-tab:hover {
@@ -454,35 +536,75 @@
     background: var(--bg-tertiary);
   }
 
-  .tabs {
-    display: flex;
-    background: var(--bg-tertiary);
-    border-bottom: 2px solid var(--border-primary);
-    padding: 0 var(--space-6);
-    gap: var(--space-1);
+  .dropdown-arrow {
+    font-size: 10px;
+    opacity: 0.7;
+    transition: transform 0.2s;
   }
 
-  .tab {
-    padding: var(--space-3) var(--space-5);
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    z-index: 1000;
+    margin-top: var(--space-1);
+    overflow: hidden;
+  }
+
+  .dropdown-item {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
     border: none;
     background: transparent;
     cursor: pointer;
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-secondary);
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
+    text-align: left;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
   }
 
-  .tab:hover {
-    color: var(--text-primary);
+  .dropdown-item:hover {
     background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
-  .tab.active {
+  .dropdown-item.active {
+    background: var(--bg-active);
     color: var(--theo-blue);
-    border-bottom-color: var(--theo-blue);
-    background: var(--bg-primary);
+    border-left-color: var(--theo-blue);
+    font-weight: 600;
+  }
+
+  .page-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-primary);
+    font-size: var(--font-size-sm);
+  }
+
+  .breadcrumb-category {
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .breadcrumb-separator {
+    color: var(--text-tertiary);
+    font-weight: 300;
+  }
+
+  .breadcrumb-page {
+    color: var(--text-primary);
+    font-weight: 600;
   }
 
   .tab-content {

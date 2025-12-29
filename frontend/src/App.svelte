@@ -390,14 +390,14 @@ async function handleLogout() {
               class:active={currentMode === "personal"}
               on:click={() => { setMode("personal"); modeDropdownOpen = false; }}
             >
-              🏠 Personal
+             Personal
             </button>
             <button
               class="dropdown-item"
               class:active={currentMode === "work"}
               on:click={() => { setMode("work"); modeDropdownOpen = false; }}
             >
-              💼 Work
+              Work
             </button>
           </div>
         {/if}

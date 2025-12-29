@@ -155,93 +155,12 @@
 </div>
 
 <style>
-  .tab-panel {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  h2 {
-    margin-top: 0;
-    margin-bottom: var(--space-2);
-  }
-
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .section {
-    margin-bottom: var(--space-6);
-    padding: var(--space-5);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
-  }
-
-  .section:last-child {
-    margin-bottom: 0;
-  }
-
-  .form-group {
-    margin-bottom: var(--space-4);
-  }
-
-  .form-group label {
-    display: block;
-    width: auto;
-    margin-bottom: var(--space-1);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="password"],
-  .form-group input[type="number"] {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-sm);
-    font-family: inherit;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .form-group input[type="password"]:focus,
-  .form-group input[type="number"]:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-
-  .form-group small {
-    display: block;
-    color: var(--text-tertiary);
-    font-size: var(--font-size-xs);
-    margin-top: var(--space-1);
-  }
-
-  .hint {
-    color: var(--text-tertiary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .error-message {
-    padding: var(--space-3);
-    background: var(--error-50);
-    border: 1px solid var(--error-200);
-    border-radius: var(--radius-md);
-    color: var(--error-700);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
-
-  .success-message {
-    padding: var(--space-3);
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-    border-radius: var(--radius-md);
-    color: #065f46;
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-4);
-  }
+  /* All styles imported from global CSS:
+     - .tab-panel from settings.css
+     - .section from settings.css
+     - .form-group from forms.css
+     - .success-message from forms.css
+     - .error-message from forms.css
+     - .hint from forms.css
+  */
 </style>
