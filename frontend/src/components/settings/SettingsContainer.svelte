@@ -12,6 +12,7 @@
   import PersonalModeSettings from "./PersonalModeSettings.svelte";
   import AccountSettings from "./AccountSettings.svelte";
   import ThemeSettings from "./ThemeSettings.svelte";
+  import VoiceSettings from "./VoiceSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -309,6 +310,9 @@
           <button class="dropdown-item" class:active={activeTab === "memory"} on:click={() => switchCategory("general", "memory")}>
             Memory
           </button>
+          <button class="dropdown-item" class:active={activeTab === "voice"} on:click={() => switchCategory("general", "voice")}>
+            Voice
+          </button>
           <button class="dropdown-item" class:active={activeTab === "theme"} on:click={() => switchCategory("general", "theme")}>
             Theme
           </button>
@@ -395,6 +399,7 @@
       {#if activeTab === "intents"}Intents{/if}
       {#if activeTab === "routing"}Routing{/if}
       {#if activeTab === "memory"}Memory{/if}
+      {#if activeTab === "voice"}Voice{/if}
       {#if activeTab === "theme"}Theme{/if}
       {#if activeTab === "personal"}🏠 Personal Mode{/if}
       {#if activeTab === "work"}💼 Work Mode{/if}
@@ -427,6 +432,10 @@
         bind:filterType
         on:reload={() => loadMemories()}
       />
+    {/if}
+
+    {#if activeTab === "voice"}
+      <VoiceSettings />
     {/if}
 
     {#if activeTab === "theme"}
