@@ -311,8 +311,9 @@
   <div class="section">
     <h3>Debug Settings</h3>
     <div class="rule">
-      <label>Debug logs</label>
+      <label for="debug-logs">Debug logs</label>
       <input
+        id="debug-logs"
         type="checkbox"
         checked={debugEnabled}
         disabled={savingDebug}
@@ -324,8 +325,9 @@
     </div>
 
     <div class="rule">
-      <label>Advanced mode</label>
+      <label for="advanced-mode">Advanced mode</label>
       <input
+        id="advanced-mode"
         type="checkbox"
         checked={advancedMode}
         on:change={(e) => toggleAdvancedMode(e.target.checked)}

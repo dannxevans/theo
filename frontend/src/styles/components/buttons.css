@@ -7,6 +7,7 @@
 .btn-primary,
 .btn-secondary,
 .btn-danger,
+.btn-warning,
 .btn-small {
   display: inline-flex;
   align-items: center;
@@ -72,6 +73,20 @@
 
 .btn-danger:hover {
   background: var(--error-600);
+}
+
+/* Warning Button */
+.btn-warning {
+  height: 40px;
+  padding: 0 var(--space-3);
+  background: var(--warning-500);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.btn-warning:hover {
+  background: var(--warning-600);
 }
 
 /* Success Button */

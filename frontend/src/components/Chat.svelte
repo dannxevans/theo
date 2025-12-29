@@ -1,5 +1,5 @@
 <script>
-  
+
   import DOMPurify from "dompurify";
   import {
   streamMessage,
@@ -18,6 +18,7 @@
   import "prismjs/components/prism-python";
   import "prismjs/themes/prism-tomorrow.css";
   import { tick, afterUpdate } from "svelte";
+  import VoiceControls from "./VoiceControls.svelte";
 
   export let sessionId;
   export let currentMode = "personal";
@@ -117,6 +118,42 @@
   let advancedMode = false;
   let usedProviders = new Set(); // Track providers used in this session
 
+  // Voice controls
+  let voiceControls = null;
+  let autoReadEnabled = localStorage.getItem("theo.autoRead") !== "false"; // Default to true
+  let lastMessageCount = 0;
+  let selectedVoice = "alloy";
+  let speechSpeed = 1.0;
+  let isSpeaking = false; // Track if TTS is currently playing
+
+  // Load voice settings from localStorage
+  function loadVoiceSettings() {
+    selectedVoice = localStorage.getItem("theo.voice") || "alloy";
+    speechSpeed = parseFloat(localStorage.getItem("theo.speechSpeed")) || 1.0;
+  }
+
+  // Save auto-read preference when it changes
+  $: {
+    localStorage.setItem("theo.autoRead", autoReadEnabled.toString());
+  }
+
+  // Watch for new assistant messages and auto-read if enabled
+  $: {
+    if (autoReadEnabled && messages.length > lastMessageCount && lastMessageCount > 0) {
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage && latestMessage.role === "assistant" && latestMessage.text) {
+        // Reload voice settings in case they were changed
+        loadVoiceSettings();
+        // Auto-read the latest assistant message
+        setTimeout(() => {
+          voiceControls?.speak(latestMessage.text);
+        }, 100);
+      }
+    }
+    // Always update lastMessageCount when messages change
+    lastMessageCount = messages.length;
+  }
+
   // Mode lock detection
   $: isModeLocked = sessionMode && sessionMode !== currentMode;
 
@@ -134,6 +171,12 @@
     } catch (e) {
       // If fails, leave providers empty
     }
+
+    // Load voice settings on mount
+    loadVoiceSettings();
+
+    // Initialize lastMessageCount to prevent auto-read on page load
+    lastMessageCount = messages.length;
 
     // Load advanced mode from localStorage
     const storedAdvanced = localStorage.getItem("theo.advancedMode");
@@ -550,6 +593,20 @@
               Fork
             </button>
           {/if}
+
+          <!-- Model selector -->
+          <select
+            class="provider-select"
+            bind:value={forcedModel}
+            title="Model"
+          >
+            <option value="">Auto</option>
+            <option value="mock">Mock</option>
+            {#each providers as p}
+              <option value={p.id}>{p.name}</option>
+            {/each}
+          </select>
+
           <button class="btn-danger" on:click={deleteSession}>
             Delete
           </button>
@@ -777,21 +834,26 @@
           />
 
           <div class="input-controls">
-            <select
-              class="provider-select"
-              bind:value={forcedModel}
-              title="Model"
-            >
-              <option value="">Auto</option>
-              <option value="mock">Mock</option>
-              {#each providers as p}
-                <option value={p.id}>{p.name}</option>
-              {/each}
-            </select>
+            <!-- Voice controls -->
+            <VoiceControls
+              bind:this={voiceControls}
+              bind:autoReadEnabled
+              bind:isSpeaking
+              selectedVoice={selectedVoice}
+              speechSpeed={speechSpeed}
+              onTranscript={(text) => {
+                input = text;
+                submit();
+              }}
+            />
 
             {#if streaming}
               <button class="btn-danger" disabled>
                 Streaming…
+              </button>
+            {:else if isSpeaking}
+              <button class="btn-warning" on:click={() => voiceControls?.stopSpeaking()}>
+                Speaking…
               </button>
             {:else}
               <button class="btn-primary" on:click={submit} disabled={loading || isModeLocked}>
@@ -1086,5 +1148,27 @@
     background: #f5f5f5;
     cursor: not-allowed;
     opacity: 0.7;
+  }
+
+  /* Voice controls */
+  .speak-btn {
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0.25rem;
+    margin-left: 0.5rem;
+    transition: opacity 0.2s ease;
+  }
+
+  .speak-btn:hover {
+    opacity: 1;
+  }
+
+  .message-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 </style>

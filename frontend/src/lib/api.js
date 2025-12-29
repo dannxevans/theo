@@ -972,3 +972,78 @@ export async function updatePIIConfig(config) {
 
   return response.json();
 }
+
+// ========================================
+// Voice API (TTS & STT)
+// ========================================
+
+/**
+ * Convert text to speech audio.
+ * @param {string} text - Text to convert to speech
+ * @param {string} voice - Voice ID (alloy, echo, fable, onyx, nova, shimmer)
+ * @param {number} speed - Speech speed (0.25 to 4.0)
+ * @returns {Promise<Blob>} Audio blob (MP3)
+ */
+export async function textToSpeech(text, voice = "alloy", speed = 1.0) {
+  const response = await fetch(`${API_BASE}/api/voice/tts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ text, voice, speed })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "TTS failed");
+  }
+
+  return response.blob();
+}
+
+/**
+ * Convert speech audio to text.
+ * @param {Blob} audioBlob - Audio data
+ * @param {string} format - Audio format (webm, mp3, wav, etc.)
+ * @param {string} language - Optional language code (e.g., 'en', 'es')
+ * @returns {Promise<Object>} Transcription result { text, language }
+ */
+export async function speechToText(audioBlob, format = "webm", language = null) {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, `recording.${format}`);
+  formData.append("format", format);
+  if (language) {
+    formData.append("language", language);
+  }
+
+  const response = await fetch(`${API_BASE}/api/voice/stt`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "STT failed");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get list of available TTS voices.
+ * @returns {Promise<Array>} List of voice objects
+ */
+export async function getVoices() {
+  const response = await fetch(`${API_BASE}/api/voice/voices`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch voices");
+  }
+
+  const data = await response.json();
+  return data.voices || [];
+}

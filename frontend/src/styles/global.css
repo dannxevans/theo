@@ -167,6 +167,15 @@ h3 {
   background-color: var(--bg-secondary);
 }
 
+.logo-button {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
 .logo {
   height: 28px;
   width: auto;
