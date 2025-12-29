@@ -218,8 +218,8 @@
 /* New session button - matches Send button style */
 .new-session {
   margin: 0 0.75rem 0.5rem 0.75rem;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.8rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
   border-radius: var(--radius-md);
   border: none;
   background: var(--theo-gradient);

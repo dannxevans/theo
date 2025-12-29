@@ -123,7 +123,7 @@
   }
 </script>
 
-<div class="work-mode-settings">
+<div class="tab-panel">
   <h2>💼 Work Mode</h2>
   <p class="subtitle">Professional tone and optimized for productivity tasks.</p>
 
@@ -351,7 +351,8 @@
 </div>
 
 <style>
-  /* Component-specific styles only - all form/section styles imported from global CSS:
+  /* All styles imported from global CSS:
+     - .tab-panel from settings.css
      - .form-group from forms.css
      - .section from settings.css
      - .subsection from forms.css

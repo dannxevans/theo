@@ -759,34 +759,46 @@
           {/if}
         </div>
         <div class="input">
-          <input
+          <textarea
             bind:value={input}
-            placeholder={isModeLocked ? `Locked - Switch to ${sessionMode} mode` : "Talk to THEO"}
-            on:keydown={(e) => e.key === "Enter" && !isModeLocked && submit()}
+            placeholder={isModeLocked ? 'Locked - Switch to ${sessionMode} mode' : "Talk to THEO AI"}
+            on:keydown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !isModeLocked) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            on:input={(e) => {
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+            }}
             disabled={isModeLocked}
+            rows="1"
           />
 
-          {#if streaming}
-            <button class="btn-danger" disabled>
-              Streaming…
-            </button>
-          {:else}
-            <button class="btn-primary" on:click={submit} disabled={loading || isModeLocked}>
-              {loading ? "Thinking…" : "Send"}
-            </button>
-          {/if}
+          <div class="input-controls">
+            <select
+              class="provider-select"
+              bind:value={forcedModel}
+              title="Model"
+            >
+              <option value="">Auto</option>
+              <option value="mock">Mock</option>
+              {#each providers as p}
+                <option value={p.id}>{p.name}</option>
+              {/each}
+            </select>
 
-          <select
-            class="provider-select"
-            bind:value={forcedModel}
-            title="Model"
-          >
-            <option value="">Auto</option>
-            <option value="mock">Mock</option>
-            {#each providers as p}
-              <option value={p.id}>{p.name}</option>
-            {/each}
-          </select>
+            {#if streaming}
+              <button class="btn-danger" disabled>
+                Streaming…
+              </button>
+            {:else}
+              <button class="btn-primary" on:click={submit} disabled={loading || isModeLocked}>
+                {loading ? "Thinking…" : "Send"}
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -1070,7 +1082,7 @@
   }
 
   /* Disabled input styling for mode lock */
-  .input input:disabled {
+  .input textarea:disabled {
     background: #f5f5f5;
     cursor: not-allowed;
     opacity: 0.7;
