@@ -106,7 +106,8 @@ class ModeOperations(BaseMemoryOperations):
             return dict(row._mapping) if row else None
 
     def create_or_update_mode_settings(self, user_id, mode, system_prompt_override=None,
-                                       preferred_provider_id=None, tone=None):
+                                       preferred_provider_id=None, tone=None,
+                                       pii_filtering_enabled=None, pii_redaction_config=None):
         """
         Create or update mode settings.
 
@@ -116,6 +117,8 @@ class ModeOperations(BaseMemoryOperations):
             system_prompt_override: Optional custom system prompt
             preferred_provider_id: Optional preferred AI provider ID
             tone: Optional tone setting (e.g., "professional", "casual")
+            pii_filtering_enabled: Optional PII filtering toggle
+            pii_redaction_config: Optional PII redaction configuration (JSON string)
         """
         with self._get_connection() as conn:
             # Check if exists
@@ -135,6 +138,10 @@ class ModeOperations(BaseMemoryOperations):
                 values["preferred_provider_id"] = preferred_provider_id
             if tone is not None:
                 values["tone"] = tone
+            if pii_filtering_enabled is not None:
+                values["pii_filtering_enabled"] = pii_filtering_enabled
+            if pii_redaction_config is not None:
+                values["pii_redaction_config"] = pii_redaction_config
 
             if existing:
                 conn.execute(
@@ -155,6 +162,10 @@ class ModeOperations(BaseMemoryOperations):
                     values["preferred_provider_id"] = None
                 if "tone" not in values:
                     values["tone"] = "neutral"
+                if "pii_filtering_enabled" not in values:
+                    values["pii_filtering_enabled"] = False
+                if "pii_redaction_config" not in values:
+                    values["pii_redaction_config"] = None
 
                 conn.execute(
                     insert(self.mode_settings).values(**values)

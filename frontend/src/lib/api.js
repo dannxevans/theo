@@ -922,3 +922,53 @@ export async function rejectConfirmation(confirmationId, reason = null) {
 
   return response.json();
 }
+
+// =============================
+// Session Mode API
+// =============================
+
+export async function getSessionMode(sessionId) {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/mode`, {
+    headers: { ...getAuthHeaders() }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get session mode");
+  }
+
+  const data = await response.json();
+  return data.mode;
+}
+
+// =============================
+// PII Configuration API
+// =============================
+
+export async function getPIIConfig() {
+  const response = await fetch(`${API_BASE}/api/mode/settings/work/pii-config`, {
+    headers: { ...getAuthHeaders() }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get PII config");
+  }
+
+  return response.json();
+}
+
+export async function updatePIIConfig(config) {
+  const response = await fetch(`${API_BASE}/api/mode/settings/work/pii-config`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update PII config");
+  }
+
+  return response.json();
+}

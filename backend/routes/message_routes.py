@@ -164,6 +164,26 @@ def stream_chat_sse(session_id):
                         logging.info(f"[MODE] Set subtab_context_prefix for {current_mode} mode: {mode_context_prefix[:100]}")
             else:
                 logging.warning(f"[MODE] No user_id - skipping mode context injection")
+                current_mode = "personal"  # Default to personal if no user
+
+            # Apply PII redaction for work mode (OFFICIAL)
+            pii_redaction_log = None
+            filtered_text = text  # Use filtered_text to avoid scope issues
+            if current_mode == "work" and user_id:
+                mode_settings = memory.get_mode_settings(user_id, "work")
+                if mode_settings and mode_settings.get("pii_filtering_enabled"):
+                    from core.pii_filter import PIIFilter
+                    pii_filter = PIIFilter(mode_settings)
+                    filtered_text, pii_redaction_log = pii_filter.filter_text(text)
+
+                    if pii_redaction_log:
+                        logging.info(f"[PII] Redacted {len(pii_redaction_log)} PII items from user message")
+                        # Update text in router_context
+                        router_context["text"] = filtered_text
+
+            # Store mode and user_id for context manager
+            router_context["session_mode"] = current_mode
+            router_context["session_user_id"] = user_id
 
             # Route request (non-streaming, we chunk manually)
             result = route_request(router_context)
@@ -177,7 +197,7 @@ def stream_chat_sse(session_id):
 
             # Save the turn to database BEFORE sending end event
             # This ensures metadata is persisted before frontend reloads messages
-            context_manager.update(session_id, text, result, provider_registry)
+            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id)
 
             # Send metadata at end of stream
             end_payload = {

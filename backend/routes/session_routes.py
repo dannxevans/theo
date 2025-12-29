@@ -34,20 +34,39 @@ def get_session(session_id):
 @session_bp.route("/sessions", methods=["GET"])
 def list_sessions():
     """
-    List all sessions for the current user.
-    Returns: [{ "id": "...", "title": "...", "summary": "..." }, ...]
+    List all sessions for the current user, filtered by current mode.
+    Returns: [{ "id": "...", "title": "...", "mode": "...", "summary": "..." }, ...]
     """
     from core.memory import MemoryStore
     from config import Config
+    from datetime import datetime
 
     memory = MemoryStore(Config.DATABASE_URL)
-    sessions = memory.list_sessions()
+
+    # Get user_id and current mode from auth token
+    user_id = None
+    current_mode = None
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user_id = session["user_id"]
+            # Get current mode
+            mode_config = memory.get_user_mode(user_id)
+            if mode_config:
+                current_mode = mode_config.get("active_mode", "personal")
+
+    # Filter sessions by user_id and current mode
+    sessions = memory.list_sessions(user_id=user_id, mode=current_mode)
 
     response = []
     for s in sessions:
         response.append({
             "id": s["id"],
             "title": s.get("title"),
+            "mode": s.get("mode", "personal"),
             "summary": s.get("summary"),
         })
 
@@ -83,6 +102,24 @@ def get_session_messages(session_id):
     ])
 
 
+@session_bp.route("/sessions/<session_id>/mode", methods=["GET"])
+def get_session_mode(session_id):
+    """
+    Get the mode for a specific session.
+    Returns: { "mode": "work" | "personal" }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+    mode = memory.get_session_mode(session_id)
+
+    if mode is None:
+        return jsonify({"error": "Session not found"}), 404
+
+    return jsonify({"mode": mode})
+
+
 @session_bp.route("/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
     """
@@ -94,7 +131,7 @@ def delete_session(session_id):
 
     memory = MemoryStore(Config.DATABASE_URL)
     memory.delete_session(session_id)
-    
+
     return jsonify({"status": "ok"})
 
 
