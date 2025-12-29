@@ -51,6 +51,69 @@
     };
   }
 
+  function getProviderRiskAssessment(providerType, baseUrl) {
+    // Provider risk assessment for OFFICIAL classification
+    const riskProfiles = {
+      'openai': {
+        dataLocation: 'United States',
+        riskLevel: 'MEDIUM',
+        suitableForOfficial: true,
+        notes: 'Data processed in US data centers. OpenAI has enterprise-grade security but data leaves UK jurisdiction.',
+        recommendation: 'Suitable for OFFICIAL. For UK-hosted alternatives, consider Azure OpenAI with UK regions.'
+      },
+      'anthropic': {
+        dataLocation: 'United States',
+        riskLevel: 'MEDIUM',
+        suitableForOfficial: true,
+        notes: 'Data processed in US data centers. Anthropic has strong privacy commitments but data leaves UK jurisdiction.',
+        recommendation: 'Suitable for OFFICIAL. Monitor for UK/EU hosting options as they become available.'
+      },
+      'openrouter': {
+        dataLocation: 'Various (depends on model)',
+        riskLevel: 'HIGH',
+        suitableForOfficial: false,
+        notes: 'Routes requests through multiple providers. Data location and processing varies by model selected.',
+        recommendation: 'Not recommended for OFFICIAL data. Use direct provider connections for better control.'
+      },
+      'mock': {
+        dataLocation: 'Local (no external API)',
+        riskLevel: 'LOW',
+        suitableForOfficial: true,
+        notes: 'Test provider only. No data sent to external services.',
+        recommendation: 'Safe for testing. Not suitable for production use.'
+      }
+    };
+
+    // Check for Azure OpenAI (UK region)
+    if (providerType === 'openai' && baseUrl && (baseUrl.includes('uksouth') || baseUrl.includes('ukwest'))) {
+      return {
+        dataLocation: 'United Kingdom',
+        riskLevel: 'LOW',
+        suitableForOfficial: true,
+        notes: 'Azure OpenAI with UK region selected. Data stays within UK jurisdiction.',
+        recommendation: 'Recommended for OFFICIAL data. UK Government approved service.'
+      };
+    }
+
+    return riskProfiles[providerType] || {
+      dataLocation: 'Unknown',
+      riskLevel: 'UNKNOWN',
+      suitableForOfficial: false,
+      notes: 'Unknown provider type. Data location and security controls not assessed.',
+      recommendation: 'Review provider documentation before using with OFFICIAL data.'
+    };
+  }
+
+  function getRiskLevelColor(riskLevel) {
+    const colors = {
+      'LOW': '#10b981',
+      'MEDIUM': '#f59e0b',
+      'HIGH': '#ef4444',
+      'UNKNOWN': '#9ca3af'
+    };
+    return colors[riskLevel] || colors.UNKNOWN;
+  }
+
   async function saveProvider() {
     providerError = null;
 
@@ -207,6 +270,36 @@
               </div>
             {/if}
           </div>
+
+          <!-- OFFICIAL Classification Risk Assessment -->
+          {#if p.type !== 'mock'}
+            {@const riskAssessment = getProviderRiskAssessment(p.type, p.base_url)}
+            <div class="risk-assessment">
+              <div class="risk-header">
+                <strong>OFFICIAL Classification Risk Assessment</strong>
+                <span class="risk-badge" style="background-color: {getRiskLevelColor(riskAssessment.riskLevel)}">
+                  {riskAssessment.riskLevel} RISK
+                </span>
+              </div>
+              <div class="risk-details">
+                <div class="risk-row">
+                  <span class="risk-label">Data Location:</span>
+                  <span class="risk-value">{riskAssessment.dataLocation}</span>
+                </div>
+                <div class="risk-row">
+                  <span class="risk-label">Suitable for OFFICIAL:</span>
+                  <span class="risk-value" style="color: {riskAssessment.suitableForOfficial ? '#10b981' : '#ef4444'}">
+                    {riskAssessment.suitableForOfficial ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div class="risk-notes">
+                  <p><strong>Notes:</strong> {riskAssessment.notes}</p>
+                  <p><strong>Recommendation:</strong> {riskAssessment.recommendation}</p>
+                </div>
+              </div>
+            </div>
+          {/if}
+
           <div class="provider-actions">
             <button class="btn-small" on:click={() => editProvider(p)}>Edit</button>
             <button class="btn-small btn-danger" on:click={() => handleDeleteProvider(p.id)}>Delete</button>
@@ -326,5 +419,79 @@
   .provider-actions {
     display: flex;
     gap: var(--space-2);
+  }
+
+  /* Risk Assessment Styling */
+  .risk-assessment {
+    margin: var(--space-4) 0;
+    padding: var(--space-4);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+  }
+
+  .risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-primary);
+  }
+
+  .risk-header strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+  }
+
+  .risk-badge {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .risk-details {
+    font-size: var(--font-size-sm);
+  }
+
+  .risk-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+    padding: var(--space-1) 0;
+  }
+
+  .risk-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .risk-value {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .risk-notes {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-primary);
+  }
+
+  .risk-notes p {
+    margin: 0 0 var(--space-2) 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .risk-notes p:last-child {
+    margin-bottom: 0;
+  }
+
+  .risk-notes strong {
+    color: var(--text-primary);
   }
 </style>

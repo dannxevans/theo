@@ -38,16 +38,38 @@ class SessionOperations(BaseMemoryOperations):
                 .where(self.sessions.c.id == session_id)
             ).fetchone()
             if not exists:
+                # Determine classification based on mode
+                classification = "OFFICIAL" if mode == "work" else None
+
                 conn.execute(
                     insert(self.sessions).values(
                         id=session_id,
                         title=None,
                         mode=mode,
+                        classification=classification,
                         user_id=user_id,
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow(),
                     )
                 )
+
+                # Log classification audit for work mode sessions
+                if mode == "work" and user_id:
+                    try:
+                        classification_audit = self.tables.get("classification_audit")
+                        if classification_audit is not None:
+                            conn.execute(
+                                insert(classification_audit).values(
+                                    user_id=user_id,
+                                    session_id=session_id,
+                                    classification="OFFICIAL",
+                                    action="create",
+                                    timestamp=datetime.utcnow()
+                                )
+                            )
+                    except Exception as e:
+                        # Don't fail session creation if audit logging fails
+                        logging.warning(f"Failed to log classification audit: {e}")
 
     def save_session_title(self, session_id, title):
         """
