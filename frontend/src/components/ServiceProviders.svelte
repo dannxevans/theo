@@ -202,8 +202,11 @@
 </script>
 
 <div class="service-providers">
-    <div class="header">
-        <h2>Service Providers</h2>
+    <div class="page-header">
+        <div>
+            <h2>Service Providers</h2>
+            <p class="subtitle">Manage your service providers for appointments and bookings.</p>
+        </div>
         <button class="btn-primary" on:click={openAddModal}>
             + Add Provider
         </button>
@@ -330,26 +333,39 @@
 {/if}
 
 <style>
+    /* Match standard settings page structure */
     .service-providers {
-        padding: 20px;
+        max-width: 900px;
+        margin: 0 auto;
     }
 
-    .header {
+    .page-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
+        align-items: flex-start;
+        margin-bottom: var(--space-6);
+        gap: var(--space-4);
+    }
+
+    .page-header h2 {
+        margin: 0 0 var(--space-2) 0;
+    }
+
+    .page-header .subtitle {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
     }
 
     .providers-list {
         display: grid;
-        gap: 15px;
+        gap: var(--space-4);
     }
 
     .provider-card {
         border: 1px solid var(--border-primary);
-        border-radius: 8px;
-        padding: 15px;
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
         background: var(--bg-tertiary);
     }
 
@@ -357,30 +373,30 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
     }
 
     .provider-header h3 {
         margin: 0;
-        font-size: 1.1em;
+        font-size: var(--font-size-lg);
         color: var(--text-primary);
     }
 
     .provider-actions {
         display: flex;
-        gap: 10px;
+        gap: var(--space-2);
     }
 
     .provider-details p {
-        margin: 5px 0;
-        font-size: 0.9em;
+        margin: var(--space-1) 0;
+        font-size: var(--font-size-sm);
         color: var(--text-secondary);
     }
 
     .close-btn {
         background: none;
         border: none;
-        font-size: 24px;
+        font-size: var(--font-size-2xl);
         cursor: pointer;
         padding: 0;
         width: 30px;
@@ -391,13 +407,13 @@
     .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 15px;
+        gap: var(--space-4);
     }
 
     .form-group.checkbox label {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     .form-group.checkbox input {
@@ -406,7 +422,7 @@
 
     .loading {
         text-align: center;
-        padding: 40px;
+        padding: var(--space-10);
         color: var(--text-secondary);
     }
 

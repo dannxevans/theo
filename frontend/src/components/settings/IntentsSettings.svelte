@@ -110,12 +110,15 @@
 </script>
 
 <div class="tab-panel">
-  <h2>Intents</h2>
-  <p class="subtitle">Define custom intents to classify and route your requests.</p>
-
-  <button class="btn-primary" on:click={startNewIntent}>
-    + New Intent
-  </button>
+  <div class="page-header">
+    <div>
+      <h2>Intents</h2>
+      <p class="subtitle">Define custom intents to classify and route your requests.</p>
+    </div>
+    <button class="btn-primary" on:click={startNewIntent}>
+      + New Intent
+    </button>
+  </div>
 
   {#if showIntentForm}
     <div class="intent-form">
@@ -252,6 +255,22 @@
     margin: 0 auto;
   }
 
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .page-header h2 {
+    margin: 0 0 var(--space-2) 0;
+  }
+
+  .page-header .subtitle {
+    margin: 0;
+  }
+
   h2 {
     margin-top: 0;
     margin-bottom: var(--space-2);
@@ -342,6 +361,8 @@
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-3);
     color: var(--text-primary);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .intent-keywords.empty {

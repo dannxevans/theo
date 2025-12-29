@@ -108,6 +108,10 @@
   font-weight: normal;
 }
 
+.message.user .timestamp {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .message-meta {
   margin-top: 0.25rem;
   font-size: 0.75rem;
@@ -191,6 +195,13 @@
   color: white;
 }
 
+/* Cyberpunk theme - use darker color for user bubbles for better readability */
+[data-theme="cyberpunk"] .message.user .bubble {
+  background: linear-gradient(135deg, #0a3d4a 0%, #1a1a3d 100%);
+  border: 1px solid var(--theo-indigo);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
 /* Session bar */
 .session-bar {
   background: var(--bg-tertiary);
@@ -206,8 +217,12 @@
 
 /* Session items */
 .session-row.active {
-  background: var(--theo-indigo);
-  color: white;
+  background: var(--bg-active);
+  border-left: 3px solid var(--theo-indigo);
+}
+
+.session-row.active .session-item {
+  color: var(--text-primary);
 }
 
 .session-item:hover {
