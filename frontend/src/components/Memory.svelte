@@ -108,34 +108,28 @@
 
   {#if showAddForm}
     <div class="add-form">
-      <div class="form-row">
-        <label>
-          Type
-          <select bind:value={newMemory.type}>
-            <option value="fact">Fact</option>
-            <option value="preference">Preference</option>
-            <option value="goal">Goal</option>
-            <option value="context">Context</option>
-          </select>
-        </label>
+      <div class="form-group">
+        <label for="memory-type">Type</label>
+        <select id="memory-type" bind:value={newMemory.type}>
+          <option value="fact">Fact</option>
+          <option value="preference">Preference</option>
+          <option value="goal">Goal</option>
+          <option value="context">Context</option>
+        </select>
       </div>
 
-      <div class="form-row">
-        <label>
-          Key
-          <input type="text" bind:value={newMemory.key} placeholder="e.g., project" />
-        </label>
+      <div class="form-group">
+        <label for="memory-key">Key</label>
+        <input id="memory-key" type="text" bind:value={newMemory.key} placeholder="e.g., project" />
       </div>
 
-      <div class="form-row">
-        <label>
-          Value
-          <input type="text" bind:value={newMemory.value} placeholder="e.g., Atlas" />
-        </label>
+      <div class="form-group">
+        <label for="memory-value">Value</label>
+        <input id="memory-value" type="text" bind:value={newMemory.value} placeholder="e.g., Atlas" />
       </div>
 
-      <div class="form-row">
-        <label>
+      <div class="form-group">
+        <label class="checkbox-label">
           <input type="checkbox" bind:checked={newMemory.pinned} />
           Pin this memory (always included)
         </label>
@@ -268,54 +262,25 @@
   }
 
   .add-form {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-6);
+    margin-bottom: var(--space-6);
   }
 
-  .form-row {
-    margin-bottom: 1rem;
-  }
-
-  .form-row label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-  }
-
-  .form-row input[type="text"],
-  .form-row select {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 0.875rem;
-  }
-
-  .form-row input[type="checkbox"] {
-    margin-right: 0.5rem;
-  }
-
-  .form-actions {
+  /* Checkbox styling */
+  .checkbox-label {
     display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 6px;
+    align-items: center;
+    gap: var(--space-2);
     cursor: pointer;
+    font-weight: 500;
   }
 
-  .btn-primary:hover {
-    background: #2563eb;
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
   }
 
   .btn-secondary {

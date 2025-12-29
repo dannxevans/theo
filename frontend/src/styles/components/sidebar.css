@@ -17,12 +17,12 @@
 }
 
 .sidebar-title {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-secondary);
   margin: 0.75rem 0.75rem 0.5rem 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.5px;
 }
 
 /* ============================

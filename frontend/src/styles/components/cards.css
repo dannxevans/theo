@@ -9,17 +9,18 @@
 
 .session-group {
   margin: 0.6rem 0.75rem 0.3rem 0.75rem;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .session-row {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  margin: 0 0.75rem;
+  margin: 0 0.75rem 0.5rem 0.75rem; /* Added bottom margin for spacing */
   border-radius: 6px;
 }
 
@@ -31,8 +32,12 @@
 
 .session-item {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
   text-align: left;
-  padding: 0.4rem 0.55rem;
+  padding: 0.5rem 0.65rem; /* Increased padding for better spacing */
   font-size: 0.8rem;
   border: none;
   background: transparent;
@@ -43,6 +48,22 @@
 
 .session-item:hover {
   background: #f3f4f6;
+}
+
+.session-label {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.session-mode {
+  font-weight: 600;
+}
+
+.session-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 /* ============================
