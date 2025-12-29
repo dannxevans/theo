@@ -11,6 +11,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 ## ✨ Key Features
 
 - **Multi-Model Routing** - Intelligent routing based on user-defined intents
+- **Voice Features** - Text-to-Speech and Speech-to-Text powered by OpenAI
 - **Microsoft 365 Integration** - Calendar and email management via Graph API
 - **Work/Personal Modes** - Dual-mode system with mode-specific configurations
 - **Memory System** - Structured memory with relevance scoring and pinning
@@ -76,6 +77,7 @@ For comprehensive documentation, visit the **[THEO Wiki](https://github.com/dann
 - **[Architecture Overview](https://github.com/dannxevans/theo/wiki/Architecture)** - System design and components
 - **[API Reference](https://github.com/dannxevans/theo/wiki/API-Reference)** - Complete API documentation
 - **[Configuration Guide](https://github.com/dannxevans/theo/wiki/Configuration)** - System prompts, intents, routing
+- **[Voice Features](DOCS/voice-features.md)** - Text-to-Speech and Speech-to-Text setup
 - **[M365 Integration](docs/M365_INTEGRATION.md)** - Microsoft 365 setup
 - **[AWS Deployment](docs/ECS_DATABASE_SETUP.md)** - ECS and S3 configuration
 - **[Testing Guide](docs/TESTING.md)** - Running and writing tests
@@ -92,6 +94,10 @@ docs/
 ├── SERVICE_BOOKING.md        # Service provider integration
 ├── TESTING.md                # Test infrastructure and coverage
 └── archive/                  # Refactoring history
+
+DOCS/
+├── voice-features.md         # Voice TTS/STT user guide
+└── voice-implementation-summary.md  # Voice features technical docs
 ```
 
 ---
@@ -111,17 +117,19 @@ docs/
 theo/
 ├── backend/
 │   ├── app.py                 # Main Flask application
-│   ├── routes/                # 14 modular route blueprints
+│   ├── routes/                # 15 modular route blueprints
 │   ├── core/                  # Core business logic
 │   │   ├── actions/           # Action handlers (5 modules)
 │   │   └── memory/            # Memory operations (12 modules)
 │   ├── providers/             # AI provider integrations
+│   ├── voice/                 # TTS/STT providers (OpenAI)
 │   ├── actions/               # Action providers (M365, etc.)
-│   └── tests/                 # 353 backend tests
+│   └── tests/                 # 391 backend tests (38 voice tests)
 └── frontend/
     ├── src/
     │   ├── components/        # Svelte components
-    │   │   └── settings/      # 10 modular settings components
+    │   │   ├── settings/      # 11 modular settings components
+    │   │   └── VoiceControls.svelte  # Voice UI controls
     │   └── lib/api.js         # REST client
     └── tests/                 # 264 frontend tests
 ```
@@ -180,7 +188,7 @@ pytest                                      # Run all tests
 pytest --cov=. --cov-report=html           # With coverage
 ```
 
-**Current Status**: 353 tests, 169 passing, 40.54% coverage
+**Current Status**: 391 tests, 207 passing, 43.2% coverage
 
 ### Frontend Tests
 
@@ -198,12 +206,12 @@ See [TESTING.md](docs/TESTING.md) for detailed test documentation.
 
 ## 📊 Project Stats
 
-- **Backend**: 5,121 lines across 54 modular files
-- **Frontend**: Refactored from 2,777-line monolith to 10 components
-- **Tests**: 617 total tests (backend + frontend)
-- **Coverage**: 40.54% backend, expanding frontend coverage
-- **Routes**: 14 blueprint modules with 63+ endpoints
-- **Documentation**: 8 comprehensive docs + GitHub Wiki
+- **Backend**: 5,300+ lines across 58 modular files
+- **Frontend**: Refactored from 2,777-line monolith to 12 components
+- **Tests**: 655 total tests (391 backend + 264 frontend)
+- **Coverage**: 43.2% backend, expanding frontend coverage
+- **Routes**: 15 blueprint modules with 66+ endpoints
+- **Documentation**: 10 comprehensive docs + GitHub Wiki
 
 ---
 

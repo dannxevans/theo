@@ -240,6 +240,7 @@ def create_schema(meta: MetaData):
         Column("id", String, primary_key=True),
         Column("title", String, nullable=True),
         Column("mode", String, default="personal"),  # "work" or "personal"
+        Column("classification", String, default="OFFICIAL"),  # UK Government classification
         Column("user_id", Integer, nullable=True),  # For filtering sessions by user
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
@@ -410,6 +411,21 @@ def create_schema(meta: MetaData):
         Column("created_at", DateTime, default=datetime.utcnow),
     )
 
+    # =============================
+    # Classification Audit
+    # =============================
+    classification_audit = Table(
+        "classification_audit",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=True),
+        Column("session_id", String, nullable=True),
+        Column("classification", String, nullable=False),
+        Column("action", String, nullable=False),  # 'create', 'export', 'update', 'access'
+        Column("justification", Text, nullable=True),
+        Column("timestamp", DateTime, default=datetime.utcnow),
+    )
+
     return {
         "users": users,
         "auth_sessions": auth_sessions,
@@ -434,4 +450,5 @@ def create_schema(meta: MetaData):
         "action_confirmations": action_confirmations,
         "m365_credentials": m365_credentials,
         "calendar_events_cache": calendar_events_cache,
+        "classification_audit": classification_audit,
     }

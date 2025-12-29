@@ -61,3 +61,5 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+docs/
+theo.wiki/

@@ -74,6 +74,10 @@ class MemoryStore:
         self.action_confirmations = tables["action_confirmations"]
         self.m365_credentials = tables["m365_credentials"]
         self.calendar_events_cache = tables["calendar_events_cache"]
+        self.classification_audit = tables["classification_audit"]
+
+        # Store tables dict for easy access
+        self.tables = tables
 
         # Create all tables
         self.meta.create_all(self.engine)
@@ -501,3 +505,55 @@ class MemoryStore:
     def update_turn_metadata(self, session_id, confirmation_id, approved):
         """Update the metadata of a turn to reflect approval/rejection status."""
         return self._action_ops.update_turn_metadata(session_id, confirmation_id, approved)
+
+    # =============================
+    # Classification Audit Operations
+    # =============================
+
+    def log_classification_audit(self, user_id, classification, action, session_id=None, justification=None):
+        """
+        Log a classification-related action for OFFICIAL compliance.
+
+        Args:
+            user_id: ID of user performing the action
+            classification: Classification level (e.g., 'OFFICIAL')
+            action: Type of action ('create', 'export', 'update', 'access')
+            session_id: Optional session ID if action is session-specific
+            justification: Optional justification text
+
+        Returns:
+            ID of the created audit log entry
+        """
+        with self._get_connection() as conn:
+            from sqlalchemy import insert
+            from datetime import datetime
+
+            stmt = insert(self.classification_audit).values(
+                user_id=user_id,
+                session_id=session_id,
+                classification=classification,
+                action=action,
+                justification=justification,
+                timestamp=datetime.utcnow()
+            )
+
+            result = conn.execute(stmt)
+            return result.lastrowid
+
+    def _get_connection(self):
+        """Get a database connection context manager."""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def connection():
+            session = self.Session()
+            try:
+                yield session
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+
+        return connection()
