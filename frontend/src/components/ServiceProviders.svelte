@@ -258,8 +258,19 @@
 </div>
 
 {#if showAddModal}
-    <div class="modal-overlay" on:click={() => showAddModal = false}>
-        <div class="modal" on:click|stopPropagation>
+    <div
+        class="modal-overlay"
+        on:click={(e) => e.target === e.currentTarget && (showAddModal = false)}
+        on:keydown={(e) => e.key === 'Escape' && (showAddModal = false)}
+        role="button"
+        tabindex="-1"
+        aria-label="Close modal"
+    >
+        <div
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+        >
             <div class="modal-header">
                 <h2>{editingProvider ? 'Edit' : 'Add'} Service Provider</h2>
                 <button class="close-btn" on:click={() => showAddModal = false}>×</button>
@@ -267,13 +278,13 @@
 
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Provider Name</label>
-                    <input type="text" bind:value={formName} placeholder="e.g., Cuts Barber - Rory">
+                    <label for="provider-name">Provider Name</label>
+                    <input id="provider-name" type="text" bind:value={formName} placeholder="e.g., Cuts Barber - Rory">
                 </div>
 
                 <div class="form-group">
-                    <label>Category</label>
-                    <select bind:value={formCategory}>
+                    <label for="provider-category">Category</label>
+                    <select id="provider-category" bind:value={formCategory}>
                         {#each categories as cat}
                             <option value={cat.value}>{cat.label}</option>
                         {/each}
@@ -281,8 +292,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Provider Type</label>
-                    <select bind:value={formProviderType}>
+                    <label for="provider-type">Provider Type</label>
+                    <select id="provider-type" bind:value={formProviderType}>
                         {#each providerTypes as type}
                             <option value={type.value}>{type.label}</option>
                         {/each}
@@ -290,25 +301,25 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Booking URL</label>
-                    <input type="url" bind:value={formBookingUrl} placeholder="https://...">
+                    <label for="provider-booking-url">Booking URL</label>
+                    <input id="provider-booking-url" type="url" bind:value={formBookingUrl} placeholder="https://...">
                     <small>The link where you book appointments</small>
                 </div>
 
                 <div class="form-group">
-                    <label>Typical Duration (minutes)</label>
-                    <input type="number" bind:value={formDuration} min="5" max="240">
+                    <label for="provider-duration">Typical Duration (minutes)</label>
+                    <input id="provider-duration" type="number" bind:value={formDuration} min="5" max="240">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Travel Time from Home (minutes)</label>
-                        <input type="number" bind:value={formTravelTimeHome} min="0" max="120">
+                        <label for="provider-travel-home">Travel Time from Home (minutes)</label>
+                        <input id="provider-travel-home" type="number" bind:value={formTravelTimeHome} min="0" max="120">
                     </div>
 
                     <div class="form-group">
-                        <label>Travel Time from Office (minutes)</label>
-                        <input type="number" bind:value={formTravelTimeOffice} min="0" max="120">
+                        <label for="provider-travel-office">Travel Time from Office (minutes)</label>
+                        <input id="provider-travel-office" type="number" bind:value={formTravelTimeOffice} min="0" max="120">
                     </div>
                 </div>
 
