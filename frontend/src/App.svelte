@@ -65,8 +65,8 @@
 
   onMount(() => {
     document.addEventListener('click', handleClickOutside);
-    document.addEventListener('mousemove', handleUserActivity);
-    document.addEventListener('keypress', handleUserActivity);
+    document.addEventListener('click', handleUserActivity);
+    document.addEventListener('keydown', handleUserActivity);
 
     // Start timeout if authenticated
     if (isAuthenticated) {
@@ -75,8 +75,8 @@
 
     return () => {
       document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('mousemove', handleUserActivity);
-      document.removeEventListener('keypress', handleUserActivity);
+      document.removeEventListener('click', handleUserActivity);
+      document.removeEventListener('keydown', handleUserActivity);
       if (sessionTimeoutId) {
         clearTimeout(sessionTimeoutId);
       }
@@ -379,14 +379,18 @@ async function handleLogout() {
   <header class="header">
     <div class="header-left">
       <button class="hamburger" on:click={openSidebar}>☰</button>
-      <img
-        src="/logo.svg"
-        alt="THEO"
-        class="logo"
+      <button
+        class="logo-button"
         on:click={() => { showSettings = false; }}
-        style="cursor: pointer;"
         title="Go to Chat"
-      />
+        aria-label="Go to Chat"
+      >
+        <img
+          src="/logo.svg"
+          alt="THEO"
+          class="logo"
+        />
+      </button>
     </div>
 
     <div class="header-right">
@@ -509,7 +513,14 @@ async function handleLogout() {
       {/each}
     </aside>
     {#if sidebarOpen}
-      <div class="sidebar-backdrop" on:click={closeSidebar}></div>
+      <div
+        class="sidebar-backdrop"
+        on:click={closeSidebar}
+        on:keydown={(e) => e.key === 'Escape' && closeSidebar()}
+        role="button"
+        tabindex="0"
+        aria-label="Close sidebar"
+      ></div>
     {/if}
 
     <section class="main">

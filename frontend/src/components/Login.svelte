@@ -138,19 +138,6 @@
     width: auto;
   }
 
-  .login-header h1 {
-    font-size: var(--font-size-3xl);
-    font-weight: 700;
-    color: var(--gray-900);
-    margin: 0 0 var(--space-2) 0;
-  }
-
-  .login-header p {
-    font-size: var(--font-size-base);
-    color: var(--gray-600);
-    margin: 0;
-  }
-
   .form-group {
     margin-bottom: var(--space-4);
   }
@@ -228,30 +215,15 @@
     text-align: center;
   }
 
-  .hint {
-    font-size: var(--font-size-sm);
-    color: var(--gray-600);
-    margin: 0 0 var(--space-2) 0;
-  }
-
   .hint-secondary {
     font-size: var(--font-size-xs);
     color: var(--gray-500);
     margin: 0;
   }
 
-  .hint strong {
-    color: var(--gray-700);
-    font-weight: 600;
-  }
-
   @media (max-width: 768px) {
     .login-box {
       padding: var(--space-6);
-    }
-
-    .login-header h1 {
-      font-size: var(--font-size-2xl);
     }
   }
 </style>
