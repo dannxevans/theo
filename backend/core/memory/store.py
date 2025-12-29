@@ -198,9 +198,9 @@ class MemoryStore(LegacyMemoryStore):
         """Save or update a session title."""
         return self._session_ops.save_session_title(session_id, title)
 
-    def list_sessions(self):
+    def list_sessions(self, user_id=None, mode=None):
         """Return all sessions with their latest summary."""
-        return self._session_ops.list_sessions()
+        return self._session_ops.list_sessions(user_id=user_id, mode=mode)
 
     def delete_session(self, session_id):
         """Permanently delete a session and all associated data."""
@@ -222,9 +222,9 @@ class MemoryStore(LegacyMemoryStore):
         """Generate an automatic summary of the conversation using an LLM."""
         return self._session_ops.generate_auto_summary(session_id, provider_call)
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None):
         """Save a conversation turn (message)."""
-        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata)
+        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata, mode, user_id)
 
     def get_recent_turns(self, session_id, limit=6):
         """Get recent conversation turns for a session."""
@@ -367,10 +367,12 @@ class MemoryStore(LegacyMemoryStore):
         return self._mode_ops.get_mode_settings(user_id, mode)
 
     def create_or_update_mode_settings(self, user_id, mode, system_prompt_override=None,
-                                       preferred_provider_id=None, tone=None):
+                                       preferred_provider_id=None, tone=None,
+                                       pii_filtering_enabled=None, pii_redaction_config=None):
         """Create or update mode settings."""
         return self._mode_ops.create_or_update_mode_settings(
-            user_id, mode, system_prompt_override, preferred_provider_id, tone
+            user_id, mode, system_prompt_override, preferred_provider_id, tone,
+            pii_filtering_enabled, pii_redaction_config
         )
 
     def get_all_mode_settings(self, user_id):
