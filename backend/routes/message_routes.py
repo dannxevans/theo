@@ -148,6 +148,12 @@ def stream_chat_sse(session_id):
                         elif work_subtab == "email":
                             tone = config.get("tone", "professional")
                             context_prefix = f"You are helping rewrite emails with a {tone} tone. Focus on clarity, professionalism, and appropriate formatting for business communication."
+
+                        # Check for subtab-specific preferred provider (only if not already forced)
+                        subtab_preferred_provider = config.get("preferred_provider_id")
+                        if subtab_preferred_provider and not forced_provider:
+                            router_context["forced_provider"] = str(subtab_preferred_provider)
+                            logging.info(f"[MODE] Using subtab preferred provider: {subtab_preferred_provider}")
                     else:
                         logging.info(f"[MODE] No subtab config found for {work_subtab}")
 
