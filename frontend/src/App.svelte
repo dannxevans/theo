@@ -183,11 +183,22 @@ async function setMode(mode) {
   const previousMode = currentMode;
 
   try {
+    // Notify old chat BEFORE switching
+    window.dispatchEvent(new CustomEvent("modeSwitching", {
+      detail: { fromMode: previousMode, toMode: mode }
+    }));
+
     await setUserMode(mode);
     currentMode = mode;
 
+    // Brief delay for notification to render
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Create a new session when switching modes to separate contexts
     newSession();
+
+    // Reload sessions (backend auto-filters by new mode)
+    loadSessions();
 
     // Load last active subtab from localStorage when switching to work mode
     if (mode === "work") {
@@ -232,6 +243,19 @@ async function handleLogout() {
 }
 
   function selectSession(id) {
+    const session = sessions.find(s => s.id === id);
+
+    // Check mode mismatch - select the session but it will be locked
+    if (session && session.mode && session.mode !== currentMode) {
+      // Still select it, but Chat.svelte will show it as locked
+      activeSessionId = id;
+      localStorage.setItem(SESSION_STORAGE_KEY, id);
+      sidebarOpen = false;
+      // Chat will detect mode mismatch and disable input
+      return;
+    }
+
+    // Normal selection
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
     sidebarOpen = false;
@@ -450,7 +474,12 @@ async function handleLogout() {
         {#if showSettings}
           <Settings />
         {:else}
-          <Chat sessionId={activeSessionId} currentMode={currentMode} activeWorkSubtab={activeWorkSubtab} />
+          <Chat
+            sessionId={activeSessionId}
+            currentMode={currentMode}
+            sessionMode={sessions.find(s => s.id === activeSessionId)?.mode}
+            activeWorkSubtab={activeWorkSubtab}
+          />
         {/if}
       </div>
     </section>

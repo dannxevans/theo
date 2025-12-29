@@ -1,5 +1,6 @@
 <script>
-  import { updateModeSettings, updateWorkSubtabConfig } from "../../lib/api";
+  import { updateModeSettings, updateWorkSubtabConfig, getPIIConfig, updatePIIConfig } from "../../lib/api";
+  import { onMount } from "svelte";
 
   export let workModeSettings = {
     system_prompt_override: "",
@@ -20,9 +21,39 @@
   let savingWorkMode = false;
   let savingCodeSubtab = false;
   let savingEmailSubtab = false;
+  let savingPII = false;
   let workModeSaveStatus = null;
   let codeSubtabSaveStatus = null;
   let emailSubtabSaveStatus = null;
+  let piiSaveStatus = null;
+
+  // PII Configuration
+  let piiFilteringEnabled = false;
+  let piiRedactionConfig = {
+    emails: true,
+    phones: true,
+    ssns: true,
+    creditCards: true,
+    names: false,
+    addresses: false
+  };
+
+  // Load PII config on mount
+  onMount(async () => {
+    try {
+      const config = await getPIIConfig();
+      piiFilteringEnabled = config.pii_filtering_enabled || false;
+      if (config.pii_redaction_config) {
+        // Parse if string, otherwise use as-is
+        const redactionConfig = typeof config.pii_redaction_config === 'string'
+          ? JSON.parse(config.pii_redaction_config)
+          : config.pii_redaction_config;
+        piiRedactionConfig = { ...piiRedactionConfig, ...redactionConfig };
+      }
+    } catch (e) {
+      console.error("Failed to load PII config:", e);
+    }
+  });
 
   async function saveWorkMode() {
     try {
@@ -69,6 +100,25 @@
       emailSubtabSaveStatus = `Error: ${e.message}`;
     } finally {
       savingEmailSubtab = false;
+    }
+  }
+
+  async function savePIIConfig() {
+    try {
+      savingPII = true;
+      piiSaveStatus = null;
+      await updatePIIConfig({
+        pii_filtering_enabled: piiFilteringEnabled,
+        pii_redaction_config: piiRedactionConfig
+      });
+      piiSaveStatus = "PII protection settings saved!";
+      setTimeout(() => {
+        piiSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      piiSaveStatus = `Error: ${e.message}`;
+    } finally {
+      savingPII = false;
     }
   }
 </script>
@@ -126,6 +176,82 @@
       disabled={savingWorkMode}
     >
       {savingWorkMode ? "Saving..." : "Save Work Mode Settings"}
+    </button>
+  </div>
+
+  <!-- PII Protection Settings -->
+  <div class="section">
+    <h3>🔒 PII Protection (OFFICIAL Mode)</h3>
+    <p class="hint">
+      Work mode includes PII (Personally Identifiable Information) filtering to protect sensitive data before it's sent to AI models.
+      Enable this to automatically redact emails, phone numbers, SSNs, credit cards, and other sensitive information.
+    </p>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          bind:checked={piiFilteringEnabled}
+        />
+        Enable PII Filtering
+      </label>
+      <p class="hint">When enabled, sensitive information will be redacted before processing</p>
+    </div>
+
+    {#if piiFilteringEnabled}
+      <div class="pii-config-options">
+        <h4>Redaction Options</h4>
+        <p class="hint">Select which types of information to redact:</p>
+
+        <div class="checkbox-grid">
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.emails} />
+            Email Addresses
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.phones} />
+            Phone Numbers
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.ssns} />
+            Social Security Numbers
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.creditCards} />
+            Credit Card Numbers
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.names} />
+            Personal Names (experimental)
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={piiRedactionConfig.addresses} />
+            Street Addresses (experimental)
+          </label>
+        </div>
+
+        <div class="pii-warning">
+          <strong>⚠️ Note:</strong> Name and address detection are experimental and may have false positives.
+          Use with caution.
+        </div>
+      </div>
+    {/if}
+
+    {#if piiSaveStatus}
+      <div class="success-message">{piiSaveStatus}</div>
+    {/if}
+
+    <button
+      class="btn-primary"
+      on:click={savePIIConfig}
+      disabled={savingPII}
+    >
+      {savingPII ? "Saving..." : "Save PII Protection Settings"}
     </button>
   </div>
 
@@ -325,5 +451,44 @@
 
   .btn-primary {
     margin-bottom: var(--space-4);
+  }
+
+  /* Checkbox styling */
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+  }
+
+  /* PII Configuration */
+  .pii-config-options {
+    margin-top: var(--space-4);
+    padding: var(--space-4);
+    background: #f8f9fa;
+    border-radius: var(--radius-md);
+  }
+
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-3);
+    margin: var(--space-3) 0;
+  }
+
+  .pii-warning {
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: var(--radius-sm);
+    color: #856404;
+    font-size: var(--font-size-sm);
   }
 </style>

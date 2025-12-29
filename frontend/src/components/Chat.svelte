@@ -21,6 +21,7 @@
 
   export let sessionId;
   export let currentMode = "personal";
+  export let sessionMode = undefined; // Mode of the current session
   export let activeWorkSubtab = "conversation";
 
   function switchWorkSubtab(subtab) {
@@ -116,6 +117,12 @@
   let advancedMode = false;
   let usedProviders = new Set(); // Track providers used in this session
 
+  // Mode lock detection
+  $: isModeLocked = sessionMode && sessionMode !== currentMode;
+
+  // Mode switch notification
+  let modeSwitchNotification = null;
+
   import { onMount } from "svelte";
   onMount(async () => {
     try {
@@ -135,6 +142,21 @@
     // Listen for advanced mode changes
     window.addEventListener("advancedModeChanged", (e) => {
       advancedMode = e.detail.enabled;
+    });
+
+    // Listen for mode switching events
+    window.addEventListener("modeSwitching", (e) => {
+      const { fromMode, toMode } = e.detail;
+      modeSwitchNotification = {
+        fromMode,
+        toMode,
+        message: `Switching from ${fromMode} to ${toMode} mode. Creating new chat...`
+      };
+
+      // Clear notification after 3 seconds
+      setTimeout(() => {
+        modeSwitchNotification = null;
+      }, 3000);
     });
   });
 
@@ -502,7 +524,7 @@
         <div class="session-title">
           <strong>Chat</strong>
           {#if currentMode === "work"}
-            <span class="official-badge">OFFICIAL</span>
+            <span class="official-badge">Working at OFFICIAL</span>
           {/if}
           {#if forcedModel}
             <span class="provider-badge forced">Forced: {forcedModel}</span>
@@ -557,6 +579,20 @@
           >
             💻 Code Development
           </button>
+        </div>
+      {/if}
+
+      <!-- Mode Switch Notification -->
+      {#if modeSwitchNotification}
+        <div class="mode-switch-notification">
+          <strong>Mode Switching:</strong> {modeSwitchNotification.message}
+        </div>
+      {/if}
+
+      <!-- Mode Lock Warning -->
+      {#if isModeLocked}
+        <div class="mode-lock-warning">
+          <strong>⚠️ Mode Mismatch:</strong> This is a {sessionMode} chat. To continue, switch to {sessionMode} mode.
         </div>
       {/if}
 
@@ -724,8 +760,9 @@
         <div class="input">
           <input
             bind:value={input}
-            placeholder="Talk to THEO"
-            on:keydown={(e) => e.key === "Enter" && submit()}
+            placeholder={isModeLocked ? `Locked - Switch to ${sessionMode} mode` : "Talk to THEO"}
+            on:keydown={(e) => e.key === "Enter" && !isModeLocked && submit()}
+            disabled={isModeLocked}
           />
 
           {#if streaming}
@@ -733,7 +770,7 @@
               Streaming…
             </button>
           {:else}
-            <button class="btn-primary" on:click={submit} disabled={loading}>
+            <button class="btn-primary" on:click={submit} disabled={loading || isModeLocked}>
               {loading ? "Thinking…" : "Send"}
             </button>
           {/if}
@@ -979,5 +1016,46 @@
     font-size: 0.8rem;
     color: #6c757d;
     font-style: italic;
+  }
+
+  /* Mode Lock Warning */
+  .mode-lock-warning {
+    background: #dc3545;
+    color: white;
+    padding: 1rem;
+    margin: 0.5rem 1rem;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  /* Mode Switch Notification */
+  .mode-switch-notification {
+    background: #ffc107;
+    color: #000;
+    padding: 1rem;
+    margin: 0.5rem 1rem;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 500;
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Disabled input styling for mode lock */
+  .input input:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 </style>

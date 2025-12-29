@@ -23,12 +23,14 @@ class SessionOperations(BaseMemoryOperations):
     # Session Management
     # =============================
 
-    def _ensure_session(self, session_id):
+    def _ensure_session(self, session_id, mode="personal", user_id=None):
         """
         Ensure a session exists in the database.
 
         Args:
             session_id: Session identifier
+            mode: Session mode ("work" or "personal")
+            user_id: User ID for filtering sessions
         """
         with self._get_connection() as conn:
             exists = conn.execute(
@@ -40,6 +42,8 @@ class SessionOperations(BaseMemoryOperations):
                     insert(self.sessions).values(
                         id=session_id,
                         title=None,
+                        mode=mode,
+                        user_id=user_id,
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow(),
                     )
@@ -63,15 +67,19 @@ class SessionOperations(BaseMemoryOperations):
                 )
             )
 
-    def list_sessions(self):
+    def list_sessions(self, user_id=None, mode=None):
         """
         Return all sessions with their latest summary.
 
         Returns sessions ordered by most recently updated (based on latest turn created_at).
         Only sessions with at least one turn are returned, limited to the most recent 50.
 
+        Args:
+            user_id: Filter sessions by user ID (None = all users)
+            mode: Filter sessions by mode ("work" or "personal", None = all modes)
+
         Returns:
-            List of session dictionaries with id, title, summary, has_messages, updated_at
+            List of session dictionaries with id, title, mode, summary, has_messages, updated_at
         """
         with self._get_connection() as conn:
             latest_turn_subq = (
@@ -84,19 +92,28 @@ class SessionOperations(BaseMemoryOperations):
                 .subquery()
             )
 
-            rows = conn.execute(
+            query = (
                 select(
                     self.sessions.c.id,
                     self.sessions.c.title,
+                    self.sessions.c.mode,
                     self.sessions.c.created_at,
                     self.sessions.c.updated_at,
                     latest_turn_subq.c.turn_count,
                     latest_turn_subq.c.latest_turn_created_at,
                 )
                 .join(latest_turn_subq, self.sessions.c.id == latest_turn_subq.c.session_id)
-                .order_by(latest_turn_subq.c.latest_turn_created_at.desc())
-                .limit(50)
-            ).fetchall()
+            )
+
+            # Apply filters
+            if user_id is not None:
+                query = query.where(self.sessions.c.user_id == user_id)
+            if mode is not None:
+                query = query.where(self.sessions.c.mode == mode)
+
+            query = query.order_by(latest_turn_subq.c.latest_turn_created_at.desc()).limit(50)
+
+            rows = conn.execute(query).fetchall()
 
             result = []
             for r in rows:
@@ -110,12 +127,33 @@ class SessionOperations(BaseMemoryOperations):
                 result.append({
                     "id": r.id,
                     "title": r.title,
+                    "mode": r.mode or "personal",  # Default to personal if NULL
                     "summary": summary_row.content if summary_row else "",
                     "has_messages": r.turn_count > 0,
                     "updated_at": r.latest_turn_created_at,
                 })
 
             return result
+
+    def get_session_mode(self, session_id):
+        """
+        Get the mode for a specific session.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Session mode ("work" or "personal"), or None if session doesn't exist
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                select(self.sessions.c.mode)
+                .where(self.sessions.c.id == session_id)
+            ).fetchone()
+
+            if row:
+                return row.mode or "personal"  # Default to personal if NULL
+            return None
 
     def delete_session(self, session_id):
         """
@@ -294,7 +332,7 @@ class SessionOperations(BaseMemoryOperations):
     # Conversation Turns
     # =============================
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None):
         """
         Save a conversation turn (message).
 
@@ -307,9 +345,11 @@ class SessionOperations(BaseMemoryOperations):
             model: Optional model name for assistant messages
             intent: Optional detected intent
             metadata: Optional metadata dictionary
+            mode: Session mode ("work" or "personal")
+            user_id: User ID for session filtering
         """
-        logging.info(f"[MEMORY] save_turn() called: session={session_id}, role={role}, has_metadata={metadata is not None}")
-        self._ensure_session(session_id)
+        logging.info(f"[MEMORY] save_turn() called: session={session_id}, role={role}, mode={mode}, has_metadata={metadata is not None}")
+        self._ensure_session(session_id, mode=mode, user_id=user_id)
 
         # Set session title from first user message (once)
         if role == "user":

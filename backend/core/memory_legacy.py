@@ -81,6 +81,8 @@ class MemoryStore:
             Column("system_prompt_override", Text, nullable=True),
             Column("preferred_provider_id", Integer, nullable=True),
             Column("tone", String, default="neutral"),  # "professional", "casual", "neutral"
+            Column("pii_filtering_enabled", Boolean, default=False),  # PII redaction for work mode
+            Column("pii_redaction_config", Text, nullable=True),  # JSON config for PII filtering
             Column("created_at", DateTime, default=datetime.utcnow),
             Column("updated_at", DateTime, default=datetime.utcnow),
         )
@@ -245,6 +247,8 @@ class MemoryStore:
             Column("title", String, nullable=True),
             Column("created_at", DateTime, default=datetime.utcnow),
             Column("updated_at", DateTime, default=datetime.utcnow),
+            Column("mode", String, default="personal"),  # "work" or "personal"
+            Column("user_id", Integer, nullable=True),  # For filtering sessions by user
         )
 
         # =============================
