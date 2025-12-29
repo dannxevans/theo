@@ -11,9 +11,6 @@
   let currentMode = "personal"; // "work" or "personal"
   let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
 
-  // Dark mode state
-  let darkMode = false;
-
   // Dropdown state
   let modeDropdownOpen = false;
   let settingsDropdownOpen = false;
@@ -92,22 +89,25 @@
     sidebarOpen = false;
   }
 
-  // Dark mode functions
-  function toggleDarkMode() {
-    darkMode = !darkMode;
-    applyTheme();
-    localStorage.setItem("theo.darkMode", darkMode ? "dark" : "light");
-  }
+  // Theme loading function (for new multi-theme system)
+  function loadTheme() {
+    if (typeof document === "undefined") return;
 
-  function applyTheme() {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    // Get theme from localStorage (set by ThemeSettings.svelte)
+    const savedTheme = localStorage.getItem("theme") || "light";
+
+    // Apply theme using the new system
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.removeAttribute("data-theme");
+    } else if (savedTheme === "light") {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      // Custom themes (cyberpunk, nature, corporate)
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", savedTheme);
     }
-  }
-
-  // Load dark mode preference on mount
-  $: if (typeof window !== "undefined") {
-    applyTheme();
   }
 
   let sessions = [];
@@ -133,10 +133,8 @@
   }
 
 onMount(async () => {
-  // Load dark mode preference
-  const savedTheme = localStorage.getItem("theo.darkMode");
-  darkMode = savedTheme === "dark";
-  applyTheme();
+  // Load theme preference (new multi-theme system)
+  loadTheme();
 
   // Check authentication first
   try {
@@ -411,14 +409,6 @@ async function handleLogout() {
         on:click={() => { showSettings = false; }}
       >
         Home
-      </button>
-
-      <button
-        class="btn-pill btn-theme"
-        on:click={toggleDarkMode}
-        title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        {darkMode ? "🌙" : "☀️"}
       </button>
 
       <div class="dropdown" class:open={settingsDropdownOpen}>
