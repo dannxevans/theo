@@ -170,14 +170,14 @@
   }
 
   .save-status.success {
-    background: var(--success-50);
-    color: #155724;
-    border: 1px solid var(--success-500);
+    background: var(--status-success-bg);
+    color: var(--status-success-text);
+    border: 1px solid var(--status-success-border);
   }
 
   .save-status.error {
-    background: var(--error-50);
-    color: #721c24;
-    border: 1px solid var(--error-500);
+    background: var(--status-error-bg);
+    color: var(--status-error-text);
+    border: 1px solid var(--status-error-border);
   }
 </style>

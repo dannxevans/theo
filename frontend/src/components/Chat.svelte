@@ -934,13 +934,13 @@
   }
 
   .confirmation-status.approved {
-    background: #d4edda;
-    color: #155724;
+    background: var(--status-success-bg);
+    color: var(--status-success-text);
   }
 
   .confirmation-status.rejected {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--status-error-bg);
+    color: var(--status-error-text);
   }
 
   /* Completed state styling */
@@ -1003,22 +1003,22 @@
     display: inline-block;
   }
 
-  /* AI responses - baby blue */
+  /* AI responses - blue */
   .provider-badge-ai {
-    background: #DBEAFE;
-    color: #1E40AF;
+    background: var(--info-100);
+    color: var(--info-700);
   }
 
   /* Action router responses - amber */
   .provider-badge-action {
-    background: #FEF3C7;
-    color: #92400E;
+    background: var(--warning-100);
+    color: var(--warning-600);
   }
 
   /* Error responses - red */
   .provider-badge-error {
-    background: #FEE2E2;
-    color: #991B1B;
+    background: var(--error-100);
+    color: var(--error-700);
   }
 
   .bubble-footer {

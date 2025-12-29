@@ -150,10 +150,10 @@
 
   .success-message {
     padding: var(--space-3);
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
+    background: var(--status-success-bg);
+    border: 1px solid var(--status-success-border);
     border-radius: var(--radius-md);
-    color: #065f46;
+    color: var(--status-success-text);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
