@@ -114,11 +114,13 @@
   let codeSubtabConfig = {
     language: "servicenow_javascript",
     framework: "",
-    additional_context: ""
+    additional_context: "",
+    preferred_provider_id: null
   };
   let emailSubtabConfig = {
     tone: "professional",
-    signature: ""
+    signature: "",
+    preferred_provider_id: null
   };
 
   // Memory state
@@ -196,7 +198,8 @@
         codeSubtabConfig = {
           language: parsed.language || "servicenow_javascript",
           framework: parsed.framework || "",
-          additional_context: parsed.additional_context || ""
+          additional_context: parsed.additional_context || "",
+          preferred_provider_id: parsed.preferred_provider_id || null
         };
       }
 
@@ -205,7 +208,8 @@
         const parsed = JSON.parse(emailConfig.config_json);
         emailSubtabConfig = {
           tone: parsed.tone || "professional",
-          signature: parsed.signature || ""
+          signature: parsed.signature || "",
+          preferred_provider_id: parsed.preferred_provider_id || null
         };
       }
     } catch (e) {
