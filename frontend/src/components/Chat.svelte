@@ -320,10 +320,11 @@
         metadata: t.metadata || null
       }));
 
-      // Track unique providers used in this session
+      // Track unique AI providers used in this session (exclude system providers)
+      const excludedProviders = ['action_router', 'error', 'memory'];
       usedProviders = new Set(
         messages
-          .filter(m => m.provider)
+          .filter(m => m.provider && !excludedProviders.includes(m.provider))
           .map(m => m.provider)
       );
 
