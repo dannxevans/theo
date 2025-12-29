@@ -344,7 +344,7 @@
     .empty-state {
         text-align: center;
         padding: 40px;
-        color: #666;
+        color: var(--text-tertiary);
     }
 
     .providers-list {
@@ -353,10 +353,10 @@
     }
 
     .provider-card {
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 15px;
-        background: white;
+        background: var(--bg-tertiary);
     }
 
     .provider-header {
@@ -369,6 +369,7 @@
     .provider-header h3 {
         margin: 0;
         font-size: 1.1em;
+        color: var(--text-primary);
     }
 
     .provider-actions {
@@ -379,6 +380,7 @@
     .provider-details p {
         margin: 5px 0;
         font-size: 0.9em;
+        color: var(--text-secondary);
     }
 
     .badge {
@@ -405,7 +407,7 @@
     }
 
     .modal {
-        background: white;
+        background: var(--bg-primary);
         border-radius: 8px;
         width: 90%;
         max-width: 600px;
@@ -415,7 +417,7 @@
 
     .modal-header {
         padding: 20px;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-primary);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -423,6 +425,7 @@
 
     .modal-header h2 {
         margin: 0;
+        color: var(--text-primary);
     }
 
     .close-btn {
@@ -433,6 +436,7 @@
         padding: 0;
         width: 30px;
         height: 30px;
+        color: var(--text-primary);
     }
 
     .modal-body {
@@ -447,20 +451,29 @@
         display: block;
         margin-bottom: 5px;
         font-weight: 500;
+        color: var(--text-primary);
     }
 
     .form-group input,
     .form-group select {
         width: 100%;
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--border-focus);
     }
 
     .form-group small {
         display: block;
         margin-top: 5px;
-        color: #666;
+        color: var(--text-tertiary);
         font-size: 0.85em;
     }
 
@@ -482,7 +495,7 @@
 
     .modal-footer {
         padding: 20px;
-        border-top: 1px solid #ddd;
+        border-top: 1px solid var(--border-primary);
         display: flex;
         justify-content: flex-end;
         gap: 10px;

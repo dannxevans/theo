@@ -11,6 +11,9 @@
   let currentMode = "personal"; // "work" or "personal"
   let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
 
+  // Dark mode state
+  let darkMode = false;
+
   // Dropdown state
   let modeDropdownOpen = false;
   let settingsDropdownOpen = false;
@@ -89,6 +92,24 @@
     sidebarOpen = false;
   }
 
+  // Dark mode functions
+  function toggleDarkMode() {
+    darkMode = !darkMode;
+    applyTheme();
+    localStorage.setItem("theo.darkMode", darkMode ? "dark" : "light");
+  }
+
+  function applyTheme() {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    }
+  }
+
+  // Load dark mode preference on mount
+  $: if (typeof window !== "undefined") {
+    applyTheme();
+  }
+
   let sessions = [];
   let activeSessionId = null;
   const MAX_SESSIONS = 20;
@@ -112,6 +133,11 @@
   }
 
 onMount(async () => {
+  // Load dark mode preference
+  const savedTheme = localStorage.getItem("theo.darkMode");
+  darkMode = savedTheme === "dark";
+  applyTheme();
+
   // Check authentication first
   try {
     const result = await verifySession();
@@ -385,6 +411,14 @@ async function handleLogout() {
         on:click={() => { showSettings = false; }}
       >
         Home
+      </button>
+
+      <button
+        class="btn-pill btn-theme"
+        on:click={toggleDarkMode}
+        title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      >
+        {darkMode ? "🌙" : "☀️"}
       </button>
 
       <div class="dropdown" class:open={settingsDropdownOpen}>

@@ -4,7 +4,7 @@
    ============================= */
 
 :root {
-  /* Brand Colors */
+  /* Brand Colors (consistent across themes) */
   --theo-blue: #38BDF8;
   --theo-indigo: #6366F1;
   --theo-violet: #A855F7;
@@ -15,7 +15,7 @@
     var(--theo-violet) 100%
   );
 
-  /* Neutral Colors */
+  /* Neutral Colors (base palette) */
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -27,19 +27,70 @@
   --gray-800: #1f2937;
   --gray-900: #111827;
 
-  /* Semantic Colors */
+  /* Theme Colors (Light Mode Default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f3f4f6;
+  --bg-active: #e5e7eb;
+
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
+
+  --border-primary: #e5e7eb;
+  --border-secondary: #d1d5db;
+  --border-focus: var(--theo-indigo);
+
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  /* Semantic Color Palette */
   --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
   --success-500: #10b981;
   --success-600: #059669;
+  --success-700: #047857;
+
   --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
   --warning-500: #f59e0b;
   --warning-600: #d97706;
+
   --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-200: #fecaca;
+  --error-300: #fca5a5;
   --error-500: #ef4444;
   --error-600: #dc2626;
+  --error-700: #b91c1c;
+
   --info-50: #eff6ff;
+  --info-100: #dbeafe;
   --info-500: #3b82f6;
   --info-600: #2563eb;
+  --info-700: #1d4ed8;
+
+  /* Semantic Status Tokens (theme-aware) */
+  --status-success-bg: var(--success-50);
+  --status-success-border: var(--success-500);
+  --status-success-text: var(--success-600);
+
+  --status-warning-bg: var(--warning-50);
+  --status-warning-border: var(--warning-500);
+  --status-warning-text: var(--warning-600);
+
+  --status-error-bg: var(--error-50);
+  --status-error-border: var(--error-500);
+  --status-error-text: var(--error-600);
+
+  --status-info-bg: var(--info-50);
+  --status-info-border: var(--info-500);
+  --status-info-text: var(--info-600);
 
   /* Spacing Scale (based on 4px grid) */
   --space-1: 0.25rem;  /* 4px */
@@ -60,9 +111,9 @@
   --radius-full: 999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+  --shadow-md: 0 4px 6px -1px var(--shadow-color);
+  --shadow-lg: 0 10px 15px -3px var(--shadow-color);
   --shadow-brand: 0 4px 12px rgba(99, 102, 241, 0.35);
 
   /* Typography */
@@ -79,4 +130,36 @@
   --z-modal-backdrop: 30;
   --z-modal: 40;
   --z-toast: 50;
+}
+
+/* =============================
+   Dark Mode Theme
+   ============================= */
+
+[data-theme="dark"] {
+  /* Dark Mode Backgrounds */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #1e293b;
+  --bg-hover: #334155;
+  --bg-active: #475569;
+
+  /* Dark Mode Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #0f172a;
+
+  /* Dark Mode Borders */
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --border-focus: var(--theo-blue);
+
+  /* Dark Mode Shadows */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+
+  /* Adjusted brand colors for dark mode */
+  --shadow-brand: 0 4px 12px rgba(56, 189, 248, 0.25);
 }

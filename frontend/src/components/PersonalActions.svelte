@@ -300,19 +300,19 @@
     font-size: 1.75rem;
     font-weight: 600;
     margin-bottom: 2rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
 
   h3 {
     font-size: 1.25rem;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: #333;
+    color: var(--text-primary);
   }
 
   .section {
-    background: #fff;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
@@ -327,13 +327,25 @@
   }
 
   .connection-status.connected {
-    background: #f0fdf4;
-    border: 1px solid #86efac;
+    background: var(--success-50);
+    border: 1px solid var(--success-500);
+  }
+
+  .connection-status.connected .status-icon {
+    color: var(--success-600);
+  }
+
+  .connection-status.connected .status-label {
+    color: var(--success-600);
+  }
+
+  .connection-status.connected .status-detail {
+    color: var(--success-600);
   }
 
   .connection-status.disconnected {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-secondary);
   }
 
   .status-icon {
@@ -347,13 +359,13 @@
 
   .status-label {
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text-primary);
     margin-bottom: 0.25rem;
   }
 
   .status-detail {
     font-size: 0.875rem;
-    color: #666;
+    color: var(--text-secondary);
   }
 
   .btn-connect,
@@ -400,7 +412,7 @@
 
   .auth-instructions h4 {
     margin-bottom: 1rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
 
   .auth-instructions ol {
@@ -411,6 +423,7 @@
   .auth-instructions li {
     margin-bottom: 0.75rem;
     line-height: 1.5;
+    color: var(--text-primary);
   }
 
   .verification-link {
@@ -421,24 +434,24 @@
 
   .user-code {
     display: inline-block;
-    background: #f3f4f6;
+    background: var(--bg-secondary);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-family: monospace;
     font-size: 1.125rem;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text-primary);
     letter-spacing: 0.1em;
   }
 
   .auth-waiting {
     margin-top: 1rem;
     font-style: italic;
-    color: #666;
+    color: var(--text-secondary);
   }
 
   .no-confirmations {
-    color: #666;
+    color: var(--text-secondary);
     font-style: italic;
     padding: 1rem;
     text-align: center;
@@ -451,10 +464,10 @@
   }
 
   .confirmation-card {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-primary);
     border-radius: 6px;
     padding: 1rem;
-    background: #fafafa;
+    background: var(--bg-secondary);
   }
 
   .confirmation-header {
@@ -476,12 +489,12 @@
 
   .confirmation-expires {
     font-size: 0.875rem;
-    color: #666;
+    color: var(--text-secondary);
   }
 
   .confirmation-message {
     margin-bottom: 1rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
     font-size: 1rem;
     line-height: 1.5;
   }

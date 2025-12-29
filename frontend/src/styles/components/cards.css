@@ -11,7 +11,7 @@
   margin: 0.6rem 0.75rem 0.3rem 0.75rem;
   font-size: 0.65rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
@@ -37,7 +37,7 @@
   background: transparent;
   cursor: pointer;
   border-radius: 6px;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .session-item:hover {
@@ -151,4 +151,52 @@
     font-size: 10px;
     padding: var(--space-1) var(--space-2);
   }
+}
+
+/* Dark mode updates for cards */
+.session-row.active {
+  background: var(--theo-indigo);
+}
+
+.session-row.active .session-item {
+  color: white;
+}
+
+.session-item:hover {
+  background: var(--bg-hover);
+}
+
+.session-bar {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.summary {
+  background: var(--bg-tertiary);
+  border-left: 4px solid var(--theo-indigo);
+  color: var(--text-primary);
+}
+
+.provider-badge {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* Better sidebar hover states for both themes */
+.session-row {
+  transition: background-color 0.2s ease;
+}
+
+.session-row:not(.active):hover {
+  background: var(--bg-hover);
+  border-radius: 6px;
+}
+
+.session-item {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.session-item:not(.active):hover {
+  background: transparent;
+  color: var(--text-primary);
 }

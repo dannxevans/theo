@@ -96,19 +96,21 @@
   }
 
   .subtitle {
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
 
   .section {
     margin-bottom: var(--space-6);
-    padding-bottom: var(--space-6);
-    border-bottom: 1px solid var(--gray-200);
+    padding: var(--space-5);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
   }
 
   .section:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
   }
 
   .form-group {
@@ -120,19 +122,28 @@
     width: auto;
     margin-bottom: var(--space-1);
     font-weight: 600;
+    color: var(--text-primary);
   }
 
   .form-group select,
   .form-group textarea {
     width: 100%;
     padding: var(--space-2);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-sm);
     font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--border-focus);
   }
 
   .hint {
-    color: var(--gray-600);
+    color: var(--text-tertiary);
     font-size: var(--font-size-sm);
     margin-top: var(--space-1);
   }

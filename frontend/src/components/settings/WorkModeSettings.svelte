@@ -361,43 +361,48 @@
   }
 
   .subtitle {
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-4);
   }
 
   .section {
     margin-bottom: var(--space-6);
-    padding-bottom: var(--space-6);
-    border-bottom: 1px solid var(--gray-200);
+    padding: var(--space-5);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
   }
 
   .section:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
   }
 
   .subsection {
     margin-top: var(--space-6);
     padding-top: var(--space-4);
-    border-top: 1px solid var(--gray-100);
+    border-top: 1px solid var(--border-primary);
   }
 
   .subsection:first-child {
     border-top: none;
     padding-top: 0;
+    margin-top: 0;
   }
 
   h3 {
     margin-bottom: var(--space-4);
+    color: var(--text-primary);
   }
 
   h4 {
     margin-bottom: var(--space-3);
+    color: var(--text-primary);
   }
 
   .hint {
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-tertiary);
     margin-top: var(--space-1);
   }
 
@@ -410,6 +415,7 @@
     width: auto;
     margin-bottom: var(--space-1);
     font-weight: 600;
+    color: var(--text-primary);
   }
 
   .form-group input[type="text"],
@@ -417,14 +423,23 @@
   .form-group textarea {
     width: 100%;
     padding: var(--space-2);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-sm);
     font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .form-group input[type="text"]:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--border-focus);
   }
 
   .form-group p.hint {
     display: block;
-    color: var(--gray-500);
+    color: var(--text-tertiary);
     font-size: var(--font-size-xs);
     margin-top: var(--space-1);
   }
@@ -471,7 +486,8 @@
   .pii-config-options {
     margin-top: var(--space-4);
     padding: var(--space-4);
-    background: #f8f9fa;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-md);
   }
 
@@ -485,10 +501,10 @@
   .pii-warning {
     margin-top: var(--space-4);
     padding: var(--space-3);
-    background: #fff3cd;
-    border: 1px solid #ffc107;
+    background: var(--warning-50);
+    border: 1px solid var(--warning-500);
     border-radius: var(--radius-sm);
-    color: #856404;
+    color: var(--warning-800);
     font-size: var(--font-size-sm);
   }
 </style>

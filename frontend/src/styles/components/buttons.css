@@ -47,9 +47,9 @@
 .btn-secondary {
   height: 40px;
   padding: 0 var(--space-3);
-  background: white;
-  color: var(--gray-900);
-  border: 1px solid var(--gray-300);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: 500;
@@ -57,7 +57,7 @@
 
 .btn-secondary:hover {
   border-color: var(--theo-blue);
-  background-color: var(--gray-50);
+  background-color: var(--bg-hover);
 }
 
 /* Danger/Destructive Button */
@@ -78,17 +78,17 @@
 .btn-small {
   height: 32px;
   padding: 0 var(--space-3);
-  background: white;
-  color: var(--gray-700);
-  border: 1px solid var(--gray-300);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
   font-weight: 500;
 }
 
 .btn-small:hover {
-  background: var(--gray-50);
-  border-color: var(--gray-400);
+  background: var(--bg-hover);
+  border-color: var(--border-secondary);
 }
 
 .btn-small.btn-danger {
@@ -116,41 +116,41 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   border-radius: var(--radius-full);
-  border: 1px solid var(--gray-300);
-  background-color: var(--gray-50);
-  color: var(--gray-700);
+  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-pill:hover {
   border-color: var(--theo-indigo);
-  color: var(--gray-900);
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 .btn-pill.active {
-  background: linear-gradient(white, white) padding-box,
-              var(--theo-gradient) border-box;
-  border: 1px solid transparent;
-  color: var(--gray-900);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-focus);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .btn-pill.btn-logout {
   background-color: transparent;
-  border-color: var(--gray-400);
-  color: var(--gray-600);
+  border-color: var(--border-secondary);
+  color: var(--text-tertiary);
 }
 
 .btn-pill.btn-logout:hover {
-  background-color: #fee;
-  border-color: #fcc;
-  color: #c33;
+  background-color: var(--error-50);
+  border-color: var(--error-300);
+  color: var(--error-600);
 }
 
 .btn-pill.btn-mode {
   font-weight: 600;
-  background: white;
+  background: var(--bg-primary);
 }
 
 .btn-pill.btn-mode.mode-work {
@@ -173,6 +173,18 @@
 .btn-pill.btn-mode.mode-personal:hover {
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
   color: white;
+}
+
+/* Theme Toggle Button */
+.btn-pill.btn-theme {
+  padding: 0 var(--space-2);
+  font-size: 1.1rem;
+  min-width: 32px;
+}
+
+.btn-pill.btn-theme:hover {
+  background-color: var(--bg-active);
+  transform: scale(1.05);
 }
 
 /* New session button */
@@ -201,14 +213,14 @@
 .delete-btn {
   background: transparent;
   border: none;
-  color: #999;
+  color: var(--text-tertiary);
   cursor: pointer;
   font-size: 0.9rem;
   padding: 0 0.25rem;
 }
 
 .delete-btn:hover {
-  color: #c00;
+  color: var(--error-500);
 }
 
 /* Confirm buttons */
