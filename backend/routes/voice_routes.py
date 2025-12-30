@@ -106,6 +106,25 @@ def text_to_speech():
             output_format="mp3"
         )
 
+        # Calculate cost and log usage
+        character_count = len(text)
+        model = provider.model  # tts-1 or tts-1-hd
+
+        # OpenAI TTS pricing (in micro-dollars per 1K characters)
+        # tts-1: $15/1M chars = $0.015/1K chars = 15,000 micro-dollars/1K chars
+        # tts-1-hd: $30/1M chars = $0.030/1K chars = 30,000 micro-dollars/1K chars
+        cost_per_1k_chars = 30000 if model == "tts-1-hd" else 15000
+        estimated_cost = int((character_count / 1000) * cost_per_1k_chars)
+
+        # Log usage
+        memory = MemoryStore(Config.DATABASE_URL)
+        memory.log_tts_usage(
+            model=model,
+            character_count=character_count,
+            estimated_cost=estimated_cost,
+            success=True
+        )
+
         # Return audio file
         return send_file(
             BytesIO(audio_bytes),
@@ -118,6 +137,21 @@ def text_to_speech():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logging.error(f"[VOICE_ROUTES] TTS error: {e}")
+
+        # Log failed request
+        try:
+            if 'text' in locals():
+                memory = MemoryStore(Config.DATABASE_URL)
+                memory.log_tts_usage(
+                    model="tts-1-hd",
+                    character_count=len(text),
+                    estimated_cost=0,
+                    success=False,
+                    error_message=str(e)
+                )
+        except:
+            pass
+
         return jsonify({"error": str(e)}), 500
 
 

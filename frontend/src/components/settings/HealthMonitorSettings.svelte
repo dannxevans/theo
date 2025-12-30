@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { setDebugFlag, getProviderCosts } from "../../lib/api";
+  import { setDebugFlag, getProviderCosts, getVoiceCosts } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
@@ -20,6 +20,7 @@
 
   // Cost tracking state
   let costData = null;
+  let voiceCostData = null;
   let selectedPeriod = 30;
   let costLoading = false;
 
@@ -92,10 +93,15 @@
   async function loadCostData() {
     costLoading = true;
     try {
-      costData = await getProviderCosts(selectedPeriod === "all" ? null : selectedPeriod);
+      const period = selectedPeriod === "all" ? null : selectedPeriod;
+      [costData, voiceCostData] = await Promise.all([
+        getProviderCosts(period),
+        getVoiceCosts(period)
+      ]);
     } catch (e) {
       console.error("Failed to load cost data:", e);
       costData = null;
+      voiceCostData = null;
     } finally {
       costLoading = false;
     }
@@ -109,6 +115,12 @@
   function getProviderCost(providerId) {
     if (!costData || !costData.providers) return null;
     return costData.providers.find(p => p.provider_id === providerId);
+  }
+
+  function getTotalCostUSD() {
+    const providerCost = costData?.total_cost_usd || 0;
+    const voiceCost = voiceCostData?.total_cost_usd || 0;
+    return providerCost + voiceCost;
   }
 
   onMount(() => {
@@ -167,17 +179,23 @@
         <div class="cost-main">
           <div class="cost-total">
             <span class="cost-label">Total Cost</span>
-            <span class="cost-amount">${costData.total_cost_usd.toFixed(6)}</span>
+            <span class="cost-amount">${getTotalCostUSD().toFixed(6)}</span>
           </div>
           <div class="cost-stats">
             <div class="cost-stat">
-              <span class="stat-label">Providers</span>
+              <span class="stat-label">AI Providers</span>
               <span class="stat-value">{costData.providers.length}</span>
+              <span class="stat-sublabel">${costData.total_cost_usd.toFixed(4)}</span>
+            </div>
+            <div class="cost-stat">
+              <span class="stat-label">Voice Services</span>
+              <span class="stat-value">{voiceCostData?.services?.length || 0}</span>
+              <span class="stat-sublabel">${(voiceCostData?.total_cost_usd || 0).toFixed(4)}</span>
             </div>
             <div class="cost-stat">
               <span class="stat-label">Total Requests</span>
               <span class="stat-value">
-                {costData.providers.reduce((sum, p) => sum + p.request_count, 0)}
+                {costData.providers.reduce((sum, p) => sum + p.request_count, 0) + (voiceCostData?.total_requests || 0)}
               </span>
             </div>
           </div>
@@ -275,7 +293,47 @@
     {/if}
   </div>
 
-  <!-- Section 2: Microsoft 365 Integration -->
+  <!-- Section 2: Voice Services -->
+  {#if voiceCostData && voiceCostData.services && voiceCostData.services.length > 0}
+    <div class="section">
+      <h3>Voice Services</h3>
+      <p class="hint">Text-to-Speech and Speech-to-Text usage and costs</p>
+
+      <div class="health-grid">
+        {#each voiceCostData.services as service}
+          <div class="health-card">
+            <div class="health-card-header">
+              <h4>{service.name}</h4>
+              <span class="health-badge badge-healthy">
+                Active
+              </span>
+            </div>
+            <div class="health-card-body">
+              <p><strong>Service Type:</strong> {service.service_type.toUpperCase()}</p>
+
+              <div class="metric-group">
+                <p><strong>Usage ({selectedPeriod ? selectedPeriod + 'd' : 'All Time'}):</strong></p>
+                {#if service.service_type === 'tts'}
+                  <p class="metric-small">{service.total_characters.toLocaleString()} characters synthesized</p>
+                {:else if service.service_type === 'stt'}
+                  <p class="metric-small">{Math.round(service.total_audio_seconds / 60)} minutes transcribed</p>
+                {/if}
+                <p class="metric-small">{service.request_count} requests</p>
+              </div>
+
+              <div class="cost-info">
+                <p><strong>Cost ({selectedPeriod ? selectedPeriod + 'd' : 'All Time'}):</strong>
+                  <span class="cost-value">${service.total_cost_usd.toFixed(6)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Section 3: Microsoft 365 Integration -->
   <div class="section">
     <h3>Microsoft 365 Integration</h3>
     <p class="hint">Connection status and token health for Microsoft Graph API</p>
@@ -371,7 +429,7 @@
     </div>
   </div>
 
-  <!-- Section 3: Service Providers -->
+  <!-- Section 4: Service Providers -->
   <div class="section">
     <h3>Service Providers</h3>
     <p class="hint">External service providers for bookings and appointments</p>
@@ -824,6 +882,12 @@
   .stat-value {
     font-size: var(--font-size-xl);
     font-weight: 600;
+  }
+
+  .stat-sublabel {
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
+    font-weight: normal;
   }
 
   /* Cost Info in Provider Cards */
