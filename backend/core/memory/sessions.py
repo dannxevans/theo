@@ -71,6 +71,23 @@ class SessionOperations(BaseMemoryOperations):
                         # Don't fail session creation if audit logging fails
                         logging.warning(f"Failed to log classification audit: {e}")
 
+    def get_session_title(self, session_id):
+        """
+        Get the current title for a session.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Session title or None if not set or session doesn't exist
+        """
+        with self._get_connection() as conn:
+            result = conn.execute(
+                select(self.sessions.c.title)
+                .where(self.sessions.c.id == session_id)
+            ).fetchone()
+            return result.title if result else None
+
     def save_session_title(self, session_id, title):
         """
         Save or update a session title.

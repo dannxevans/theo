@@ -220,9 +220,12 @@ class ContextManager:
         logging.info(f"[CONTEXT] Turns stored successfully")
 
         # Derive and persist session title if supported by memory store
-        if hasattr(self.memory, "save_session_title"):
-            title = self._derive_title(session_id)
-            self.memory.save_session_title(session_id, title)
+        # Only set auto-derived title if no title exists (don't overwrite AI-generated titles)
+        if hasattr(self.memory, "save_session_title") and hasattr(self.memory, "get_session_title"):
+            current_title = self.memory.get_session_title(session_id)
+            if not current_title:
+                title = self._derive_title(session_id)
+                self.memory.save_session_title(session_id, title)
 
         # Check if auto-summarization is needed
         if hasattr(self.memory, "should_generate_summary") and self.memory.should_generate_summary(session_id):
