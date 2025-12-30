@@ -54,6 +54,7 @@ def test_get_recent_turns_empty(memory):
 
 def test_save_session_title(memory):
     """Test save session title."""
+    memory.save_turn("session1", "user", "Hello")  # Need at least one turn for session to appear in list
     memory.save_session_title("session1", "My Conversation")
 
     sessions = memory.list_sessions()
@@ -64,6 +65,7 @@ def test_save_session_title(memory):
 
 def test_save_session_title_update(memory):
     """Test update session title."""
+    memory.save_turn("session1", "user", "Hello")  # Need at least one turn for session to appear in list
     memory.save_session_title("session1", "Original")
     memory.save_session_title("session1", "Updated")
 
@@ -178,6 +180,7 @@ def test_update_turn_metadata(memory):
 def test_ensure_session_creates_session(memory):
     """Test ensure session creates if not exists."""
     memory._ensure_session("new_session")
+    memory.save_turn("new_session", "user", "Hello")  # Need at least one turn for session to appear in list
 
     sessions = memory.list_sessions()
     session_ids = [s["id"] for s in sessions]

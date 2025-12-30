@@ -4,7 +4,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 **Philosophy**: Not "one model to rule them all," but use different models for different tasks while preserving seamless user experience.
 
-[![Tests](https://img.shields.io/badge/tests-617%20total-blue)]() [![Coverage](https://img.shields.io/badge/coverage-40.54%25-yellow)]() [![License](https://img.shields.io/badge/license-private-red)]()
+[![Tests](https://img.shields.io/badge/tests-450%20total-blue)]() [![Backend](https://img.shields.io/badge/backend-97.8%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-43.2%25-yellow)]() [![License](https://img.shields.io/badge/license-private-red)]()
 
 ---
 
@@ -77,10 +77,11 @@ For comprehensive documentation, visit the **[THEO Wiki](https://github.com/dann
 - **[Architecture Overview](https://github.com/dannxevans/theo/wiki/Architecture)** - System design and components
 - **[API Reference](https://github.com/dannxevans/theo/wiki/API-Reference)** - Complete API documentation
 - **[Configuration Guide](https://github.com/dannxevans/theo/wiki/Configuration)** - System prompts, intents, routing
+- **[Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide)** - Running and writing tests
+- **[Test Results](https://github.com/dannxevans/theo/wiki/Test-Results)** - Current test status and detailed analysis
 - **[Voice Features](DOCS/voice-features.md)** - Text-to-Speech and Speech-to-Text setup
 - **[M365 Integration](docs/M365_INTEGRATION.md)** - Microsoft 365 setup
 - **[AWS Deployment](docs/ECS_DATABASE_SETUP.md)** - ECS and S3 configuration
-- **[Testing Guide](docs/TESTING.md)** - Running and writing tests
 - **[Authentication](docs/AUTHENTICATION.md)** - Security and password management
 
 ### Local Documentation
@@ -124,14 +125,14 @@ theo/
 │   ├── providers/             # AI provider integrations
 │   ├── voice/                 # TTS/STT providers (OpenAI)
 │   ├── actions/               # Action providers (M365, etc.)
-│   └── tests/                 # 391 backend tests (38 voice tests)
+│   └── tests/                 # 186 backend tests (97.8% passing)
 └── frontend/
     ├── src/
     │   ├── components/        # Svelte components
     │   │   ├── settings/      # 11 modular settings components
     │   │   └── VoiceControls.svelte  # Voice UI controls
     │   └── lib/api.js         # REST client
-    └── tests/                 # 264 frontend tests
+    └── tests/                 # 264 frontend tests (58% passing)
 ```
 
 ---
@@ -184,11 +185,12 @@ THEO_S3_BACKUP_KEY=theo/theo.db            # S3 object key
 
 ```bash
 cd backend
+pip install -e .                            # Install package for testing
 pytest                                      # Run all tests
 pytest --cov=. --cov-report=html           # With coverage
 ```
 
-**Current Status**: 391 tests, 207 passing, 43.2% coverage
+**Current Status**: 186 tests, 182 passing (97.8%), 43.2% coverage
 
 ### Frontend Tests
 
@@ -198,9 +200,11 @@ npm test                                    # Run all tests
 npm run test:coverage                       # With coverage
 ```
 
-**Current Status**: 264 tests, 149 passing
+**Current Status**: 264 tests, 152 passing (57.6%)
 
-See [TESTING.md](docs/TESTING.md) for detailed test documentation.
+**Overall**: 450 tests, 334 passing (74.2%)
+
+See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [Test Results](https://github.com/dannxevans/theo/wiki/Test-Results) for detailed documentation.
 
 ---
 
@@ -208,7 +212,8 @@ See [TESTING.md](docs/TESTING.md) for detailed test documentation.
 
 - **Backend**: 5,300+ lines across 58 modular files
 - **Frontend**: Refactored from 2,777-line monolith to 12 components
-- **Tests**: 655 total tests (391 backend + 264 frontend)
+- **Tests**: 450 total tests (186 backend + 264 frontend)
+- **Test Pass Rate**: 74.2% overall (97.8% backend, 57.6% frontend)
 - **Coverage**: 43.2% backend, expanding frontend coverage
 - **Routes**: 15 blueprint modules with 66+ endpoints
 - **Documentation**: 10 comprehensive docs + GitHub Wiki
@@ -219,25 +224,27 @@ See [TESTING.md](docs/TESTING.md) for detailed test documentation.
 
 ### ✅ Completed
 - Multi-model routing with intent classification
+- Voice Features (OpenAI TTS/STT with auto-read mode)
 - Microsoft 365 integration (Calendar & Email)
 - OAuth 2.0 with automatic token refresh
 - Work/Personal modes with subtab configurations
 - Provider health monitoring and circuit breaker
-- Comprehensive testing infrastructure (617 tests)
+- Comprehensive testing infrastructure (450 tests, 97.8% backend passing)
 - Full codebase refactoring and modularization
+- UK Government OFFICIAL classification compliance
 
 ### 🔄 In Progress
-- Expanding test coverage to 70%+
+- Expanding frontend test coverage to 80%+
 - Cross-model conversation continuity
 - Enhanced memory relevance algorithms
 
 ### 📋 Planned
 - Google Workspace integration
 - Slack integration
-- Voice input/output
 - Multi-user administration UI
 - Email attachments and threading
 - Calendar conflict detection
+- Advanced voice controls
 
 ---
 
@@ -308,4 +315,4 @@ Built with:
 
 ---
 
-**Last Updated**: December 28, 2025
+**Last Updated**: December 30, 2025
