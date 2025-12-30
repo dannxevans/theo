@@ -4,7 +4,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 **Philosophy**: Not "one model to rule them all," but use different models for different tasks while preserving seamless user experience.
 
-[![Tests](https://img.shields.io/badge/tests-450%20total-blue)]() [![Backend](https://img.shields.io/badge/backend-97.8%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-43.2%25-yellow)]() [![License](https://img.shields.io/badge/license-private-red)]()
+[![Tests](https://img.shields.io/badge/tests-650%20total-blue)]() [![Backend](https://img.shields.io/badge/backend-67.6%25%20passing-green)]() [![Core](https://img.shields.io/badge/core%20logic-97.8%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-27.2%25-orange)]() [![License](https://img.shields.io/badge/license-private-red)]()
 
 ---
 
@@ -125,7 +125,7 @@ theo/
 │   ├── providers/             # AI provider integrations
 │   ├── voice/                 # TTS/STT providers (OpenAI)
 │   ├── actions/               # Action providers (M365, etc.)
-│   └── tests/                 # 186 backend tests (97.8% passing)
+│   └── tests/                 # 386 backend tests (67.6% passing, core 97.8%)
 └── frontend/
     ├── src/
     │   ├── components/        # Svelte components
@@ -186,11 +186,16 @@ THEO_S3_BACKUP_KEY=theo/theo.db            # S3 object key
 ```bash
 cd backend
 pip install -e .                            # Install package for testing
-pytest                                      # Run all tests
+pytest tests/memory tests/core              # Core business logic tests
+pytest tests/routes                         # API route tests
 pytest --cov=. --cov-report=html           # With coverage
 ```
 
-**Current Status**: 186 tests, 182 passing (97.8%), 43.2% coverage
+**Current Status**:
+- Core/Memory: 182/186 passing (97.8%) - Business logic
+- Routes: 79/200 passing (39.5%) - API endpoints
+- **Total Backend: 261/386 passing (67.6%)**
+- Code Coverage: 27.2%
 
 ### Frontend Tests
 
@@ -202,7 +207,7 @@ npm run test:coverage                       # With coverage
 
 **Current Status**: 264 tests, 152 passing (57.6%)
 
-**Overall**: 450 tests, 334 passing (74.2%)
+**Overall**: 650 tests, 413 passing (63.5%)
 
 See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [Test Results](https://github.com/dannxevans/theo/wiki/Test-Results) for detailed documentation.
 
@@ -212,9 +217,10 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 
 - **Backend**: 5,300+ lines across 58 modular files
 - **Frontend**: Refactored from 2,777-line monolith to 12 components
-- **Tests**: 450 total tests (186 backend + 264 frontend)
-- **Test Pass Rate**: 74.2% overall (97.8% backend, 57.6% frontend)
-- **Coverage**: 43.2% backend, expanding frontend coverage
+- **Tests**: 650 total tests (386 backend + 264 frontend)
+- **Test Pass Rate**: 63.5% overall (67.6% backend, 57.6% frontend)
+- **Core Business Logic**: 97.8% passing (182/186 tests)
+- **Code Coverage**: 27.2% backend, expanding test coverage
 - **Routes**: 15 blueprint modules with 66+ endpoints
 - **Documentation**: 10 comprehensive docs + GitHub Wiki
 
@@ -229,7 +235,7 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 - OAuth 2.0 with automatic token refresh
 - Work/Personal modes with subtab configurations
 - Provider health monitoring and circuit breaker
-- Comprehensive testing infrastructure (450 tests, 97.8% backend passing)
+- Comprehensive testing infrastructure (650 tests, core logic 97.8% passing)
 - Full codebase refactoring and modularization
 - UK Government OFFICIAL classification compliance
 

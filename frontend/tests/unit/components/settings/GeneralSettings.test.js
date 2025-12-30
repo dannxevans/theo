@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import GeneralSettings from '@/components/settings/GeneralSettings.svelte'
 import * as api from '@/lib/api.js'
@@ -18,6 +18,10 @@ describe('GeneralSettings Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('should render system prompt configuration form', () => {

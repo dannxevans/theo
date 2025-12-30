@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/svelte'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import HealthMonitorSettings from '@/components/settings/HealthMonitorSettings.svelte'
 import * as api from '@/lib/api.js'
@@ -68,6 +68,10 @@ describe('HealthMonitorSettings Component', () => {
       getItem: vi.fn(),
       setItem: vi.fn()
     }
+  })
+
+  afterEach(() => {
+    cleanup()
 
     global.window = {
       ...global.window,
