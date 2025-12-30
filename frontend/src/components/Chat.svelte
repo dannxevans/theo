@@ -147,6 +147,9 @@
   let advancedMode = false;
   let usedProviders = new Set(); // Track providers used in this session
 
+  // Input textarea reference for height reset
+  let inputTextarea = null;
+
   // Voice controls
   let voiceControls = null;
   let autoReadEnabled = localStorage.getItem("theo.autoRead") !== "false"; // Default to true
@@ -461,6 +464,11 @@
     const userText = input;
     input = "";
     error = null;
+
+    // Reset textarea height to default
+    if (inputTextarea) {
+      inputTextarea.style.height = 'auto';
+    }
 
     messages = [...messages, { role: "user", text: userText, created_at: new Date().toISOString() }];
     loading = true;
@@ -849,6 +857,7 @@
         </div>
         <div class="input">
           <textarea
+            bind:this={inputTextarea}
             bind:value={input}
             placeholder={isModeLocked ? 'Locked - Switch to ${sessionMode} mode' : "Talk to THEO AI"}
             on:keydown={(e) => {
