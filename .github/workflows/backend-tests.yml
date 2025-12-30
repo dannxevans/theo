@@ -15,6 +15,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
@@ -69,6 +70,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: test
     if: always()
     steps:

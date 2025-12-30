@@ -11,6 +11,7 @@ jobs:
   backend-core:
     name: Backend Core Tests (97.8%)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
 
@@ -35,6 +36,7 @@ jobs:
   backend-routes:
     name: Backend Route Tests (39.5%)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
 
@@ -60,6 +62,7 @@ jobs:
   frontend:
     name: Frontend Tests (57.6%)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
 
@@ -83,6 +86,7 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       security-events: write
       contents: read
@@ -110,6 +114,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [backend-core, backend-routes, frontend, security]
     if: always()
     steps:
