@@ -296,6 +296,10 @@ class MemoryStore:
         """Reset health metrics for a provider."""
         return self._provider_ops.reset_provider_health(provider_id)
 
+    def get_provider_costs(self, days=30):
+        """Get provider costs for specified period."""
+        return self._provider_ops.get_provider_costs(days)
+
     def estimate_cost(self, provider_id, input_tokens, output_tokens):
         """Estimate cost for a request in micro-dollars."""
         return self._provider_ops.estimate_cost(provider_id, input_tokens, output_tokens)

@@ -113,8 +113,18 @@ class GoogleProvider:
         try:
             # Gemini response format: candidates[0].content.parts[0].text
             text = data["candidates"][0]["content"]["parts"][0]["text"]
+            # Gemini usage format: usageMetadata
+            usage = data.get("usageMetadata", {})
+            input_tokens = usage.get("promptTokenCount", 0)
+            output_tokens = usage.get("candidatesTokenCount", 0)
         except (KeyError, IndexError):
             raise RuntimeError(f"Unexpected Gemini response: {data}")
+
+        # Store usage data in instance for router to access
+        self._last_usage = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens
+        }
 
         return text
 
