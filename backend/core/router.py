@@ -266,11 +266,35 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
 
 
 def provider_supports_intent(provider_cfg, intent: str) -> bool:
+    """
+    Check if a provider supports a given intent.
+
+    For hardcoded intents (coding, general, etc.), check PROVIDER_CAPABILITIES.
+    For custom user-defined intents, assume all providers can handle them via LLM.
+    """
     ptype = provider_cfg.get("type")
     allowed = PROVIDER_CAPABILITIES.get(ptype)
     if not allowed:
         return False
-    return intent in allowed
+
+    # Check if this is a hardcoded intent
+    if intent in allowed:
+        return True
+
+    # For custom intents, check if it's an action intent (M365, calendar, etc.)
+    # Action intents should NOT go to LLM providers
+    action_intents = {
+        "book_appointment", "update_appointment", "cancel_appointment",
+        "read_calendar", "compose_email", "read_email",
+        "approve_confirmation", "reject_confirmation"
+    }
+
+    if intent in action_intents:
+        # Action intents can only be handled by action providers (not LLM providers)
+        return False
+
+    # For all other custom intents, allow any LLM provider to handle them
+    return True
 
 
 def extract_explicit_memory(text: str):
