@@ -155,7 +155,7 @@ def test_get_routing_preferences(memory):
 def test_get_routing_preferences_empty(memory):
     """Test get routing preferences when none exist."""
     prefs = memory.get_routing_preferences("user1")
-    assert isinstance(prefs, list)
+    assert isinstance(prefs, dict)
     assert len(prefs) == 0
 
 

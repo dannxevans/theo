@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import IntentsSettings from '@/components/settings/IntentsSettings.svelte'
 import * as api from '@/lib/api.js'
@@ -37,6 +37,10 @@ describe('IntentsSettings Component', () => {
       ...global.window,
       confirm: vi.fn(() => true)
     }
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('should render intents list', () => {

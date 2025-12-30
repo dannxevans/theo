@@ -63,3 +63,8 @@ Thumbs.db
 .cache/
 docs/
 theo.wiki/
+
+# Python package build artifacts
+*.egg-info/
+dist/
+build/

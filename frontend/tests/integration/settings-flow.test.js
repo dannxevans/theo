@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/svelte'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import GeneralSettings from '@/components/settings/GeneralSettings.svelte'
 import IntentsSettings from '@/components/settings/IntentsSettings.svelte'
@@ -18,6 +18,10 @@ describe('Settings Flow Integration Tests', () => {
       confirm: vi.fn(() => true),
       alert: vi.fn()
     }
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   describe('General Settings Flow', () => {
