@@ -210,6 +210,7 @@ docker pull ghcr.io/dannxevans/theo-frontend:latest
 - Branch name pattern: `release`
 - ☑ Require pull request reviews (1 approval) - Recommended
 - ☑ Require status checks to pass:
+  - ✅ **Validate Source Branch** (enforces PRs only from `stage`)
   - ✅ build-backend
   - ✅ build-frontend
 - ☑ Require branches to be up to date before merging
@@ -219,6 +220,7 @@ docker pull ghcr.io/dannxevans/theo-frontend:latest
 - Branch name pattern: `main`
 - ☑ Require pull request reviews (1 approval) - Recommended
 - ☑ Require status checks to pass:
+  - ✅ **Validate Source Branch** (enforces PRs only from `release`)
   - ✅ build-backend
   - ✅ build-frontend
 - ☑ Require branches to be up to date before merging

@@ -56,10 +56,10 @@ feature/* → stage → release → main
 - Pattern: `stage` (test environment)
   - ☑ Require status checks: "Backend Core Tests"
 - Pattern: `release` (pre-production)
-  - ☑ Require status checks: "build-backend", "build-frontend"
+  - ☑ Require status checks: "Validate Source Branch", "build-backend", "build-frontend"
   - ☑ Require review: 1 approval
 - Pattern: `main` (production)
-  - ☑ Require status checks: "build-backend", "build-frontend"
+  - ☑ Require status checks: "Validate Source Branch", "build-backend", "build-frontend"
   - ☑ Require review: 1 approval
 
 ## Common Issues

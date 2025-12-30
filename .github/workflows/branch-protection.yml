@@ -1,0 +1,37 @@
+name: Branch Protection
+
+on:
+  pull_request:
+    branches: [ release, main ]
+
+jobs:
+  validate-source-branch:
+    name: Validate Source Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+    - name: Check source branch for release
+      if: github.base_ref == 'release'
+      run: |
+        if [[ "${{ github.head_ref }}" != "stage" ]]; then
+          echo "❌ ERROR: Only 'stage' branch can create PRs to 'release'"
+          echo "Current source branch: ${{ github.head_ref }}"
+          echo ""
+          echo "Correct workflow:"
+          echo "  feature/* → stage → release → main"
+          exit 1
+        fi
+        echo "✅ Valid: PR from 'stage' to 'release'"
+
+    - name: Check source branch for main
+      if: github.base_ref == 'main'
+      run: |
+        if [[ "${{ github.head_ref }}" != "release" ]]; then
+          echo "❌ ERROR: Only 'release' branch can create PRs to 'main'"
+          echo "Current source branch: ${{ github.head_ref }}"
+          echo ""
+          echo "Correct workflow:"
+          echo "  feature/* → stage → release → main"
+          exit 1
+        fi
+        echo "✅ Valid: PR from 'release' to 'main'"
