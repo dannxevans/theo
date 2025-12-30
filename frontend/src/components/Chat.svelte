@@ -954,6 +954,33 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   }
 
+  :global(.markdown p code),
+  :global(.markdown li code) {
+    display: inline;
+    white-space: normal;
+    word-break: keep-all;
+    background: rgba(110, 118, 129, 0.1);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  :global(.markdown strong),
+  :global(.markdown b) {
+    font-weight: 600;
+    font-family: inherit;
+    display: inline;
+    white-space: normal;
+  }
+
+  :global(.markdown em),
+  :global(.markdown i) {
+    font-style: italic;
+    font-family: inherit;
+    display: inline;
+    white-space: normal;
+  }
+
   :global(.copy-btn) {
     background: #1f6feb;
     color: #fff;
