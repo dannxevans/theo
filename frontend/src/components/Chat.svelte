@@ -170,7 +170,10 @@
   $: {
     if (autoReadEnabled && messages.length > lastMessageCount && lastMessageCount > 0) {
       const latestMessage = messages[messages.length - 1];
-      if (latestMessage && latestMessage.role === "assistant" && latestMessage.text) {
+      // Skip TTS for coding intent - we don't want lines of code read out loud
+      const shouldSkipTTS = latestMessage?.task_type === "coding";
+
+      if (latestMessage && latestMessage.role === "assistant" && latestMessage.text && !shouldSkipTTS) {
         // Reload voice settings in case they were changed
         loadVoiceSettings();
         // Auto-read the latest assistant message
