@@ -97,8 +97,34 @@ def get_health_overview():
     creds = memory.get_m365_credentials(user["id"])
 
     if creds:
+        # Proactively refresh token if it's close to expiry
+        # This ensures tokens are kept fresh even when M365 features aren't actively used
+        from actions.m365_provider import M365Provider
+        from datetime import timedelta
+
         expires_at = creds.get("expires_at")
         now = datetime.utcnow()
+
+        # Check if token needs refresh (within 5 minutes of expiry)
+        if expires_at and now >= (expires_at - timedelta(minutes=5)):
+            try:
+                logging.info("[HEALTH] M365 token expiring soon, attempting proactive refresh...")
+                provider = M365Provider(
+                    access_token=creds["access_token"],
+                    refresh_token=creds["refresh_token"],
+                    expires_at=expires_at,
+                    user_id=user["id"],
+                    memory_store=memory
+                )
+                # This will trigger token refresh if needed
+                provider._ensure_token_valid()
+
+                # Reload credentials after refresh
+                creds = memory.get_m365_credentials(user["id"])
+                expires_at = creds.get("expires_at")
+                logging.info(f"[HEALTH] Token refreshed successfully. New expiry: {expires_at}")
+            except Exception as e:
+                logging.error(f"[HEALTH] Proactive token refresh failed: {e}")
 
         # Calculate hours until expiry
         hours_until_expiry = None
