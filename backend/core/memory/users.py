@@ -28,9 +28,12 @@ class UserOperations(BaseMemoryOperations):
             username: Unique username
             password_hash: Hashed password
             is_admin: Whether user has admin privileges
+
+        Returns:
+            Created user ID
         """
         with self._get_connection() as conn:
-            conn.execute(
+            result = conn.execute(
                 insert(self.users).values(
                     username=username,
                     password_hash=password_hash,
@@ -40,6 +43,7 @@ class UserOperations(BaseMemoryOperations):
                     updated_at=datetime.utcnow(),
                 )
             )
+            return result.lastrowid
 
     def get_user_by_username(self, username):
         """

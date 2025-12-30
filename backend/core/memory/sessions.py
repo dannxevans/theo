@@ -96,6 +96,7 @@ class SessionOperations(BaseMemoryOperations):
             session_id: Session identifier
             title: Session title
         """
+        self._ensure_session(session_id)
         with self._get_connection() as conn:
             conn.execute(
                 update(self.sessions)
@@ -255,7 +256,7 @@ class SessionOperations(BaseMemoryOperations):
             session_id: Session identifier
 
         Returns:
-            Summary text or empty string if no summary exists
+            Summary text or None if no summary exists
         """
         with self._get_connection() as conn:
             row = conn.execute(
@@ -264,7 +265,7 @@ class SessionOperations(BaseMemoryOperations):
                 .order_by(self.summaries.c.created_at.desc())
                 .limit(1)
             ).fetchone()
-            return row.content if row else ""
+            return row.content if row else None
 
     def should_generate_summary(self, session_id, threshold=20):
         """

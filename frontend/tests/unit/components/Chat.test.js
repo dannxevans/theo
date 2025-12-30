@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import Chat from '@/components/Chat.svelte'
 import * as api from '@/lib/api.js'
@@ -68,6 +68,7 @@ describe('Chat Component', () => {
   })
 
   afterEach(() => {
+    cleanup()
     vi.clearAllMocks()
   })
 
