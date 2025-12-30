@@ -21,7 +21,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start 
 
 ### Prerequisites
 
