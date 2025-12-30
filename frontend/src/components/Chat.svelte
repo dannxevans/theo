@@ -713,7 +713,7 @@
                 <div class="message-header">
                   <strong>{m.role === "user" ? "Me" : "Theo"}</strong>
                   {#if m.created_at}
-                    <span class="timestamp">- {formatTimestamp(m.created_at)}</span>
+                    <span class="timestamp">{formatTimestamp(m.created_at)}</span>
                   {/if}
                 </div>
 
