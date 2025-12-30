@@ -2,11 +2,9 @@ name: Docker Build
 
 on:
   push:
-    branches: [ release, main ]  # Only build on release/main (not stage)
+    branches: [ release, main ]  # Build when code is merged to release/main
     tags:
       - 'v*.*.*'
-  pull_request:
-    branches: [ release, main ]
   workflow_dispatch:  # Allow manual trigger
 
 env:
