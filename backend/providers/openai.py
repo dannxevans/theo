@@ -103,8 +103,17 @@ class OpenAIProvider:
 
         try:
             text = data["choices"][0]["message"]["content"]
+            usage = data.get("usage", {})
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
         except (KeyError, IndexError):
             raise RuntimeError(f"Unexpected OpenAI response: {data}")
+
+        # Store usage data in instance for router to access
+        self._last_usage = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens
+        }
 
         return text
 

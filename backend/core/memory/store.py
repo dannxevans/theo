@@ -18,6 +18,7 @@ from .modes import ModeOperations
 from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
 from .actions import ActionOperations
+from .voice import VoiceOperations
 
 
 class MemoryStore:
@@ -95,6 +96,7 @@ class MemoryStore:
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
+        self._voice_ops = VoiceOperations(self.engine, tables)
 
     # =============================
     # Memory Operations (delegated)
@@ -295,6 +297,10 @@ class MemoryStore:
     def reset_provider_health(self, provider_id):
         """Reset health metrics for a provider."""
         return self._provider_ops.reset_provider_health(provider_id)
+
+    def get_provider_costs(self, days=30):
+        """Get provider costs for specified period."""
+        return self._provider_ops.get_provider_costs(days)
 
     def estimate_cost(self, provider_id, input_tokens, output_tokens):
         """Estimate cost for a request in micro-dollars."""
@@ -561,3 +567,19 @@ class MemoryStore:
                 session.close()
 
         return connection()
+
+    # =============================
+    # Voice Operations (delegated)
+    # =============================
+
+    def log_tts_usage(self, model, character_count, estimated_cost, success=True, error_message=None):
+        """Log TTS usage."""
+        return self._voice_ops.log_tts_usage(model, character_count, estimated_cost, success, error_message)
+
+    def log_stt_usage(self, model, audio_duration_seconds, estimated_cost, success=True, error_message=None):
+        """Log STT usage."""
+        return self._voice_ops.log_stt_usage(model, audio_duration_seconds, estimated_cost, success, error_message)
+
+    def get_voice_costs(self, days=30):
+        """Get voice service costs."""
+        return self._voice_ops.get_voice_costs(days)

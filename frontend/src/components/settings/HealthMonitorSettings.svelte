@@ -1,6 +1,6 @@
 <script>
-  import { createEventDispatcher } from "svelte";
-  import { setDebugFlag } from "../../lib/api";
+  import { createEventDispatcher, onMount } from "svelte";
+  import { setDebugFlag, getProviderCosts, getVoiceCosts } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
@@ -17,6 +17,12 @@
   let testingM365 = false;
   let m365TestResult = null;
   let savingDebug = false;
+
+  // Cost tracking state
+  let costData = null;
+  let voiceCostData = null;
+  let selectedPeriod = 30;
+  let costLoading = false;
 
   function formatRelativeTime(isoString) {
     if (!isoString) return 'Never';
@@ -81,7 +87,45 @@
 
   function handleRefresh() {
     dispatch("reload");
+    loadCostData();
   }
+
+  async function loadCostData() {
+    costLoading = true;
+    try {
+      const period = selectedPeriod === "all" ? null : selectedPeriod;
+      [costData, voiceCostData] = await Promise.all([
+        getProviderCosts(period),
+        getVoiceCosts(period)
+      ]);
+    } catch (e) {
+      console.error("Failed to load cost data:", e);
+      costData = null;
+      voiceCostData = null;
+    } finally {
+      costLoading = false;
+    }
+  }
+
+  async function changePeriod(days) {
+    selectedPeriod = days;
+    await loadCostData();
+  }
+
+  function getProviderCost(providerId) {
+    if (!costData || !costData.providers) return null;
+    return costData.providers.find(p => p.provider_id === providerId);
+  }
+
+  function getTotalCostUSD() {
+    const providerCost = costData?.total_cost_usd || 0;
+    const voiceCost = voiceCostData?.total_cost_usd || 0;
+    return providerCost + voiceCost;
+  }
+
+  onMount(() => {
+    loadCostData();
+  });
 </script>
 
 <div class="health-monitor-settings">
@@ -97,6 +141,67 @@
 
   {#if healthError}
     <div class="error-message">{healthError}</div>
+  {/if}
+
+  <!-- Cost Summary Banner -->
+  {#if !costLoading && costData}
+    <div class="cost-banner">
+      <div class="cost-banner-header">
+        <h3>💰 Cost Summary</h3>
+        <div class="period-selector">
+          <button
+            class="period-btn"
+            class:active={selectedPeriod === 7}
+            on:click={() => changePeriod(7)}>
+            7 Days
+          </button>
+          <button
+            class="period-btn"
+            class:active={selectedPeriod === 30}
+            on:click={() => changePeriod(30)}>
+            30 Days
+          </button>
+          <button
+            class="period-btn"
+            class:active={selectedPeriod === 90}
+            on:click={() => changePeriod(90)}>
+            90 Days
+          </button>
+          <button
+            class="period-btn"
+            class:active={selectedPeriod === null}
+            on:click={() => changePeriod(null)}>
+            All Time
+          </button>
+        </div>
+      </div>
+      <div class="cost-banner-body">
+        <div class="cost-main">
+          <div class="cost-total">
+            <span class="cost-label">Total Cost</span>
+            <span class="cost-amount">${getTotalCostUSD().toFixed(6)}</span>
+          </div>
+          <div class="cost-stats">
+            <div class="cost-stat">
+              <span class="stat-label">AI Providers</span>
+              <span class="stat-value">{costData.providers.length}</span>
+              <span class="stat-sublabel">${costData.total_cost_usd.toFixed(4)}</span>
+            </div>
+            <div class="cost-stat">
+              <span class="stat-label">Voice Services</span>
+              <span class="stat-value">{voiceCostData?.services?.length || 0}</span>
+              <span class="stat-sublabel">${(voiceCostData?.total_cost_usd || 0).toFixed(4)}</span>
+            </div>
+            <div class="cost-stat">
+              <span class="stat-label">Total Requests</span>
+              <span class="stat-value">
+                {costData.providers.reduce((sum, p) => sum + p.request_count, 0) + (voiceCostData?.total_requests || 0)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   {/if}
 
   <!-- Section 1: AI Providers Health -->
@@ -158,6 +263,20 @@
                   </span>
                 </p>
 
+                {#if costData && !costLoading}
+                  {@const providerCost = getProviderCost(provider.id)}
+                  {#if providerCost}
+                    <div class="cost-info">
+                      <p><strong>Cost ({selectedPeriod ? selectedPeriod + 'd' : 'All Time'}):</strong>
+                        <span class="cost-value">${providerCost.total_cost_usd.toFixed(6)}</span>
+                      </p>
+                      <p class="metric-small">
+                        {providerCost.input_tokens_total.toLocaleString()} input + {providerCost.output_tokens_total.toLocaleString()} output tokens
+                      </p>
+                    </div>
+                  {/if}
+                {/if}
+
                 {#if provider.last_success_at}
                   <p class="metric-small">Last Success: {formatRelativeTime(provider.last_success_at)}</p>
                 {/if}
@@ -174,7 +293,47 @@
     {/if}
   </div>
 
-  <!-- Section 2: Microsoft 365 Integration -->
+  <!-- Section 2: Voice Services -->
+  {#if voiceCostData && voiceCostData.services && voiceCostData.services.length > 0}
+    <div class="section">
+      <h3>Voice Services</h3>
+      <p class="hint">Text-to-Speech and Speech-to-Text usage and costs</p>
+
+      <div class="health-grid">
+        {#each voiceCostData.services as service}
+          <div class="health-card">
+            <div class="health-card-header">
+              <h4>{service.name}</h4>
+              <span class="health-badge badge-healthy">
+                Active
+              </span>
+            </div>
+            <div class="health-card-body">
+              <p><strong>Service Type:</strong> {service.service_type.toUpperCase()}</p>
+
+              <div class="metric-group">
+                <p><strong>Usage ({selectedPeriod ? selectedPeriod + 'd' : 'All Time'}):</strong></p>
+                {#if service.service_type === 'tts'}
+                  <p class="metric-small">{service.total_characters.toLocaleString()} characters synthesized</p>
+                {:else if service.service_type === 'stt'}
+                  <p class="metric-small">{Math.round(service.total_audio_seconds / 60)} minutes transcribed</p>
+                {/if}
+                <p class="metric-small">{service.request_count} requests</p>
+              </div>
+
+              <div class="cost-info">
+                <p><strong>Cost ({selectedPeriod ? selectedPeriod + 'd' : 'All Time'}):</strong>
+                  <span class="cost-value">${service.total_cost_usd.toFixed(6)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Section 3: Microsoft 365 Integration -->
   <div class="section">
     <h3>Microsoft 365 Integration</h3>
     <p class="hint">Connection status and token health for Microsoft Graph API</p>
@@ -270,7 +429,7 @@
     </div>
   </div>
 
-  <!-- Section 3: Service Providers -->
+  <!-- Section 4: Service Providers -->
   <div class="section">
     <h3>Service Providers</h3>
     <p class="hint">External service providers for bookings and appointments</p>
@@ -622,5 +781,124 @@
   input[type="checkbox"] {
     transform: scale(1.2);
     cursor: pointer;
+  }
+
+  /* Cost Banner Styles */
+  .cost-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
+    color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .cost-banner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .cost-banner-header h3 {
+    margin: 0;
+    color: white;
+    font-size: var(--font-size-xl);
+  }
+
+  .period-selector {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .period-btn {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: white;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .period-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .period-btn.active {
+    background: white;
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  .cost-banner-body {
+    display: flex;
+    gap: var(--space-6);
+  }
+
+  .cost-main {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cost-total {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .cost-label {
+    font-size: var(--font-size-sm);
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .cost-amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .cost-stats {
+    display: flex;
+    gap: var(--space-5);
+  }
+
+  .cost-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .stat-label {
+    font-size: var(--font-size-sm);
+    opacity: 0.8;
+  }
+
+  .stat-value {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+  }
+
+  .stat-sublabel {
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
+    font-weight: normal;
+  }
+
+  /* Cost Info in Provider Cards */
+  .cost-info {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-secondary);
+  }
+
+  .cost-value {
+    color: #667eea;
+    font-weight: 600;
   }
 </style>

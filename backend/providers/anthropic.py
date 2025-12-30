@@ -80,6 +80,17 @@ class AnthropicProvider(LLMProvider):
             if block.get("type") == "text":
                 text_parts.append(block.get("text", ""))
 
+        # Extract usage data
+        usage = data.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+
+        # Store usage data in instance for router to access
+        self._last_usage = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens
+        }
+
         return "\n".join(text_parts)
 
     def stream_chat(self, system, messages):

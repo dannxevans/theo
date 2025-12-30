@@ -266,11 +266,35 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
 
 
 def provider_supports_intent(provider_cfg, intent: str) -> bool:
+    """
+    Check if a provider supports a given intent.
+
+    For hardcoded intents (coding, general, etc.), check PROVIDER_CAPABILITIES.
+    For custom user-defined intents, assume all providers can handle them via LLM.
+    """
     ptype = provider_cfg.get("type")
     allowed = PROVIDER_CAPABILITIES.get(ptype)
     if not allowed:
         return False
-    return intent in allowed
+
+    # Check if this is a hardcoded intent
+    if intent in allowed:
+        return True
+
+    # For custom intents, check if it's an action intent (M365, calendar, etc.)
+    # Action intents should NOT go to LLM providers
+    action_intents = {
+        "book_appointment", "update_appointment", "cancel_appointment",
+        "read_calendar", "compose_email", "read_email",
+        "approve_confirmation", "reject_confirmation"
+    }
+
+    if intent in action_intents:
+        # Action intents can only be handled by action providers (not LLM providers)
+        return False
+
+    # For all other custom intents, allow any LLM provider to handle them
+    return True
 
 
 def extract_explicit_memory(text: str):
@@ -746,9 +770,18 @@ def route_request(context: dict, stream: bool = False):
         if memory:
             logging.info(f"[ROUTER] Updating health for provider {provider_cfg['id']}")
             memory.update_provider_health(provider_cfg["id"], success=True, latency_ms=latency_ms)
-            # Estimate tokens (rough approximation based on character count)
-            input_tokens = (len(system_prompt) + sum(len(m.get("content", "")) for m in messages)) // 4
-            output_tokens = 0  # Will be updated after response
+
+            # Extract actual token usage from provider
+            input_tokens = 0
+            output_tokens = 0
+            if hasattr(provider, '_last_usage'):
+                input_tokens = provider._last_usage.get("input_tokens", 0)
+                output_tokens = provider._last_usage.get("output_tokens", 0)
+                logging.info(f"[ROUTER] Token usage: {input_tokens} input, {output_tokens} output")
+
+            # Calculate cost
+            estimated_cost = memory.estimate_cost(provider_cfg["id"], input_tokens, output_tokens)
+
             memory.log_request(
                 session_id=session_id,
                 provider_id=provider_cfg["id"],
@@ -757,7 +790,7 @@ def route_request(context: dict, stream: bool = False):
                 latency_ms=latency_ms,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                estimated_cost=0,
+                estimated_cost=estimated_cost,
             )
 
     except Exception as e:
