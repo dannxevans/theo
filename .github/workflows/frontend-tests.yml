@@ -15,6 +15,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         node-version: ['16.x', '18.x', '20.x']
@@ -48,6 +49,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -63,7 +65,18 @@ jobs:
       working-directory: frontend
       run: npm ci
 
+    - name: Check if lint script exists
+      id: check-lint
+      working-directory: frontend
+      run: |
+        if npm run | grep -q "lint"; then
+          echo "has_lint=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_lint=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Run linter
+      if: steps.check-lint.outputs.has_lint == 'true'
       working-directory: frontend
       run: npm run lint
       continue-on-error: true  # Don't fail build on linting
