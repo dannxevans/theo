@@ -92,7 +92,7 @@
       else if (model.includes("grok-4")) modelName = "Grok-4";
       else if (model.includes("grok-3")) modelName = "Grok-3";
       else modelName = model;
-    } else if (model && (model.includes("mistral") || model.includes("magistral"))) {
+    } else if (model && (model.includes("mistral") || model.includes("magistral") || model.includes("codestral")) || provider && provider.includes("codestral")) {
       providerType = "Mistral";
       if (model.includes("mistral-large")) modelName = "Mistral Large";
       else if (model.includes("mistral-medium")) modelName = "Mistral Medium";
