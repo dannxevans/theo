@@ -140,3 +140,46 @@ def reset_provider_health(provider_id):
     memory.reset_provider_health(provider_id)
 
     return jsonify({"status": "ok"})
+
+
+@provider_bp.route("/costs", methods=["GET"])
+def get_provider_costs():
+    """
+    Get cost summary for all providers.
+    Query params:
+        - days: Number of days to look back (7, 30, 90, or omit for all-time)
+    Returns: {
+        "providers": [...],
+        "total_cost_usd": float,
+        "period_days": int or null
+    }
+    """
+    from app import memory
+
+    days_param = request.args.get("days")
+    days = None if days_param is None else int(days_param)
+
+    costs = memory.get_provider_costs(days)
+    return jsonify(costs)
+
+
+@provider_bp.route("/voice-costs", methods=["GET"])
+def get_voice_costs():
+    """
+    Get cost summary for voice services (TTS/STT).
+    Query params:
+        - days: Number of days to look back (7, 30, 90, or omit for all-time)
+    Returns: {
+        "services": [...],
+        "total_cost_usd": float,
+        "total_requests": int,
+        "period_days": int or null
+    }
+    """
+    from app import memory
+
+    days_param = request.args.get("days")
+    days = None if days_param is None else int(days_param)
+
+    costs = memory.get_voice_costs(days)
+    return jsonify(costs)

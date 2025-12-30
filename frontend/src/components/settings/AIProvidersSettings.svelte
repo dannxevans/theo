@@ -6,6 +6,7 @@
   export let healthSummary = {};
 
   const dispatch = createEventDispatcher();
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
   let showAddProviderForm = false;
   let editingProvider = null;
@@ -17,7 +18,9 @@
     base_url: "",
     model: "",
     api_key: "",
-    enabled: true
+    enabled: true,
+    cost_per_1k_input: "",
+    cost_per_1k_output: ""
   };
 
   function getHealthBadge(providerId) {
@@ -149,7 +152,36 @@
     }
 
     try {
-      await upsertProvider(providerForm);
+      // Save provider configuration
+      // Only include api_key if it's not empty (to preserve existing key when editing)
+      const providerData = { ...providerForm };
+      if (!providerData.api_key) {
+        delete providerData.api_key;
+      }
+      await upsertProvider(providerData);
+
+      // Save cost metadata if provided
+      const inputCost = parseFloat(providerForm.cost_per_1k_input) || 0;
+      const outputCost = parseFloat(providerForm.cost_per_1k_output) || 0;
+
+      if (inputCost > 0 || outputCost > 0) {
+        // Convert USD to micro-dollars (multiply by 1,000,000)
+        const costData = {
+          cost_per_1k_input: Math.round(inputCost * 1000000),
+          cost_per_1k_output: Math.round(outputCost * 1000000)
+        };
+
+        const token = localStorage.getItem("auth_token");
+        await fetch(`${API_BASE}/api/providers/${providerForm.id}/metadata`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(costData)
+        });
+      }
+
       cancelProviderForm();
       dispatch("reload");
     } catch (e) {
@@ -170,7 +202,7 @@
     }
   }
 
-  function editProvider(p) {
+  async function editProvider(p) {
     editingProvider = p.id;
     providerForm = {
       id: p.id,
@@ -179,8 +211,30 @@
       base_url: p.base_url || "",
       model: p.model || "",
       api_key: "", // never prefill secrets
-      enabled: p.enabled
+      enabled: p.enabled,
+      cost_per_1k_input: "",
+      cost_per_1k_output: ""
     };
+
+    // Fetch existing cost metadata
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(`${API_BASE}/api/providers/${p.id}/metadata`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const metadata = await response.json();
+        // Convert micro-dollars back to USD
+        providerForm.cost_per_1k_input = (metadata.cost_per_1k_input_tokens / 1000000).toFixed(6);
+        providerForm.cost_per_1k_output = (metadata.cost_per_1k_output_tokens / 1000000).toFixed(6);
+      }
+    } catch (e) {
+      console.error("Failed to load cost metadata:", e);
+    }
+
     showAddProviderForm = true;
   }
 
@@ -266,6 +320,16 @@
       <div class="form-group">
         <label for="provider-api-key">API Key (leave empty to keep existing)</label>
         <input id="provider-api-key" type="password" bind:value={providerForm.api_key} placeholder="sk-..."/>
+      </div>
+      <div class="form-group">
+        <label for="provider-cost-input">Cost per 1K Input Tokens (USD)</label>
+        <input id="provider-cost-input" type="number" step="0.000001" min="0" bind:value={providerForm.cost_per_1k_input} placeholder="0.00"/>
+        <p class="hint">Cost in USD for every 1,000 input tokens. Leave as 0 for free providers.</p>
+      </div>
+      <div class="form-group">
+        <label for="provider-cost-output">Cost per 1K Output Tokens (USD)</label>
+        <input id="provider-cost-output" type="number" step="0.000001" min="0" bind:value={providerForm.cost_per_1k_output} placeholder="0.00"/>
+        <p class="hint">Cost in USD for every 1,000 output tokens. Leave as 0 for free providers.</p>
       </div>
       <div class="form-group">
         <label class="checkbox-label">

@@ -64,18 +64,24 @@ class ProviderOperations(BaseMemoryOperations):
             ).fetchone()
 
             if existing:
+                # Build update values - preserve existing api_key if not provided
+                update_values = {
+                    "name": provider["name"],
+                    "type": provider["type"],
+                    "base_url": provider.get("base_url"),
+                    "model": provider.get("model"),
+                    "enabled": provider.get("enabled", True),
+                    "updated_at": datetime.utcnow(),
+                }
+
+                # Only update api_key if it's explicitly provided
+                if "api_key" in provider:
+                    update_values["api_key"] = provider["api_key"]
+
                 conn.execute(
                     update(self.providers)
                     .where(self.providers.c.id == provider["id"])
-                    .values(
-                        name=provider["name"],
-                        type=provider["type"],
-                        base_url=provider.get("base_url"),
-                        model=provider.get("model"),
-                        api_key=provider.get("api_key"),
-                        enabled=provider.get("enabled", True),
-                        updated_at=datetime.utcnow(),
-                    )
+                    .values(**update_values)
                 )
             else:
                 conn.execute(
@@ -111,13 +117,15 @@ class ProviderOperations(BaseMemoryOperations):
 
     def init_provider_metadata(self, provider_id, cost_per_1k_input=0, cost_per_1k_output=0):
         """
-        Initialize provider metadata with cost data.
+        Initialize or update provider metadata with cost data.
 
         Args:
             provider_id: Provider identifier
             cost_per_1k_input: Cost per 1K input tokens in micro-dollars (1/1,000,000 of $1)
             cost_per_1k_output: Cost per 1K output tokens in micro-dollars
         """
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
         with self._get_connection() as conn:
             existing = conn.execute(
                 select(self.provider_metadata.c.provider_id)
@@ -125,6 +133,7 @@ class ProviderOperations(BaseMemoryOperations):
             ).fetchone()
 
             if not existing:
+                # Create new metadata entry
                 conn.execute(
                     insert(self.provider_metadata).values(
                         provider_id=provider_id,
@@ -135,6 +144,18 @@ class ProviderOperations(BaseMemoryOperations):
                         failed_requests=0,
                         health_status="unknown",
                         circuit_breaker_open=False,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+            else:
+                # Update existing metadata's cost fields
+                from sqlalchemy import update
+                conn.execute(
+                    update(self.provider_metadata)
+                    .where(self.provider_metadata.c.provider_id == provider_id)
+                    .values(
+                        cost_per_1k_input_tokens=cost_per_1k_input,
+                        cost_per_1k_output_tokens=cost_per_1k_output,
                         updated_at=datetime.utcnow(),
                     )
                 )
@@ -340,6 +361,63 @@ class ProviderOperations(BaseMemoryOperations):
         output_cost = (output_tokens / 1000) * metadata["cost_per_1k_output_tokens"]
 
         return int(input_cost + output_cost)
+
+    def get_provider_costs(self, days=30):
+        """
+        Calculate total costs for all providers over the specified period.
+
+        Args:
+            days: Number of days to look back (7, 30, 90, or None for all-time)
+
+        Returns:
+            Dictionary with provider costs and totals
+        """
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+
+        with self._get_connection() as conn:
+            # Build query with optional date filter
+            query = select(
+                self.request_logs.c.provider_id,
+                func.sum(self.request_logs.c.input_tokens).label("total_input_tokens"),
+                func.sum(self.request_logs.c.output_tokens).label("total_output_tokens"),
+                func.sum(self.request_logs.c.estimated_cost).label("total_cost_microdollars"),
+                func.count(self.request_logs.c.id).label("request_count")
+            ).group_by(self.request_logs.c.provider_id)
+
+            # Apply date filter if specified
+            if days is not None:
+                cutoff_date = datetime.utcnow() - timedelta(days=days)
+                query = query.where(self.request_logs.c.created_at >= cutoff_date)
+
+            rows = conn.execute(query).fetchall()
+
+            # Build response
+            providers = []
+            total_cost_usd = 0.0
+
+            for row in rows:
+                cost_usd = row.total_cost_microdollars / 1_000_000 if row.total_cost_microdollars else 0.0
+                total_cost_usd += cost_usd
+
+                # Get provider name
+                provider_info = self.get_provider(row.provider_id)
+                provider_name = provider_info.get("name", row.provider_id) if provider_info else row.provider_id
+
+                providers.append({
+                    "provider_id": row.provider_id,
+                    "name": provider_name,
+                    "total_cost_usd": round(cost_usd, 6),
+                    "input_tokens_total": row.total_input_tokens or 0,
+                    "output_tokens_total": row.total_output_tokens or 0,
+                    "request_count": row.request_count or 0
+                })
+
+            return {
+                "providers": providers,
+                "total_cost_usd": round(total_cost_usd, 6),
+                "period_days": days
+            }
 
     def delete_provider_metadata(self, provider_id):
         """

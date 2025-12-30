@@ -603,6 +603,38 @@ export async function resetProviderHealth(providerId) {
   return response.json();
 }
 
+export async function getProviderCosts(days = 30) {
+  const params = new URLSearchParams();
+  if (days !== null) {
+    params.append("days", days.toString());
+  }
+
+  const response = await fetch(`${API_BASE}/api/providers/costs?${params}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get provider costs");
+  }
+
+  return response.json();
+}
+
+export async function getVoiceCosts(days = 30) {
+  const params = new URLSearchParams();
+  if (days !== null) {
+    params.append("days", days.toString());
+  }
+
+  const response = await fetch(`${API_BASE}/api/providers/voice-costs?${params}`);
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get voice costs");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Authentication API
 // =============================

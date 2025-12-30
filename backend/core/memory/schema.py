@@ -215,6 +215,24 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Voice Services Usage
+    # =============================
+    voice_usage_logs = Table(
+        "voice_usage_logs",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("service_type", String, nullable=False),  # "tts" or "stt"
+        Column("provider", String, nullable=False),  # "openai_tts_standard", "openai_tts_hd", "openai_whisper"
+        Column("model", String, nullable=True),  # e.g., "tts-1", "tts-1-hd", "whisper-1"
+        Column("character_count", Integer, default=0),  # for TTS
+        Column("audio_duration_seconds", Integer, default=0),  # for STT
+        Column("estimated_cost", Integer, default=0),  # in micro-dollars
+        Column("success", Boolean, default=True),
+        Column("error_message", Text, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
     # Providers
     # =============================
     providers = Table(
@@ -440,6 +458,7 @@ def create_schema(meta: MetaData):
         "routing_preferences": routing_preferences,
         "provider_metadata": provider_metadata,
         "request_logs": request_logs,
+        "voice_usage_logs": voice_usage_logs,
         "providers": providers,
         "sessions": sessions,
         "summaries": summaries,

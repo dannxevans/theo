@@ -770,9 +770,18 @@ def route_request(context: dict, stream: bool = False):
         if memory:
             logging.info(f"[ROUTER] Updating health for provider {provider_cfg['id']}")
             memory.update_provider_health(provider_cfg["id"], success=True, latency_ms=latency_ms)
-            # Estimate tokens (rough approximation based on character count)
-            input_tokens = (len(system_prompt) + sum(len(m.get("content", "")) for m in messages)) // 4
-            output_tokens = 0  # Will be updated after response
+
+            # Extract actual token usage from provider
+            input_tokens = 0
+            output_tokens = 0
+            if hasattr(provider, '_last_usage'):
+                input_tokens = provider._last_usage.get("input_tokens", 0)
+                output_tokens = provider._last_usage.get("output_tokens", 0)
+                logging.info(f"[ROUTER] Token usage: {input_tokens} input, {output_tokens} output")
+
+            # Calculate cost
+            estimated_cost = memory.estimate_cost(provider_cfg["id"], input_tokens, output_tokens)
+
             memory.log_request(
                 session_id=session_id,
                 provider_id=provider_cfg["id"],
@@ -781,7 +790,7 @@ def route_request(context: dict, stream: bool = False):
                 latency_ms=latency_ms,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                estimated_cost=0,
+                estimated_cost=estimated_cost,
             )
 
     except Exception as e:
