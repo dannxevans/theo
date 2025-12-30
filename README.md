@@ -4,7 +4,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 **Philosophy**: Not "one model to rule them all," but use different models for different tasks while preserving seamless user experience.
 
-[![Tests](https://img.shields.io/badge/tests-650%20total-blue)]() [![Backend](https://img.shields.io/badge/backend-67.6%25%20passing-green)]() [![Core](https://img.shields.io/badge/core%20logic-97.8%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-27.2%25-orange)]() [![License](https://img.shields.io/badge/license-private-red)]()
+![CI](https://github.com/dannxevans/theo/actions/workflows/ci.yml/badge.svg?branch=stage) [![Tests](https://img.shields.io/badge/tests-650%20total-blue)]() [![Backend](https://img.shields.io/badge/backend-67.6%25%20passing-green)]() [![Core](https://img.shields.io/badge/core%20logic-97.8%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-27.2%25-orange)]() [![License](https://img.shields.io/badge/license-private-red)]()
 
 ---
 
