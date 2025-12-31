@@ -17,10 +17,12 @@ def get_routing_preferences():
     """
     from core.memory import MemoryStore
     from config import Config
+    from flask import g
 
     memory = MemoryStore(Config.DATABASE_URL)
-    prefs = memory.get_routing_preferences("local")
-    
+    user_id = str(getattr(g, 'user_id', 'local'))
+    prefs = memory.get_routing_preferences(user_id)
+
     return jsonify(prefs)
 
 
@@ -33,16 +35,18 @@ def set_routing_preference():
     """
     from core.memory import MemoryStore
     from config import Config
+    from flask import g
 
     memory = MemoryStore(Config.DATABASE_URL)
+    user_id = str(getattr(g, 'user_id', 'local'))
     data = request.json
-    
+
     memory.set_routing_preference(
-        user_id="local",
+        user_id=user_id,
         intent=data["intent"],
         provider_id=data["provider_id"],
     )
-    
+
     return jsonify({"status": "ok"})
 
 
@@ -54,8 +58,10 @@ def delete_routing_preference(intent):
     """
     from core.memory import MemoryStore
     from config import Config
+    from flask import g
 
     memory = MemoryStore(Config.DATABASE_URL)
-    memory.delete_routing_preference("local", intent)
-    
+    user_id = str(getattr(g, 'user_id', 'local'))
+    memory.delete_routing_preference(user_id, intent)
+
     return jsonify({"status": "ok"})

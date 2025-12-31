@@ -23,10 +23,10 @@
 
 <div class="tab-panel">
   <h2>Routing Rules</h2>
-  <p class="subtitle">Assign specific AI providers to intents for customized routing.</p>
+  <p class="subtitle">Assign specific AI providers to intents for customized routing. Action intents are not shown here as they have predefined routing.</p>
 
   <div class="routing-form">
-    {#each intents.filter(i => i.enabled) as intent}
+    {#each intents.filter(i => i.enabled && !i.is_action) as intent}
       <div class="form-group">
         <label for="route-{intent.id}">{intent.name}</label>
         <select

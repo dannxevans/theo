@@ -45,7 +45,7 @@ def login():
 
     # Create session token
     token = generate_session_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 day session
+    expires_at = datetime.utcnow() + timedelta(days=Config.SESSION_EXPIRY_DAYS)
 
     memory.create_auth_session(token, user["id"], expires_at)
 
@@ -103,15 +103,35 @@ def verify_session():
     if not session:
         return jsonify({"valid": False})
 
-    # Check expiration
-    if session["expires_at"] < datetime.utcnow():
+    now = datetime.utcnow()
+
+    # Check absolute expiration
+    if session["expires_at"] < now:
         memory.delete_auth_session(token)
         return jsonify({"valid": False})
+
+    # Check inactivity timeout
+    # Get user's session timeout preference (defaults to 8 hours)
+    user_id = session["user_id"]
+    timeout_hours_str = memory.get_user_preference(user_id, "session_timeout", str(Config.DEFAULT_SESSION_INACTIVITY_HOURS))
+    try:
+        timeout_hours = int(timeout_hours_str)
+    except (ValueError, TypeError):
+        timeout_hours = Config.DEFAULT_SESSION_INACTIVITY_HOURS
+
+    last_activity = session.get("last_activity_at") or session.get("created_at")
+    inactivity_threshold = timedelta(hours=timeout_hours)
+    if last_activity and (now - last_activity) > inactivity_threshold:
+        memory.delete_auth_session(token)
+        return jsonify({"valid": False, "reason": "inactivity_timeout"})
 
     # Get user
     user = memory.get_user_by_id(session["user_id"])
     if not user or not user["is_enabled"]:
         return jsonify({"valid": False})
+
+    # Update last activity timestamp
+    memory.update_session_activity(token)
 
     return jsonify({
         "valid": True,
