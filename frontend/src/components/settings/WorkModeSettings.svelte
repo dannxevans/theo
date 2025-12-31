@@ -126,7 +126,7 @@
 </script>
 
 <div class="tab-panel">
-  <h2>💼 Work Mode</h2>
+  <h2>Work Mode</h2>
   <p class="subtitle">Professional tone and optimized for productivity tasks.</p>
 
   <!-- Work Mode Settings -->
@@ -259,7 +259,7 @@
 
   <!-- Work Mode Sub-Tabs Configuration -->
   <div class="section">
-    <h3>💼 Work Mode Sub-Tabs</h3>
+    <h3>Work Mode Sub-Tabs</h3>
     <p class="hint">Configure automatic context injection for work mode sub-tabs</p>
 
     <!-- Code Development Sub-Tab -->

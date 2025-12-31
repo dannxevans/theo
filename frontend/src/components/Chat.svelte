@@ -704,7 +704,7 @@
       <!-- Mode Lock Warning -->
       {#if isModeLocked}
         <div class="mode-lock-warning">
-          This is a {sessionMode} chat. To continue, switch to {sessionMode} mode.
+          This is a {sessionMode} chat. To continue, you must switch modes
         </div>
       {/if}
 
@@ -879,7 +879,7 @@
           <textarea
             bind:this={inputTextarea}
             bind:value={input}
-            placeholder={isModeLocked ? `Locked - Switch to ${sessionMode} mode` : "Talk to THEO AI"}
+            placeholder={isModeLocked ? `This is a ${sessionMode} chat. To continue you must switch modes` : "How can I help you today?"}
             on:keydown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !isModeLocked) {
                 e.preventDefault();
