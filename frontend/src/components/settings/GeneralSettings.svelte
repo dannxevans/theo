@@ -32,8 +32,8 @@
   <h2>System Prompt Configuration</h2>
   <p class="subtitle">Customize how THEO responds and behaves.</p>
 
-  <div class="section">
-    <div class="form-group">
+<div class="section">
+    <!--   <div class="form-group">
       <label for="persona-name">Persona Name</label>
       <input
         id="persona-name"
@@ -42,7 +42,7 @@
         placeholder="e.g., THEO"
       />
       <small>The name your AI assistant will identify as</small>
-    </div>
+    </div> -->
 
     <div class="form-group">
       <label for="tone">Tone</label>

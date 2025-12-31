@@ -405,8 +405,8 @@
       {#if activeTab === "memory"}Memory{/if}
       {#if activeTab === "voice"}Voice{/if}
       {#if activeTab === "theme"}Theme{/if}
-      {#if activeTab === "personal"}🏠 Personal Mode{/if}
-      {#if activeTab === "work"}💼 Work Mode{/if}
+      {#if activeTab === "personal"}Personal Mode{/if}
+      {#if activeTab === "work"}Work Mode{/if}
       {#if activeTab === "theo-account"}THEO Account{/if}
       {#if activeTab === "ai-providers"}AI Providers{/if}
       {#if activeTab === "integrations"}Integrations{/if}
