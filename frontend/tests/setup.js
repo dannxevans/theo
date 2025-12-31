@@ -1,11 +1,7 @@
 import '@testing-library/jest-dom'
-import { expect, afterEach } from 'vitest'
-import { cleanup } from '@testing-library/svelte'
+import { expect } from 'vitest'
 
-// Cleanup after each test
-afterEach(() => {
-  cleanup()
-})
+// Note: No manual cleanup - tests that need cleanup should handle it themselves
 
 // Mock localStorage
 const localStorageMock = {
