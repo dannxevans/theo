@@ -3,17 +3,22 @@
 Seed default intents for a specific user.
 
 Usage:
-    python3 seed_user_intents.py <database_path> <user_id>
+    python3 /app/migrations/seed_user_intents.py <database_path> <user_id>
 
 Example:
-    python3 seed_user_intents.py /data/theo.db 1
+    python3 /app/migrations/seed_user_intents.py /data/theo.db 1
 """
 
 import sys
 import os
 
-# Add parent directory to path so we can import from core
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add /app to Python path so we can import from core
+app_dir = '/app'
+if os.path.exists(app_dir):
+    sys.path.insert(0, app_dir)
+else:
+    # Fallback for local development
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.memory import MemoryStore
 
