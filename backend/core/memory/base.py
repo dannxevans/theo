@@ -47,6 +47,7 @@ class BaseMemoryOperations:
         self.routing_preferences = tables["routing_preferences"]
         self.provider_metadata = tables["provider_metadata"]
         self.request_logs = tables["request_logs"]
+        self.voice_usage_logs = tables["voice_usage_logs"]
         self.providers = tables["providers"]
         self.sessions = tables["sessions"]
         self.summaries = tables["summaries"]

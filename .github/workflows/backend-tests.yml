@@ -34,23 +34,17 @@ jobs:
         pip install -r requirements.txt
         pip install -e .
 
-    - name: Run core/memory tests (97.8% passing)
+    - name: Run all backend tests (100% passing)
       working-directory: backend
       run: |
-        pytest tests/memory tests/core -v --tb=short --color=yes
-      continue-on-error: false  # Fail build if core tests fail
-
-    - name: Run route tests (informational)
-      working-directory: backend
-      run: |
-        pytest tests/routes -v --tb=short --color=yes
-      continue-on-error: true  # Don't fail build on route tests (39.5% passing)
+        pytest tests/ -v --tb=short --color=yes
+      continue-on-error: false  # Fail build if tests fail
 
     - name: Generate coverage report
       working-directory: backend
       if: matrix.python-version == '3.11'  # Only generate coverage once
       run: |
-        pytest tests/memory tests/core --cov=core --cov-report=xml --cov-report=term
+        pytest tests/ --cov=. --cov-report=xml --cov-report=term
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.11'
@@ -71,6 +65,5 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          echo "✅ Core/Memory tests passed (97.8% passing rate)"
-          echo "ℹ️  Route tests are informational (39.5% passing rate)"
+          echo "✅ All backend tests passed (100% - 445/445 tests)"
           echo "📊 Full test results available in job logs"

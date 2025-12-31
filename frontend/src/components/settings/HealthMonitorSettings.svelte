@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { setDebugFlag, getProviderCosts, getVoiceCosts } from "../../lib/api";
+  import { setDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
@@ -23,6 +23,7 @@
   let voiceCostData = null;
   let selectedPeriod = 30;
   let costLoading = false;
+  let resettingUsage = false;
 
   function formatRelativeTime(isoString) {
     if (!isoString) return 'Never';
@@ -112,6 +113,34 @@
     await loadCostData();
   }
 
+  async function handleResetUsage() {
+    const confirmed = confirm(
+      "⚠️ WARNING: This will permanently delete ALL provider usage data including:\n\n" +
+      "• All request logs\n" +
+      "• All voice usage logs\n" +
+      "• All cost tracking history\n" +
+      "• All health metrics\n\n" +
+      "Provider configurations will be preserved.\n\n" +
+      "This action cannot be undone. Continue?"
+    );
+
+    if (!confirmed) return;
+
+    resettingUsage = true;
+    try {
+      await resetProviderUsage();
+      // Reload health data and costs after reset
+      dispatch("reload");
+      await loadCostData();
+      alert("✓ Provider usage data has been reset successfully");
+    } catch (e) {
+      console.error("Failed to reset provider usage:", e);
+      alert("Failed to reset provider usage: " + e.message);
+    } finally {
+      resettingUsage = false;
+    }
+  }
+
   function getProviderCost(providerId) {
     if (!costData || !costData.providers) return null;
     return costData.providers.find(p => p.provider_id === providerId);
@@ -134,9 +163,14 @@
       <h2>System Health Monitor</h2>
       <p class="subtitle">Monitor AI provider health, performance metrics, and system status.</p>
     </div>
-    <button class="btn-secondary" on:click={handleRefresh} disabled={healthLoading}>
-      {healthLoading ? 'Refreshing...' : 'Refresh All'}
-    </button>
+    <div class="header-actions">
+      <button class="btn-secondary" on:click={handleRefresh} disabled={healthLoading}>
+        {healthLoading ? 'Refreshing...' : 'Refresh All'}
+      </button>
+      <button class="btn-danger" on:click={handleResetUsage} disabled={resettingUsage}>
+        {resettingUsage ? 'Resetting...' : 'Reset Provider Usage'}
+      </button>
+    </div>
   </div>
 
   {#if healthError}
@@ -519,6 +553,34 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: var(--space-6);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .btn-danger {
+    padding: 8px 16px;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    border: 1px solid #DC2626;
+    background: #DC2626;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #B91C1C;
+    border-color: #B91C1C;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+  }
+
+  .btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .section {
