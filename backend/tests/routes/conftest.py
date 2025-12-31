@@ -310,6 +310,11 @@ def sample_provider(memory):
     memory.upsert_provider(provider)
     memory.init_provider_metadata(provider["id"])
 
+    # Reload provider_registry cache to pick up the new provider
+    import app as app_module
+    if hasattr(app_module, 'provider_registry'):
+        app_module.provider_registry.reload()
+
     return provider
 
 
