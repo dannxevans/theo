@@ -5,7 +5,8 @@ Delegates to specialized operation modules using a clean modular architecture.
 All table definitions are centralized in schema.py.
 """
 
-from sqlalchemy import create_engine, MetaData
+from datetime import datetime
+from sqlalchemy import create_engine, MetaData, select, insert, update, delete
 from sqlalchemy.orm import sessionmaker
 
 from .schema import create_schema
@@ -194,6 +195,10 @@ class MemoryStore:
         """Seed default intents if none exist for the user."""
         return self._intent_ops.seed_default_intents(user_id)
 
+    def get_action_intents(self, user_id):
+        """Get all enabled action intents for a user."""
+        return self._intent_ops.get_action_intents(user_id)
+
     # =============================
     # Session Operations (delegated)
     # =============================
@@ -353,6 +358,10 @@ class MemoryStore:
     def delete_auth_session(self, session_id):
         """Delete authentication session (logout)."""
         return self._user_ops.delete_auth_session(session_id)
+
+    def update_session_activity(self, session_id):
+        """Update last activity timestamp for a session."""
+        return self._user_ops.update_session_activity(session_id)
 
     def cleanup_expired_sessions(self):
         """Remove expired authentication sessions."""
@@ -583,3 +592,56 @@ class MemoryStore:
     def get_voice_costs(self, days=30):
         """Get voice service costs."""
         return self._voice_ops.get_voice_costs(days)
+
+    # =============================
+    # User Preferences
+    # =============================
+
+    def get_user_preference(self, user_id, key, default=None):
+        """
+        Get a user preference value.
+
+        Args:
+            user_id: User identifier
+            key: Preference key
+            default: Default value if preference doesn't exist
+
+        Returns:
+            Preference value or default
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                select(self.preferences)
+                .where(self.preferences.c.user_id == user_id)
+                .where(self.preferences.c.key == key)
+            ).fetchone()
+            return row.value if row else default
+
+    def set_user_preference(self, user_id, key, value):
+        """
+        Set a user preference value.
+
+        Args:
+            user_id: User identifier
+            key: Preference key
+            value: Preference value
+        """
+        from sqlalchemy import insert
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        with self._get_connection() as conn:
+            # Use INSERT OR REPLACE for SQLite (upsert)
+            stmt = sqlite_insert(self.preferences).values(
+                user_id=user_id,
+                key=key,
+                value=value,
+                updated_at=datetime.utcnow()
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['user_id', 'key'],
+                set_={
+                    'value': value,
+                    'updated_at': datetime.utcnow()
+                }
+            )
+            conn.execute(stmt)

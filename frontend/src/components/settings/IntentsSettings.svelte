@@ -202,50 +202,103 @@
     </div>
   {/if}
 
-  <div class="intents-list">
-    {#each intents as intent}
-      <div class="intent-card" class:disabled={!intent.enabled}>
-        <div class="intent-header">
-          <div class="intent-info">
-            <h4>
-              {intent.name}
-              <span class="intent-id">({intent.id})</span>
-              {#if !intent.enabled}
-                <span class="status-badge status-badge--error">Disabled</span>
+  <!-- LLM Routing Intents Section -->
+  <div class="section">
+    <h3>LLM Routing Intents</h3>
+    <p class="subtitle">These intents are used to route requests to appropriate LLM providers via the Routing settings.</p>
+    <div class="intents-list">
+      {#each intents.filter(i => !i.is_action && i.id !== 'system') as intent}
+        <div class="intent-card" class:disabled={!intent.enabled}>
+          <div class="intent-header">
+            <div class="intent-info">
+              <h4>
+                {intent.name}
+                <span class="intent-id">({intent.id})</span>
+                {#if !intent.enabled}
+                  <span class="status-badge status-badge--error">Disabled</span>
+                {/if}
+              </h4>
+              {#if intent.description}
+                <p class="intent-description">{intent.description}</p>
               {/if}
-            </h4>
-            {#if intent.description}
-              <p class="intent-description">{intent.description}</p>
-            {/if}
+            </div>
+            <div class="intent-priority">
+              Priority: {intent.priority}
+            </div>
           </div>
-          <div class="intent-priority">
-            Priority: {intent.priority}
+
+          {#if intent.keywords}
+            <div class="intent-keywords">
+              <strong>Keywords:</strong> {intent.keywords}
+            </div>
+          {:else}
+            <div class="intent-keywords empty">
+              No keywords (fallback intent)
+            </div>
+          {/if}
+
+          <div class="intent-actions">
+            <button class="btn-small" on:click={() => editIntent(intent)}>
+              Edit
+            </button>
+            <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
+              {intent.enabled ? "Disable" : "Enable"}
+            </button>
+            <button class="btn-small btn-danger" on:click={() => removeIntent(intent.id)}>
+              Delete
+            </button>
           </div>
         </div>
+      {/each}
+    </div>
+  </div>
 
-        {#if intent.keywords}
-          <div class="intent-keywords">
-            <strong>Keywords:</strong> {intent.keywords}
+  <!-- Action Intents Section -->
+  <div class="section">
+    <h3>Action Intents</h3>
+    <p class="subtitle">These intents trigger actions (calendar, email, etc.). They have predefined routing but keywords can be customized.</p>
+    <div class="intents-list">
+      {#each intents.filter(i => i.is_action) as intent}
+        <div class="intent-card" class:disabled={!intent.enabled}>
+          <div class="intent-header">
+            <div class="intent-info">
+              <h4>
+                {intent.name}
+                <span class="intent-id">({intent.id})</span>
+                {#if !intent.enabled}
+                  <span class="status-badge status-badge--error">Disabled</span>
+                {/if}
+              </h4>
+              {#if intent.description}
+                <p class="intent-description">{intent.description}</p>
+              {/if}
+            </div>
+            <div class="intent-priority">
+              Priority: {intent.priority}
+            </div>
           </div>
-        {:else}
-          <div class="intent-keywords empty">
-            No keywords (fallback intent)
-          </div>
-        {/if}
 
-        <div class="intent-actions">
-          <button class="btn-small" on:click={() => editIntent(intent)}>
-            Edit
-          </button>
-          <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
-            {intent.enabled ? "Disable" : "Enable"}
-          </button>
-          <button class="btn-small btn-danger" on:click={() => removeIntent(intent.id)}>
-            Delete
-          </button>
+          {#if intent.keywords}
+            <div class="intent-keywords">
+              <strong>Keywords:</strong> {intent.keywords}
+            </div>
+          {:else}
+            <div class="intent-keywords empty">
+              No keywords
+            </div>
+          {/if}
+
+          <div class="intent-actions">
+            <button class="btn-small" on:click={() => editIntent(intent)}>
+              Edit
+            </button>
+            <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
+              {intent.enabled ? "Disable" : "Enable"}
+            </button>
+          </div>
         </div>
-      </div>
-    {/each}
+      {/each}
+    </div>
   </div>
 </div>
 
