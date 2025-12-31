@@ -220,6 +220,9 @@ class ProviderOperations(BaseMemoryOperations):
                 )
             )
 
+        # Update provider health metrics
+        self.update_provider_health(provider_id, success, latency_ms)
+
     def update_provider_health(self, provider_id, success, latency_ms=None):
         """
         Update provider health metrics based on request outcome.
