@@ -272,7 +272,7 @@ class TestProviderHelpers:
         assert error is None
         mock_provider_class.assert_called_once_with(
             api_key='test-key',
-            model='tts-1-hd'
+            model='tts-1'
         )
 
     @patch('routes.voice_routes.MemoryStore')

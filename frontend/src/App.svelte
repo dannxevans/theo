@@ -519,14 +519,6 @@ async function handleLogout() {
         {/if}
       </div>
 
-      <button
-        class="btn-pill"
-        class:active={!showSettings}
-        on:click={() => { showSettings = false; }}
-      >
-        Home
-      </button>
-
       <div class="dropdown" class:open={settingsDropdownOpen}>
         <button class="btn-pill" on:click={() => { settingsDropdownOpen = !settingsDropdownOpen; }}>
           Menu

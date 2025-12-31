@@ -29,7 +29,7 @@
 </script>
 
 <div class="tab-panel">
-  <h2>🏠 Personal Mode</h2>
+  <h2>Personal Mode</h2>
   <p class="subtitle">Casual tone and optimized for general conversation.</p>
 
   <div class="section">

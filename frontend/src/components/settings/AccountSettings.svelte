@@ -106,7 +106,7 @@
 
   <!-- Change Password Section -->
   <div class="section">
-    <h3>Change Password</h3>
+    <!-- <h3>Change Password</h3> -->
 
     {#if passwordError}
       <div class="error-message">{passwordError}</div>

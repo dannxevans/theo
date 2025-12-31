@@ -241,7 +241,7 @@
   <!-- Section 1: AI Providers Health -->
   <div class="section">
     <h3>AI Provider Health</h3>
-    <p class="hint">Real-time health monitoring for all configured AI providers</p>
+    <p class="hint">Real-time health monitoring and usage for all configured AI providers</p>
 
     {#if healthData.ai_providers && healthData.ai_providers.length === 0}
       <p class="empty-state">No AI providers configured yet. Add providers in the Accounts section.</p>
@@ -262,13 +262,13 @@
                 {:else if provider.circuit_breaker_open}
                   🔌 Circuit Breaker
                 {:else if provider.health_status === 'healthy'}
-                  🟢 Healthy
+                  Healthy
                 {:else if provider.health_status === 'degraded'}
-                  🟡 Degraded
+                  Degraded
                 {:else if provider.health_status === 'unhealthy'}
-                  🔴 Unhealthy
+                  Unhealthy
                 {:else}
-                  ⚪ Unknown
+                  Unknown
                 {/if}
               </span>
             </div>
@@ -381,13 +381,13 @@
           class:badge-unhealthy={!healthData.m365_integration?.connected || !healthData.m365_integration?.token_valid || healthData.m365_integration?.hours_until_expiry <= 0}
           class:badge-unknown={!healthData.m365_integration?.connected}>
           {#if !healthData.m365_integration?.connected}
-            ⚪ Not Configured
+            Not Configured
           {:else if !healthData.m365_integration.token_valid || healthData.m365_integration.hours_until_expiry <= 0}
-            🔴 Disconnected
+            Disconnected
           {:else if healthData.m365_integration.hours_until_expiry <= 24}
-            🟡 Token Expiring Soon
+            Token Expiring Soon
           {:else}
-            🟢 Connected
+            Connected
           {/if}
         </span>
       </div>
@@ -479,7 +479,7 @@
               <span class="health-badge"
                 class:badge-healthy={provider.is_enabled}
                 class:badge-inactive={!provider.is_enabled}>
-                {provider.is_enabled ? '🟢 Active' : '⏸️ Disabled'}
+                {provider.is_enabled ? 'Active' : '⏸Disabled'}
               </span>
             </div>
             <div class="health-card-body">
@@ -626,7 +626,7 @@
     border: 1px solid var(--border-primary);
     border-radius: 8px;
     padding: var(--space-4);
-    background: var(--bg-tertiary);
+    background: white;
     transition: box-shadow 0.2s;
   }
 
