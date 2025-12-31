@@ -16,24 +16,42 @@ from auth import hash_password, generate_session_token
 
 
 @pytest.fixture
-def app():
+def shared_db_path():
+    """
+    Create a shared temporary database file for both app and memory fixtures.
+    """
+    db_fd, db_path = tempfile.mkstemp()
+    os.close(db_fd)
+
+    yield db_path
+
+    # Cleanup
+    if os.path.exists(db_path):
+        os.unlink(db_path)
+
+
+@pytest.fixture
+def app(shared_db_path, memory, monkeypatch):
     """
     Create and configure Flask app for testing.
     """
-    # Use in-memory SQLite database for tests
-    db_fd, db_path = tempfile.mkstemp()
+    # Patch Config.DATABASE_URL to use test database
+    from config import Config
+    import app as app_module
+
+    test_db_url = f"sqlite:///{shared_db_path}"
+    monkeypatch.setattr(Config, "DATABASE_URL", test_db_url)
+
+    # Patch the global memory object in app.py to use the test memory
+    monkeypatch.setattr(app_module, "memory", memory)
 
     flask_app.config.update({
         "TESTING": True,
-        "DATABASE_URL": f"sqlite:///{db_path}",
+        "DATABASE_URL": test_db_url,
         "SECRET_KEY": "test-secret-key",
     })
 
     yield flask_app
-
-    # Cleanup
-    os.close(db_fd)
-    os.unlink(db_path)
 
 
 @pytest.fixture
@@ -45,18 +63,12 @@ def client(app):
 
 
 @pytest.fixture
-def memory():
+def memory(shared_db_path):
     """
-    Create MemoryStore with in-memory database.
+    Create MemoryStore with shared database.
     """
-    db_fd, db_path = tempfile.mkstemp()
-    memory_store = MemoryStore(f"sqlite:///{db_path}")
-
+    memory_store = MemoryStore(f"sqlite:///{shared_db_path}")
     yield memory_store
-
-    # Cleanup
-    os.close(db_fd)
-    os.unlink(db_path)
 
 
 @pytest.fixture
