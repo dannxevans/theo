@@ -265,7 +265,7 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
     return "general"
 
 
-def provider_supports_intent(provider_cfg, intent: str) -> bool:
+def provider_supports_intent(provider_cfg, intent: str, memory=None, user_id="local") -> bool:
     """
     Check if a provider supports a given intent.
 
@@ -283,11 +283,14 @@ def provider_supports_intent(provider_cfg, intent: str) -> bool:
 
     # For custom intents, check if it's an action intent (M365, calendar, etc.)
     # Action intents should NOT go to LLM providers
-    action_intents = {
-        "book_appointment", "update_appointment", "cancel_appointment",
-        "read_calendar", "compose_email", "read_email",
-        "approve_confirmation", "reject_confirmation"
-    }
+    # Get action intents dynamically from database if memory is available
+    action_intents = []
+    if memory:
+        try:
+            action_intents = memory.get_action_intents(user_id)
+        except Exception as e:
+            logging.warning(f"Failed to get action intents: {e}")
+            action_intents = []
 
     if intent in action_intents:
         # Action intents can only be handled by action providers (not LLM providers)
@@ -391,7 +394,7 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
     return None
 
 
-def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None):
+def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None, user_id: str = "local"):
     fallback_reason = None
     selected_provider = None
     routing_explanation = []
@@ -480,14 +483,14 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
 
     # Enforce provider capability constraints and fallback if needed
     if selected_provider:
-        if not provider_supports_intent(selected_provider, intent):
+        if not provider_supports_intent(selected_provider, intent, memory, user_id):
             fallback_reason = "provider does not support intent"
             routing_explanation.append(f"{selected_provider.get('type')} cannot handle {intent}")
             if provider_registry:
                 current_type = selected_provider.get("type")
                 other_type = "openai" if current_type == "anthropic" else "anthropic"
                 p = provider_registry.get_by_type(other_type)
-                if p and p.get("api_key") and provider_supports_intent(p, intent):
+                if p and p.get("api_key") and provider_supports_intent(p, intent, memory, user_id):
                     healthy, reason = is_provider_healthy(p.get("id"))
                     if healthy:
                         selected_provider = p
@@ -617,9 +620,12 @@ def route_request(context: dict, stream: bool = False):
     # Action Intent Routing
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
-    ACTION_INTENTS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "read_email", "compose_email", "approve_confirmation", "reject_confirmation"]
+    # Get action intents from database (configurable per user)
+    user_id = context.get("user_id", "local")
+    action_intents = memory.get_action_intents(user_id) if memory else []
+    logging.info(f"[ROUTER] user_id={user_id}, intent={intent}, action_intents={action_intents}, in_list={intent in action_intents}")
 
-    if intent in ACTION_INTENTS:
+    if intent in action_intents:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")
 
         # Block personal actions (M365 calendar/email) in work mode
@@ -689,7 +695,7 @@ def route_request(context: dict, stream: bool = False):
 
     _debug(memory, "Selecting provider...")
 
-    provider_cfg = select_provider(intent, memory, forced)
+    provider_cfg = select_provider(intent, memory, forced, user_id)
 
     logging.info(f"[ROUTER] Selected provider config: id={provider_cfg.get('id')}, type={provider_cfg.get('type')}, model={provider_cfg.get('model')}")
 
@@ -817,7 +823,7 @@ def route_request(context: dict, stream: bool = False):
         _debug(memory, "Attempting fallback to alternative provider")
 
         # Select alternative provider (excluding the failed one)
-        alternative_cfg = select_provider(intent, memory, forced_provider=None)
+        alternative_cfg = select_provider(intent, memory, forced_provider=None, user_id=user_id)
 
         if alternative_cfg["id"] != provider_cfg["id"] and alternative_cfg["id"] != "mock":
             _debug(memory, f"Fallback to {alternative_cfg['id']}")

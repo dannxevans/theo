@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     Table,
     MetaData,
+    UniqueConstraint,
 )
 
 
@@ -53,6 +54,7 @@ def create_schema(meta: MetaData):
         Column("user_id", Integer, nullable=False),
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("expires_at", DateTime, nullable=False),
+        Column("last_activity_at", DateTime, default=datetime.utcnow),
     )
 
     # =============================
@@ -116,6 +118,7 @@ def create_schema(meta: MetaData):
         Column("key", String, nullable=False),
         Column("value", Text, nullable=False),
         Column("updated_at", DateTime, default=datetime.utcnow),
+        UniqueConstraint("user_id", "key", name="uq_user_preference"),
     )
 
     # =============================
@@ -163,6 +166,7 @@ def create_schema(meta: MetaData):
         Column("keywords", Text, nullable=False),  # Comma-separated keywords
         Column("priority", Integer, default=0),  # Higher priority checked first
         Column("enabled", Boolean, default=True),
+        Column("is_action", Boolean, default=False),  # True for action intents (calendar, email, etc.)
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )

@@ -127,13 +127,15 @@ class UserOperations(BaseMemoryOperations):
             user_id: User ID
             expires_at: Session expiration datetime
         """
+        now = datetime.utcnow()
         with self._get_connection() as conn:
             conn.execute(
                 insert(self.auth_sessions).values(
                     id=session_id,
                     user_id=user_id,
-                    created_at=datetime.utcnow(),
+                    created_at=now,
                     expires_at=expires_at,
+                    last_activity_at=now,
                 )
             )
 
@@ -153,6 +155,20 @@ class UserOperations(BaseMemoryOperations):
                 .where(self.auth_sessions.c.id == session_id)
             ).fetchone()
             return dict(row._mapping) if row else None
+
+    def update_session_activity(self, session_id):
+        """
+        Update the last activity timestamp for a session.
+
+        Args:
+            session_id: Session identifier
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                update(self.auth_sessions)
+                .where(self.auth_sessions.c.id == session_id)
+                .values(last_activity_at=datetime.utcnow())
+            )
 
     def delete_auth_session(self, session_id):
         """

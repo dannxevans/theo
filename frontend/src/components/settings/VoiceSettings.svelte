@@ -87,43 +87,45 @@
   }
 </script>
 
-<div class="section">
-  <h3>Voice Settings</h3>
-  <p class="hint">Configure text-to-speech and speech-to-text preferences. Powered by OpenAI.</p>
+<div class="tab-panel">
+  <h2>Voice Settings</h2>
+  <p class="subtitle">Configure text-to-speech and speech-to-text preferences. Powered by OpenAI.</p>
 
-  <!-- TTS Voice Selection with Test Buttons -->
-  <div class="form-group">
-    <label>Text-to-Speech Voice</label>
-    <div class="voice-options">
-      {#each availableVoices as voice}
-        <div class="voice-option" class:selected={selectedVoice === voice.id}>
-          <div class="voice-info">
-            <label class="voice-radio">
-              <input
-                type="radio"
-                name="voice"
-                value={voice.id}
-                bind:group={selectedVoice}
-              />
-              <span class="voice-details">
-                <strong>{voice.name}</strong>
-                <small>{voice.description}</small>
-              </span>
-            </label>
-          </div>
-          <button
-            class="test-btn"
-            class:testing={testingVoice === voice.id}
-            on:click={() => testVoice(voice.id)}
-            title={testingVoice === voice.id ? "Stop preview" : "Test voice"}
-          >
-            {testingVoice === voice.id ? "⏹️" : "▶️"}
-          </button>
-        </div>
-      {/each}
+  <div class="section">
+    <!-- TTS Voice Selection with Test Button -->
+    <div class="form-group">
+      <label for="voice-select">Text-to-Speech Voice</label>
+      <div class="voice-select-container">
+        <select
+          id="voice-select"
+          bind:value={selectedVoice}
+        >
+          {#each availableVoices as voice}
+            <option value={voice.id}>
+              {voice.name} - {voice.description}
+            </option>
+          {/each}
+        </select>
+        <button
+          class="test-btn"
+          class:testing={testingVoice}
+          on:click={() => testVoice(selectedVoice)}
+          title={testingVoice ? "Stop preview" : "Test voice"}
+        >
+          {#if testingVoice}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          {:else}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          {/if}
+        </button>
+      </div>
+      <small>Choose the voice for reading messages aloud</small>
     </div>
-    <small>Choose the voice for reading messages aloud and test each one</small>
-  </div>
 
   <!-- Speech Speed -->
   <div class="form-group">
@@ -139,43 +141,61 @@
     <small>Speed multiplier (0.25 = very slow, 1.0 = normal, 4.0 = very fast)</small>
   </div>
 
-  <!-- Save Button -->
-  <button class="btn-primary" on:click={saveVoiceSettings}>
-    Save Voice Settings
-  </button>
+    {#if saveStatus}
+      <div class="save-status" class:success={saveStatus.includes("saved")} class:error={saveStatus.includes("must")}>
+        {saveStatus}
+      </div>
+    {/if}
 
-  {#if saveStatus}
-    <div class="status-message" class:error={saveStatus.includes("must")}>
-      {saveStatus}
+    <div class="form-actions">
+      <button class="btn-primary" on:click={saveVoiceSettings}>
+        Save Voice Settings
+      </button>
     </div>
-  {/if}
-</div>
-
-<!-- Usage Instructions -->
-<div class="section">
-  <h3>How to Use Voice Features</h3>
-
-  <div class="info-box">
-    <p><strong>🎤 Voice Input (Speech-to-Text):</strong></p>
-    <ul>
-      <li>Click the microphone button to start recording</li>
-      <li>Speak your message</li>
-      <li>Click the stop button (⏹️) to finish</li>
-      <li>Your message will be transcribed and sent automatically</li>
-    </ul>
   </div>
 
-  <div class="info-box">
-    <p><strong>🔊 Voice Output (Text-to-Speech):</strong></p>
-    <ul>
-      <li>Click the speaker button to toggle auto-read mode</li>
-      <li>When enabled (highlighted), all assistant responses will be read aloud</li>
-      <li>The voice and speed settings above control how messages sound</li>
-    </ul>
+  <!-- Usage Instructions -->
+  <div class="section">
+    <h3>How to Use Voice Features</h3>
+
+    <div class="info-box">
+      <p>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 0.5rem;">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+        <strong>Voice Input (Speech-to-Text):</strong>
+      </p>
+      <ul>
+        <li>Click the microphone button to start recording</li>
+        <li>Speak your message</li>
+        <li>Click the stop button to finish</li>
+        <li>Your message will be transcribed and sent automatically</li>
+      </ul>
+    </div>
+
+    <div class="info-box">
+      <p>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 0.5rem;">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+        <strong>Voice Output (Text-to-Speech):</strong>
+      </p>
+      <ul>
+        <li>Click the speaker button to toggle auto-read mode</li>
+        <li>When enabled (highlighted), all assistant responses will be read aloud</li>
+        <li>The voice and speed settings above control how messages sound</li>
+      </ul>
+    </div>
   </div>
 </div>
 
 <style>
+  /* Most styles inherited from global CSS (.tab-panel, .section, .form-group, etc.) */
+
   .section {
     margin-bottom: 2rem;
   }
@@ -184,29 +204,17 @@
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.75rem 0;
   }
 
-  .hint {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    margin: 0 0 1.5rem 0;
+  .voice-select-container {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
   }
 
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .form-group label {
-    display: block;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-  }
-
-  .form-group input[type="number"] {
-    width: 100%;
+  select {
+    flex: 1;
     max-width: 400px;
     padding: 0.5rem;
     border: 1px solid var(--border-primary);
@@ -214,98 +222,45 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 0.95rem;
-  }
-
-  .form-group small {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
-  .voice-options {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .voice-option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    border: 2px solid var(--border-primary);
-    border-radius: var(--radius-md);
-    background: var(--bg-primary);
-    transition: all 0.2s ease;
-  }
-
-  .voice-option:hover {
-    border-color: var(--primary);
-    background: var(--bg-secondary);
-  }
-
-  .voice-option.selected {
-    border-color: var(--primary);
-    background: var(--bg-secondary);
-  }
-
-  .voice-info {
-    flex: 1;
-  }
-
-  .voice-radio {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
     cursor: pointer;
   }
 
-  .voice-radio input[type="radio"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-  }
-
-  .voice-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .voice-details strong {
-    color: var(--text-primary);
-    font-size: 0.95rem;
-  }
-
-  .voice-details small {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
+  select:focus {
+    outline: none;
+    border-color: var(--primary);
   }
 
   .test-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-primary);
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
     border-radius: var(--radius-md);
-    font-size: 1.1rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 3rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
   }
 
   .test-btn:hover {
     background: var(--primary);
     border-color: var(--primary);
-    color: white;
+  }
+
+  .test-btn:hover svg {
+    stroke: white;
   }
 
   .test-btn.testing {
     background: var(--primary);
     border-color: var(--primary);
-    color: white;
     animation: pulse 1.5s infinite;
+  }
+
+  .test-btn.testing svg {
+    stroke: white;
   }
 
   @keyframes pulse {
@@ -315,20 +270,6 @@
     50% {
       opacity: 0.7;
     }
-  }
-
-  .status-message {
-    margin-top: 1rem;
-    padding: 0.75rem;
-    background: #d4edda;
-    color: #155724;
-    border-radius: var(--radius-md);
-    font-size: 0.9rem;
-  }
-
-  .status-message.error {
-    background: #f8d7da;
-    color: #721c24;
   }
 
   .info-box {
@@ -342,6 +283,8 @@
     margin: 0 0 0.5rem 0;
     font-weight: 500;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
   }
 
   .info-box ul {

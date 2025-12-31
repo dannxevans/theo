@@ -245,7 +245,9 @@ export async function generateSessionTitle(sessionId) {
 // =============================
 
 export async function getIntents() {
-  const response = await fetch(`${API_BASE}/api/intents`);
+  const response = await fetch(`${API_BASE}/api/intents`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -256,7 +258,9 @@ export async function getIntents() {
 }
 
 export async function getIntent(intentId) {
-  const response = await fetch(`${API_BASE}/api/intents/${intentId}`);
+  const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -270,6 +274,7 @@ export async function createIntent(intent) {
   const response = await fetch(`${API_BASE}/api/intents`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify(intent)
@@ -287,6 +292,7 @@ export async function updateIntent(intentId, updates) {
   const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
     method: "PUT",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify(updates)
@@ -302,7 +308,8 @@ export async function updateIntent(intentId, updates) {
 
 export async function deleteIntent(intentId) {
   const response = await fetch(`${API_BASE}/api/intents/${intentId}`, {
-    method: "DELETE"
+    method: "DELETE",
+    headers: getAuthHeaders()
   });
 
   if (!response.ok) {
@@ -318,7 +325,9 @@ export async function deleteIntent(intentId) {
 // =============================
 
 export async function getRoutingRules() {
-  const response = await fetch(`${API_BASE}/api/routing`);
+  const response = await fetch(`${API_BASE}/api/routing`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -332,6 +341,7 @@ export async function setRoutingRule(intent, providerId) {
   const response = await fetch(`${API_BASE}/api/routing`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -350,7 +360,8 @@ export async function setRoutingRule(intent, providerId) {
 
 export async function deleteRoutingRule(intent) {
   const response = await fetch(`${API_BASE}/api/routing/${intent}`, {
-    method: "DELETE"
+    method: "DELETE",
+    headers: getAuthHeaders()
   });
 
   if (!response.ok) {
@@ -1094,4 +1105,40 @@ export async function getVoices() {
 
   const data = await response.json();
   return data.voices || [];
+}
+
+/**
+ * Get user preference by key
+ */
+export async function getUserPreference(key) {
+  const response = await fetch(`${API_BASE}/api/settings/preference/${key}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get preference: ${key}`);
+  }
+
+  const data = await response.json();
+  return data.value;
+}
+
+/**
+ * Set user preference by key
+ */
+export async function setUserPreference(key, value) {
+  const response = await fetch(`${API_BASE}/api/settings/preference/${key}`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ value })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to set preference: ${key}`);
+  }
+
+  return await response.json();
 }

@@ -82,7 +82,13 @@ confirmation_manager = ConfirmationManager(memory, action_router)
 action_router.confirmation_manager = confirmation_manager
 
 # Seed default intents if none exist
-memory.seed_default_intents("local")
+# Check if intents exist for user 1 (admin), otherwise seed for user 1
+try:
+    existing_intents = memory.list_intents("1")
+    if not existing_intents:
+        memory.seed_default_intents("1")
+except Exception as e:
+    logging.warning(f"Could not check/seed intents: {e}")
 
 # Initialize authentication
 from auth import init_default_user
@@ -120,6 +126,23 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(calendar_bp)
 app.register_blueprint(confirmation_bp)
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
+
+# Set g.user_id for all requests based on auth token
+@app.before_request
+def set_user_id():
+    from flask import g
+    # Extract token from Authorization header
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        # Look up session to get user_id
+        session = memory.get_auth_session(token)
+        if session:
+            g.user_id = session.get('user_id')
+        else:
+            g.user_id = None
+    else:
+        g.user_id = None
 
 def debug_log(message):
     try:
