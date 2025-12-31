@@ -867,7 +867,7 @@
           <textarea
             bind:this={inputTextarea}
             bind:value={input}
-            placeholder={isModeLocked ? 'Locked - Switch to ${sessionMode} mode' : "Talk to THEO AI"}
+            placeholder={isModeLocked ? `Locked - Switch to ${sessionMode} mode` : "Talk to THEO AI"}
             on:keydown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !isModeLocked) {
                 e.preventDefault();
