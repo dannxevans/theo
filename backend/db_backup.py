@@ -105,6 +105,75 @@ class DatabaseBackupManager:
             logger.info(f"Started automatic database backup every {interval_seconds} seconds")
 
 
+def run_migrations(db_path: str):
+    """
+    Run all pending database migrations
+
+    Args:
+        db_path: Path to the SQLite database file
+    """
+    import sys
+    import importlib.util
+
+    migrations_dir = Path(__file__).parent / "migrations"
+
+    if not migrations_dir.exists():
+        logger.warning(f"Migrations directory not found: {migrations_dir}")
+        return False
+
+    # Get all migration files in order
+    migration_files = [
+        "001_add_action_tables.py",
+        "002_add_turns_metadata.py",
+        "003_add_mode_to_sessions.py",
+        "007_configurable_intents_and_session_timeout.py",
+        "008_add_suitable_for_official_to_providers.py"
+    ]
+
+    # Filter to only existing files
+    existing_migrations = []
+    for filename in migration_files:
+        filepath = migrations_dir / filename
+        if filepath.exists():
+            existing_migrations.append(filepath)
+
+    if not existing_migrations:
+        logger.info("No migration files found")
+        return True
+
+    logger.info(f"Running {len(existing_migrations)} migration(s)")
+
+    # Run each migration
+    all_success = True
+    for filepath in existing_migrations:
+        try:
+            # Load the migration module
+            spec = importlib.util.spec_from_file_location("migration", str(filepath))
+            module = importlib.util.module_from_spec(spec)
+
+            # Temporarily override sys.argv to pass db_path
+            original_argv = sys.argv.copy()
+            sys.argv = [sys.argv[0], db_path]
+
+            try:
+                spec.loader.exec_module(module)
+                success = module.run_migration()
+                if success:
+                    logger.info(f"✓ Migration {filepath.name} completed")
+                else:
+                    logger.warning(f"⚠ Migration {filepath.name} skipped or failed")
+                    all_success = False
+            finally:
+                # Restore original argv
+                sys.argv = original_argv
+
+        except Exception as e:
+            logger.error(f"ERROR running migration {filepath.name}: {e}")
+            all_success = False
+
+    return all_success
+
+
 def init_database_backup():
     """Initialize database backup/restore on application startup"""
     from config import Config
@@ -126,7 +195,13 @@ def init_database_backup():
     manager = DatabaseBackupManager(db_path, s3_bucket, s3_key)
 
     # Restore from S3 on startup
-    manager.restore_from_s3()
+    restored = manager.restore_from_s3()
+
+    # Run migrations after restore (or on fresh database)
+    # This ensures the database schema is up-to-date before the app starts using it
+    if os.path.exists(db_path):
+        logger.info("Running database migrations")
+        run_migrations(db_path)
 
     # Setup automatic backups every 5 minutes
     manager.setup_auto_backup(interval_seconds=300)
