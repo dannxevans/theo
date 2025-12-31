@@ -344,6 +344,37 @@ class ProviderOperations(BaseMemoryOperations):
             )
             conn.commit()
 
+    def reset_all_provider_usage(self):
+        """
+        Reset ALL provider usage data including request logs, voice usage, and metadata counters.
+        This is a destructive operation that clears all cost tracking and usage history.
+        Provider configurations are preserved.
+        """
+        with self._get_connection() as conn:
+            # Delete all request logs
+            conn.execute(delete(self.request_logs))
+
+            # Delete all voice usage logs
+            conn.execute(delete(self.voice_usage_logs))
+
+            # Reset all provider metadata counters while preserving cost configuration
+            conn.execute(
+                update(self.provider_metadata)
+                .values(
+                    total_requests=0,
+                    failed_requests=0,
+                    avg_latency_ms=0,
+                    last_success_at=None,
+                    last_failure_at=None,
+                    health_status="unknown",
+                    circuit_breaker_open=False,
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            conn.commit()
+
+            logging.info("All provider usage data has been reset")
+
     def estimate_cost(self, provider_id, input_tokens, output_tokens):
         """
         Estimate cost for a request in micro-dollars.

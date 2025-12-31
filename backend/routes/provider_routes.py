@@ -185,3 +185,21 @@ def get_voice_costs():
 
     costs = memory.get_voice_costs(days)
     return jsonify(costs)
+
+
+@provider_bp.route("/usage/reset", methods=["POST"])
+def reset_all_provider_usage():
+    """
+    Reset ALL provider usage data including request logs, voice usage, and cost tracking.
+    This is a destructive operation that clears all usage history.
+    Provider configurations and cost settings are preserved.
+    Returns: { "status": "ok", "message": "..." }
+    """
+    from app import memory
+
+    memory.reset_all_provider_usage()
+
+    return jsonify({
+        "status": "ok",
+        "message": "All provider usage data has been reset"
+    })
