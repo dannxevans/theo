@@ -23,6 +23,78 @@
     }
   }
 
+  // Sidebar enhancement states (Issue #77)
+  let sidebarCollapsed = false;
+  let sidebarWidth = 260; // Default width in pixels
+  let isResizing = false;
+  let sessionModeFilter = "all"; // "all", "personal", or "work"
+
+  const MIN_SIDEBAR_WIDTH = 200;
+  const MAX_SIDEBAR_WIDTH = 500;
+
+  // Load sidebar preferences from localStorage
+  function loadSidebarPreferences() {
+    if (typeof localStorage === "undefined") return;
+
+    const collapsed = localStorage.getItem("theo.sidebarCollapsed");
+    const width = localStorage.getItem("theo.sidebarWidth");
+    const modeFilter = localStorage.getItem("theo.sessionModeFilter");
+
+    if (collapsed) sidebarCollapsed = collapsed === "true";
+    if (width) sidebarWidth = parseInt(width) || 260;
+    if (modeFilter) sessionModeFilter = modeFilter;
+  }
+
+  // Save sidebar preferences to localStorage
+  function saveSidebarPreference(key, value) {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(`theo.${key}`, value);
+  }
+
+  // Toggle sidebar collapsed state
+  function toggleSidebarCollapse() {
+    sidebarCollapsed = !sidebarCollapsed;
+    saveSidebarPreference("sidebarCollapsed", sidebarCollapsed);
+  }
+
+  // Start resizing sidebar
+  function startResize(event) {
+    event.preventDefault();
+    isResizing = true;
+    document.addEventListener("mousemove", handleResize);
+    document.addEventListener("mouseup", stopResize);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  // Handle resize drag
+  function handleResize(event) {
+    if (!isResizing) return;
+
+    const newWidth = event.clientX;
+    if (newWidth >= MIN_SIDEBAR_WIDTH && newWidth <= MAX_SIDEBAR_WIDTH) {
+      sidebarWidth = newWidth;
+    }
+  }
+
+  // Stop resizing sidebar
+  function stopResize() {
+    if (isResizing) {
+      isResizing = false;
+      document.removeEventListener("mousemove", handleResize);
+      document.removeEventListener("mouseup", stopResize);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      saveSidebarPreference("sidebarWidth", sidebarWidth);
+    }
+  }
+
+  // Toggle session mode filter
+  function toggleSessionModeFilter(mode) {
+    sessionModeFilter = mode;
+    saveSidebarPreference("sessionModeFilter", mode);
+  }
+
   // Close dropdowns when clicking outside
   function handleClickOutside(event) {
     const target = event.target;
@@ -67,6 +139,9 @@
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('click', handleUserActivity);
     document.addEventListener('keydown', handleUserActivity);
+
+    // Load sidebar preferences
+    loadSidebarPreferences();
 
     // Start timeout if authenticated
     if (isAuthenticated) {
@@ -119,6 +194,23 @@
   let confirmDeleteId = null;
 
   let sessionQuery = "";
+
+  // Reactive filtered sessions based on mode filter and search query
+  $: filteredSessions = sessions
+    .filter(s => (s.title && s.title.trim()) || (s.summary && s.summary.trim())) // hasContent
+    .filter(s => {
+      // sessionMatches
+      if (!sessionQuery.trim()) return true;
+      const q = sessionQuery.toLowerCase();
+      const label = s.title?.slice(0, 60) || s.summary?.slice(0, 60) || "New chat";
+      return label.toLowerCase().includes(q);
+    })
+    .filter(s => {
+      // sessionModeMatches
+      if (sessionModeFilter === "all") return true;
+      const mode = s.mode || "personal";
+      return mode === sessionModeFilter;
+    });
 
   function generateUUID() {
     if (crypto && typeof crypto.randomUUID === "function") {
@@ -218,9 +310,6 @@ async function setMode(mode) {
     // Brief delay for notification to render
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Create a new session when switching modes to separate contexts
-    newSession();
-
     // Reload sessions (backend auto-filters by new mode)
     loadSessions();
 
@@ -291,8 +380,8 @@ async function handleLogout() {
     const id = generateUUID();
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
-    // Optimistically add to top of list
-    sessions = [{ id, title: "New chat", summary: "" }, ...sessions].slice(0, MAX_SESSIONS);
+    // Optimistically add to top of list with current mode
+    sessions = [{ id, title: "New chat", summary: "", mode: currentMode }, ...sessions].slice(0, MAX_SESSIONS);
   }
 
   async function deleteSession(id) {
@@ -306,7 +395,7 @@ async function handleLogout() {
           activeSessionId = sessions[0].id;
         } else {
           activeSessionId = generateUUID();
-          sessions = [{ id: activeSessionId, title: "New chat", summary: "" }];
+          sessions = [{ id: activeSessionId, title: "New chat", summary: "", mode: currentMode }];
         }
         localStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
       }
@@ -346,6 +435,13 @@ async function handleLogout() {
     if (!sessionQuery.trim()) return true;
     const q = sessionQuery.toLowerCase();
     return sessionLabel(session).toLowerCase().includes(q);
+  }
+
+  function sessionModeMatches(session) {
+    if (sessionModeFilter === "all") return true;
+    // Default to "personal" if mode is not set
+    const mode = session.mode || "personal";
+    return mode === sessionModeFilter;
   }
 
   function hasContent(session) {
@@ -457,30 +553,73 @@ async function handleLogout() {
 
 <div class="app-body">
 
-  <div class="shell layout-shell">
+  <div class="shell layout-shell" style="grid-template-columns: {sidebarCollapsed ? '50px' : `${sidebarWidth}px`} minmax(0, 1fr);">
     <!-- Sidebar placeholder (sessions will move here later) -->
-    <aside class="sidebar" class:open={sidebarOpen}>
-      <div class="sidebar-title">Sessions</div>
-      <button class="btn-pill new-session" on:click={newSession}>
-        + New chat
-      </button>
+    <aside
+      class="sidebar"
+      class:open={sidebarOpen}
+      class:collapsed={sidebarCollapsed}
+      style="width: {sidebarCollapsed ? '50px' : `${sidebarWidth}px`};"
+    >
+      <!-- Sidebar Header with Controls -->
+      <div class="sidebar-header">
+        {#if !sidebarCollapsed}
+          <div class="sidebar-title">Sessions</div>
+        {/if}
+        <button
+          class="sidebar-control-btn"
+          on:click={toggleSidebarCollapse}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {sidebarCollapsed ? '☰' : '×'}
+        </button>
+      </div>
 
-      <input
-        class="session-search"
-        type="text"
-        placeholder="Search chats"
-        bind:value={sessionQuery}
-      />
+      {#if !sidebarCollapsed}
+        <button class="btn-pill new-session" on:click={newSession}>
+          + New chat
+        </button>
+
+        <!-- Mode Filter Toggle -->
+        <div class="mode-filter">
+          <button
+            class="mode-filter-btn"
+            class:active={sessionModeFilter === "personal"}
+            on:click={() => toggleSessionModeFilter("personal")}
+          >
+            Personal
+          </button>
+          <button
+            class="mode-filter-btn"
+            class:active={sessionModeFilter === "work"}
+            on:click={() => toggleSessionModeFilter("work")}
+          >
+            Work
+          </button>
+          <button
+            class="mode-filter-btn"
+            class:active={sessionModeFilter === "all"}
+            on:click={() => toggleSessionModeFilter("all")}
+          >
+            All
+          </button>
+        </div>
+
+        <input
+          class="session-search"
+          type="text"
+          placeholder="Search chats"
+          bind:value={sessionQuery}
+        />
 
       {#each ["Today", "Yesterday", "Earlier"] as group}
-        {#if sessions.some(s => dayGroup(s.updated_at) === group && sessionMatches(s))}
+        {#if filteredSessions.some(s => dayGroup(s.updated_at) === group)}
           <div class="session-group">{group}</div>
         {/if}
 
-        {#each sessions
-          .filter(hasContent)
+        {#each filteredSessions
           .filter(s => dayGroup(s.updated_at) === group)
-          .filter(sessionMatches)
           .slice(0, MAX_SESSIONS) as s}
 
           <div class="session-row" class:active={s.id === activeSessionId}>
@@ -511,6 +650,18 @@ async function handleLogout() {
           </div>
         {/each}
       {/each}
+      {/if}
+
+      <!-- Resize Handle -->
+      {#if !sidebarCollapsed}
+        <button
+          class="resize-handle"
+          on:mousedown={startResize}
+          aria-label="Resize sidebar"
+          aria-orientation="vertical"
+          title="Drag to resize sidebar"
+        ></button>
+      {/if}
     </aside>
     {#if sidebarOpen}
       <div

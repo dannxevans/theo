@@ -303,6 +303,10 @@ class MemoryStore:
         """Reset health metrics for a provider."""
         return self._provider_ops.reset_provider_health(provider_id)
 
+    def reset_all_provider_usage(self):
+        """Reset ALL provider usage data (destructive operation)."""
+        return self._provider_ops.reset_all_provider_usage()
+
     def get_provider_costs(self, days=30):
         """Get provider costs for specified period."""
         return self._provider_ops.get_provider_costs(days)

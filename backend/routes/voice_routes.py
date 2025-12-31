@@ -32,10 +32,10 @@ def get_tts_provider():
         if not openai_config or not openai_config.get("api_key"):
             return None, "OpenAI API key not configured"
 
-        # Use tts-1-hd for better quality
+        # Use standard tts-1 model
         provider = OpenAITTSProvider(
             api_key=openai_config["api_key"],
-            model="tts-1-hd"
+            model="tts-1"
         )
 
         return provider, None

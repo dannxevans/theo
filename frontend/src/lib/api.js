@@ -646,6 +646,22 @@ export async function getVoiceCosts(days = 30) {
   return response.json();
 }
 
+export async function resetProviderUsage() {
+  const response = await fetch(`${API_BASE}/api/providers/usage/reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to reset provider usage");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Authentication API
 // =============================
