@@ -154,6 +154,7 @@
   let voiceControls = null;
   let autoReadEnabled = localStorage.getItem("theo.autoRead") !== "false"; // Default to true
   let lastMessageCount = 0;
+  let skipNextAutoRead = false; // Flag to prevent auto-read on session load
   let selectedVoice = "alloy";
   let speechSpeed = 1.0;
   let isSpeaking = false; // Track if TTS is currently playing
@@ -171,7 +172,12 @@
 
   // Watch for new assistant messages and auto-read if enabled
   $: {
-    if (autoReadEnabled && messages.length > lastMessageCount && lastMessageCount > 0) {
+    if (skipNextAutoRead) {
+      // Skip this auto-read (session was just loaded)
+      skipNextAutoRead = false;
+      lastMessageCount = messages.length;
+    } else if (autoReadEnabled && messages.length > lastMessageCount && lastMessageCount > 0) {
+      // New message arrived in current session
       const latestMessage = messages[messages.length - 1];
       // Skip TTS for coding intent - we don't want lines of code read out loud
       const shouldSkipTTS = latestMessage?.task_type === "coding";
@@ -184,9 +190,12 @@
           voiceControls?.speak(latestMessage.text);
         }, 100);
       }
+      // Update count after processing
+      lastMessageCount = messages.length;
+    } else {
+      // Just update the count
+      lastMessageCount = messages.length;
     }
-    // Always update lastMessageCount when messages change
-    lastMessageCount = messages.length;
   }
 
   // Mode lock detection
@@ -385,6 +394,9 @@
     try {
       loading = true;
       error = null;
+
+      // Set flag to prevent auto-read when loading a session
+      skipNextAutoRead = true;
 
       const turns = await getSessionMessages(id);
 
