@@ -6,6 +6,7 @@ on:
       - release
     tags:
       - 'v*'
+  workflow_dispatch:  # Allow manual trigger
 
 permissions:
   contents: read
@@ -14,9 +15,14 @@ permissions:
 env:
   REGISTRY: ghcr.io
   OWNER: dannxevans
+  AWS_REGION: eu-west-2
+  ECS_CLUSTER: theo-prod
+  BACKEND_SERVICE: theo-backend
+  FRONTEND_SERVICE: theo-frontend
 
 jobs:
   build-and-push:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
 
     steps:
@@ -76,3 +82,56 @@ jobs:
             -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.version_tag }} \
             -f backend/Dockerfile \
             --push backend
+
+  deploy-to-aws:
+    name: Deploy to AWS ECS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # Only deploy on release branch or manual trigger, not on tags
+    if: github.ref == 'refs/heads/release' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy backend service
+        run: |
+          echo "Deploying backend service to ECS..."
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.BACKEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ Backend deployment initiated"
+
+      - name: Deploy frontend service
+        run: |
+          echo "Deploying frontend service to ECS..."
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.FRONTEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ Frontend deployment initiated"
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting for backend service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.BACKEND_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Waiting for frontend service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.FRONTEND_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✓ All services deployed successfully!"
