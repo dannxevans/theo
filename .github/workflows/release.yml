@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - release
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '!backend/tests/**'
+      - '!frontend/src/**/*.test.js'
+      - '!frontend/src/**/*.spec.js'
+      - '!.github/**'
     tags:
       - 'v*'
   workflow_dispatch:  # Allow manual trigger
