@@ -775,6 +775,10 @@ Generate the email with subject and body:"""
             AI-generated summary of emails
         """
         from providers.openai import OpenAIProvider
+        from providers.anthropic import AnthropicProvider
+        from providers.gemini import GoogleProvider
+        from providers.grok import XAIProvider
+        from providers.mistral import MistralProvider
         from core.provider_registry import ProviderRegistry
 
         try:
@@ -808,8 +812,32 @@ Generate the email with subject and body:"""
                     base_url=provider_cfg.get("base_url"),
                     model=provider_cfg.get("model") or "gpt-4o-mini"
                 )
+            elif provider_type == "anthropic":
+                provider = AnthropicProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "google":
+                provider = GoogleProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "xai":
+                provider = XAIProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "mistral":
+                provider = MistralProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
             else:
-                # For now, only OpenAI is supported for lightweight tasks
+                # Unknown provider type
                 logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for lightweight tasks, using basic email list")
                 return self._format_email_list(emails, unread_only)
 
