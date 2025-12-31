@@ -46,7 +46,8 @@ def run_all_migrations():
         "001_add_action_tables.py",
         "002_add_turns_metadata.py",
         "003_add_mode_to_sessions.py",
-        "007_configurable_intents_and_session_timeout.py"  # Consolidated migration for issues #115, #116, #117
+        "007_configurable_intents_and_session_timeout.py",  # Consolidated migration for issues #115, #116, #117
+        "008_add_suitable_for_official_to_providers.py"  # Add suitable_for_official column for Work Mode provider filtering
     ]
 
     # Filter to only existing files

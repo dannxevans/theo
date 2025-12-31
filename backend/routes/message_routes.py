@@ -147,7 +147,7 @@ def stream_chat_sse(session_id):
 
                         elif work_subtab == "email":
                             tone = config.get("tone", "professional")
-                            context_prefix = f"You are helping rewrite emails with a {tone} tone. Focus on clarity, professionalism, and appropriate formatting for business communication."
+                            context_prefix = f"You are helping rewrite emails with a {tone} tone. IMPORTANT: Only output the rewritten message body content. Do NOT include greetings, salutations, sign-offs, signatures, subject lines, or any meta-commentary explaining the rewrite. The user will add their own email formatting and signature. Output ONLY the refined message body that can be directly inserted into an email."
 
                         # Check for subtab-specific preferred provider (only if not already forced)
                         subtab_preferred_provider = config.get("preferred_provider_id")

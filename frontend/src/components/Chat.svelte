@@ -202,7 +202,7 @@
       // Only enabled, non-mock providers
       providers = (result || [])
         .filter(p => p.enabled && p.type !== "mock")
-        .map(p => ({ id: p.id, name: p.name }));
+        .map(p => ({ id: p.id, name: p.name, suitable_for_official: p.suitable_for_official }));
     } catch (e) {
       // If fails, leave providers empty
     }
@@ -643,7 +643,9 @@
             <option value="">Auto</option>
             <option value="mock">Mock</option>
             {#each providers as p}
-              <option value={p.id}>{p.name}</option>
+              {#if currentMode !== "work" || p.suitable_for_official}
+                <option value={p.id}>{p.name}</option>
+              {/if}
             {/each}
           </select>
 
@@ -702,7 +704,13 @@
                 <div class="message-header">
                   <strong>Theo</strong>
                 </div>
-                <div>Hello, what do you want to do today?</div>
+                {#if currentMode === "work"}
+                  <div class="security-notice">
+                    <strong>Security Notice:</strong> All interactions are recorded and sensitive information such as passwords, personal identification numbers, and other confidential data should not be shared. Please refer to the <a href="https://www.gov.uk/government/publications/government-security-classifications" target="_blank" rel="noopener noreferrer">government classification guidance</a> for more information on handling OFFICIAL data.
+                  </div>
+                {:else}
+                  <div>Hello, what do you want to do today?</div>
+                {/if}
               </div>
             </div>
           {/if}
