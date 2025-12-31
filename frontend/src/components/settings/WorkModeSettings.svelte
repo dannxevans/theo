@@ -147,12 +147,12 @@
       <select id="work-provider" bind:value={workModeSettings.preferred_provider_id}>
         <option value={null}>Auto-select based on intent</option>
         {#each providers as provider}
-          {#if provider.enabled}
+          {#if provider.enabled && provider.suitable_for_official}
             <option value={provider.id}>{provider.name} ({provider.type})</option>
           {/if}
         {/each}
       </select>
-      <p class="hint">Override automatic provider selection for this mode</p>
+      <p class="hint">Override automatic provider selection for this mode. Only OFFICIAL-suitable providers are shown.</p>
     </div>
 
     <div class="form-group">
@@ -304,10 +304,12 @@
         <select id="code-preferred-provider" bind:value={codeSubtabConfig.preferred_provider_id}>
           <option value={null}>Auto (use Work Mode default)</option>
           {#each providers as p}
-            <option value={p.id}>{p.name}</option>
+            {#if p.suitable_for_official}
+              <option value={p.id}>{p.name}</option>
+            {/if}
           {/each}
         </select>
-        <p class="hint">Override the Work Mode provider for code development tasks</p>
+        <p class="hint">Override the Work Mode provider for code development tasks. Only OFFICIAL-suitable providers are shown.</p>
       </div>
 
       {#if codeSubtabSaveStatus}
@@ -353,10 +355,12 @@
         <select id="email-preferred-provider" bind:value={emailSubtabConfig.preferred_provider_id}>
           <option value={null}>Auto (use Work Mode default)</option>
           {#each providers as p}
-            <option value={p.id}>{p.name}</option>
+            {#if p.suitable_for_official}
+              <option value={p.id}>{p.name}</option>
+            {/if}
           {/each}
         </select>
-        <p class="hint">Override the Work Mode provider for email rewriting tasks</p>
+        <p class="hint">Override the Work Mode provider for email rewriting tasks. Only OFFICIAL-suitable providers are shown.</p>
       </div>
 
       {#if emailSubtabSaveStatus}

@@ -15,13 +15,11 @@ def get_routing_preferences():
     Get all routing preferences.
     Returns: Array of routing preference objects
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
-    prefs = memory.get_routing_preferences(user_id)
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
+    prefs = app.memory.get_routing_preferences(user_id)
 
     return jsonify(prefs)
 
@@ -33,15 +31,13 @@ def set_routing_preference():
     Request body: { "intent": "...", "provider_id": "..." }
     Returns: { "status": "ok" }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
     data = request.json
 
-    memory.set_routing_preference(
+    app.memory.set_routing_preference(
         user_id=user_id,
         intent=data["intent"],
         provider_id=data["provider_id"],
@@ -56,12 +52,10 @@ def delete_routing_preference(intent):
     Delete a routing preference for an intent.
     Returns: { "status": "ok" }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
-    memory.delete_routing_preference(user_id, intent)
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
+    app.memory.delete_routing_preference(user_id, intent)
 
     return jsonify({"status": "ok"})

@@ -249,6 +249,7 @@ def create_schema(meta: MetaData):
         Column("model", String, nullable=True),
         Column("api_key", Text, nullable=True),
         Column("enabled", Boolean, default=True),
+        Column("suitable_for_official", Boolean, default=False),
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
