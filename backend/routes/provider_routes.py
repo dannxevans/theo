@@ -30,6 +30,7 @@ def list_providers():
             "base_url": p.get("base_url"),
             "model": p.get("model"),
             "enabled": p.get("enabled", True),
+            "suitable_for_official": p.get("suitable_for_official", False),
         })
 
     return jsonify(safe)
@@ -54,6 +55,7 @@ def upsert_provider():
         "model": data.get("model"),
         "api_key": data.get("api_key"),
         "enabled": data.get("enabled", True),
+        "suitable_for_official": data.get("suitable_for_official", False),
     })
 
     # Initialize metadata for new providers

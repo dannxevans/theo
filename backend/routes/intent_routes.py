@@ -16,13 +16,11 @@ def list_intents():
     Get all user-defined intents.
     Returns: Array of intent objects
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
-    intents = memory.list_intents(user_id)
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
+    intents = app.memory.list_intents(user_id)
 
     return jsonify(intents)
 
@@ -33,13 +31,11 @@ def get_intent(intent_id):
     Get a single intent by ID.
     Returns: Intent object or 404
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
-    intent = memory.get_intent(user_id, intent_id)
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
+    intent = app.memory.get_intent(user_id, intent_id)
 
     if not intent:
         return jsonify({"error": "Intent not found"}), 404
@@ -54,12 +50,10 @@ def create_intent():
     Request body: { "id": "...", "name": "...", "description": "...", "keywords": "...", "priority": N, "enabled": bool }
     Returns: { "status": "ok", "intent_id": "..." }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
     data = request.json
 
     intent_id = data.get("id")
@@ -73,7 +67,7 @@ def create_intent():
         return jsonify({"error": "id and name are required"}), 400
 
     try:
-        memory.create_intent(
+        app.memory.create_intent(
             user_id=user_id,
             intent_id=intent_id,
             name=name,
@@ -94,12 +88,10 @@ def update_intent(intent_id):
     Request body: Fields to update (name, description, keywords, priority, enabled)
     Returns: { "status": "ok" }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
     data = request.json
     updates = {}
 
@@ -116,7 +108,7 @@ def update_intent(intent_id):
         updates["enabled"] = data["enabled"]
 
     try:
-        memory.update_intent(user_id, intent_id, **updates)
+        app.memory.update_intent(user_id, intent_id, **updates)
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -128,15 +120,13 @@ def delete_intent(intent_id):
     Delete an intent.
     Returns: { "status": "ok" }
     """
-    from core.memory import MemoryStore
-    from config import Config
+    import app
     from flask import g
 
-    memory = MemoryStore(Config.DATABASE_URL)
-    user_id = str(getattr(g, 'user_id', 'local'))
+    user_id = str(getattr(g, 'user_id', 'local') or 'local')
 
     try:
-        memory.delete_intent(user_id, intent_id)
+        app.memory.delete_intent(user_id, intent_id)
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
