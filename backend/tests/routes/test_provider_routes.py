@@ -156,7 +156,7 @@ def test_get_provider_health(client, memory, sample_provider):
     assert sample_provider["id"] in data
     provider_health = data[sample_provider["id"]]
     assert "total_requests" in provider_health
-    assert "failed_requests" in provider_health
+    assert "failure_rate" in provider_health
     assert "health_status" in provider_health
 
 

@@ -803,7 +803,6 @@ def route_request(context: dict, stream: bool = False):
 
         # Log failure
         if memory:
-            memory.update_provider_health(provider_cfg["id"], success=False, latency_ms=latency_ms)
             memory.log_request(
                 session_id=session_id,
                 provider_id=provider_cfg["id"],

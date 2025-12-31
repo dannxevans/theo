@@ -87,7 +87,13 @@ def test_get_mode_settings_all(client, memory, auth_headers, test_user):
 
     assert response.status_code == 200
     data = response.json
-    assert isinstance(data, dict)
+    assert isinstance(data, list)
+    assert len(data) == 2
+
+    # Verify both modes are present
+    modes = {item["mode"] for item in data}
+    assert "work" in modes
+    assert "personal" in modes
 
 
 def test_get_mode_setting_work(client, memory, auth_headers, test_user):

@@ -16,24 +16,68 @@ from auth import hash_password, generate_session_token
 
 
 @pytest.fixture
-def app():
+def db_path():
+    """
+    Create a temporary database file.
+    """
+    db_fd, path = tempfile.mkstemp()
+    yield path
+    # Cleanup
+    os.close(db_fd)
+    os.unlink(path)
+
+
+@pytest.fixture
+def memory(db_path):
+    """
+    Create MemoryStore with shared test database.
+    """
+    memory_store = MemoryStore(f"sqlite:///{db_path}")
+    return memory_store
+
+
+@pytest.fixture
+def app(db_path, memory):
     """
     Create and configure Flask app for testing.
+    Uses the same database as the memory fixture.
     """
-    # Use in-memory SQLite database for tests
-    db_fd, db_path = tempfile.mkstemp()
+    import app as app_module
+    import config
+
+    db_url = f"sqlite:///{db_path}"
 
     flask_app.config.update({
         "TESTING": True,
-        "DATABASE_URL": f"sqlite:///{db_path}",
+        "DATABASE_URL": db_url,
         "SECRET_KEY": "test-secret-key",
     })
 
+    # Patch Config.DATABASE_URL so routes create MemoryStore with test database
+    old_db_url = config.Config.DATABASE_URL
+    config.Config.DATABASE_URL = db_url
+
+    # Replace the app's memory instance with the test memory instance
+    old_memory = app_module.memory
+    app_module.memory = memory
+
+    # Also update references in other app components that use memory
+    if hasattr(app_module, 'context_manager'):
+        app_module.context_manager.memory = memory
+    if hasattr(app_module, 'provider_registry'):
+        app_module.provider_registry.memory = memory
+    if hasattr(app_module, 'action_registry'):
+        app_module.action_registry.memory = memory
+    if hasattr(app_module, 'action_router'):
+        app_module.action_router.memory = memory
+    if hasattr(app_module, 'confirmation_manager'):
+        app_module.confirmation_manager.memory = memory
+
     yield flask_app
 
-    # Cleanup
-    os.close(db_fd)
-    os.unlink(db_path)
+    # Restore original values
+    app_module.memory = old_memory
+    config.Config.DATABASE_URL = old_db_url
 
 
 @pytest.fixture
@@ -42,21 +86,6 @@ def client(app):
     Create Flask test client.
     """
     return app.test_client()
-
-
-@pytest.fixture
-def memory():
-    """
-    Create MemoryStore with in-memory database.
-    """
-    db_fd, db_path = tempfile.mkstemp()
-    memory_store = MemoryStore(f"sqlite:///{db_path}")
-
-    yield memory_store
-
-    # Cleanup
-    os.close(db_fd)
-    os.unlink(db_path)
 
 
 @pytest.fixture

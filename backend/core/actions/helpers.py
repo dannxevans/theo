@@ -120,14 +120,18 @@ def format_date_range(start_date: datetime, end_date: datetime) -> str:
     """
     # Same day
     if start_date.date() == end_date.date():
-        return f"on {start_date.strftime('%A, %B %d')}"
+        return f"on {start_date.strftime('%A, %B %d').replace(' 0', ' ')}"
 
     # Multiple days in same month
     if start_date.month == end_date.month:
-        return f"from {start_date.strftime('%B %d')} to {end_date.strftime('%d')}"
+        start_fmt = start_date.strftime('%B %d').replace(' 0', ' ')
+        end_day = end_date.strftime('%d').lstrip('0')
+        return f"from {start_fmt} to {end_day}"
 
     # Different months
-    return f"from {start_date.strftime('%B %d')} to {end_date.strftime('%B %d')}"
+    start_fmt = start_date.strftime('%B %d').replace(' 0', ' ')
+    end_fmt = end_date.strftime('%B %d').replace(' 0', ' ')
+    return f"from {start_fmt} to {end_fmt}"
 
 
 def format_event_list(events: list, show_date: bool = False) -> str:
