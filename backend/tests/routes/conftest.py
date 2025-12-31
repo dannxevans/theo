@@ -16,42 +16,68 @@ from auth import hash_password, generate_session_token
 
 
 @pytest.fixture
-def shared_db_path():
+def db_path():
     """
-    Create a shared temporary database file for both app and memory fixtures.
+    Create a temporary database file.
     """
-    db_fd, db_path = tempfile.mkstemp()
-    os.close(db_fd)
-
-    yield db_path
-
+    db_fd, path = tempfile.mkstemp()
+    yield path
     # Cleanup
-    if os.path.exists(db_path):
-        os.unlink(db_path)
+    os.close(db_fd)
+    os.unlink(path)
 
 
 @pytest.fixture
-def app(shared_db_path, memory, monkeypatch):
+def memory(db_path):
+    """
+    Create MemoryStore with shared test database.
+    """
+    memory_store = MemoryStore(f"sqlite:///{db_path}")
+    return memory_store
+
+
+@pytest.fixture
+def app(db_path, memory):
     """
     Create and configure Flask app for testing.
+    Uses the same database as the memory fixture.
     """
-    # Patch Config.DATABASE_URL to use test database
-    from config import Config
     import app as app_module
+    import config
 
-    test_db_url = f"sqlite:///{shared_db_path}"
-    monkeypatch.setattr(Config, "DATABASE_URL", test_db_url)
-
-    # Patch the global memory object in app.py to use the test memory
-    monkeypatch.setattr(app_module, "memory", memory)
+    db_url = f"sqlite:///{db_path}"
 
     flask_app.config.update({
         "TESTING": True,
-        "DATABASE_URL": test_db_url,
+        "DATABASE_URL": db_url,
         "SECRET_KEY": "test-secret-key",
     })
 
+    # Patch Config.DATABASE_URL so routes create MemoryStore with test database
+    old_db_url = config.Config.DATABASE_URL
+    config.Config.DATABASE_URL = db_url
+
+    # Replace the app's memory instance with the test memory instance
+    old_memory = app_module.memory
+    app_module.memory = memory
+
+    # Also update references in other app components that use memory
+    if hasattr(app_module, 'context_manager'):
+        app_module.context_manager.memory = memory
+    if hasattr(app_module, 'provider_registry'):
+        app_module.provider_registry.memory = memory
+    if hasattr(app_module, 'action_registry'):
+        app_module.action_registry.memory = memory
+    if hasattr(app_module, 'action_router'):
+        app_module.action_router.memory = memory
+    if hasattr(app_module, 'confirmation_manager'):
+        app_module.confirmation_manager.memory = memory
+
     yield flask_app
+
+    # Restore original values
+    app_module.memory = old_memory
+    config.Config.DATABASE_URL = old_db_url
 
 
 @pytest.fixture
@@ -60,15 +86,6 @@ def client(app):
     Create Flask test client.
     """
     return app.test_client()
-
-
-@pytest.fixture
-def memory(shared_db_path):
-    """
-    Create MemoryStore with shared database.
-    """
-    memory_store = MemoryStore(f"sqlite:///{shared_db_path}")
-    yield memory_store
 
 
 @pytest.fixture

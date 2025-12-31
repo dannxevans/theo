@@ -139,7 +139,7 @@ def test_reject_confirmation_success(mock_reject, client, memory, auth_headers, 
         "message": "Action rejected"
     }
 
-    response = client.post(f"/api/confirmations/{conf_id}/reject", headers=auth_headers)
+    response = client.post(f"/api/confirmations/{conf_id}/reject", headers=auth_headers, json={})
 
     assert response.status_code == 200
     data = response.json
@@ -169,7 +169,7 @@ def test_reject_confirmation_without_reason(mock_reject, client, auth_headers):
         "message": "Rejected"
     }
 
-    response = client.post("/api/confirmations/1/reject", headers=auth_headers)
+    response = client.post("/api/confirmations/1/reject", headers=auth_headers, json={})
 
     assert response.status_code == 200
 

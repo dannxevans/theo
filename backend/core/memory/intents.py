@@ -211,15 +211,20 @@ class IntentOperations(BaseMemoryOperations):
             user_id: User identifier
             intent_id: Intent ID
             **updates: Fields to update
+
+        Raises:
+            ValueError: If intent does not exist
         """
         updates["updated_at"] = datetime.utcnow()
         with self._get_connection() as conn:
-            conn.execute(
+            result = conn.execute(
                 update(self.intents)
                 .where(self.intents.c.user_id == user_id)
                 .where(self.intents.c.id == intent_id)
                 .values(**updates)
             )
+            if result.rowcount == 0:
+                raise ValueError(f"Intent {intent_id} not found")
 
     def delete_intent(self, user_id, intent_id):
         """
@@ -228,6 +233,9 @@ class IntentOperations(BaseMemoryOperations):
         Args:
             user_id: User identifier
             intent_id: Intent ID
+
+        Raises:
+            ValueError: If intent does not exist
         """
         with self._get_connection() as conn:
             # Delete routing preferences first
@@ -237,11 +245,13 @@ class IntentOperations(BaseMemoryOperations):
                 .where(self.routing_preferences.c.intent == intent_id)
             )
             # Delete intent
-            conn.execute(
+            result = conn.execute(
                 delete(self.intents)
                 .where(self.intents.c.user_id == user_id)
                 .where(self.intents.c.id == intent_id)
             )
+            if result.rowcount == 0:
+                raise ValueError(f"Intent {intent_id} not found")
 
     def seed_default_intents(self, user_id):
         """

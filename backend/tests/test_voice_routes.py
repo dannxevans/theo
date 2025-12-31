@@ -30,6 +30,7 @@ def mock_tts_provider():
     with patch('routes.voice_routes.get_tts_provider') as mock:
         provider = Mock()
         provider.synthesize.return_value = b"audio_data"
+        provider.model = "test-tts-model"
         provider.list_voices.return_value = [
             {"id": "alloy", "name": "Alloy", "description": "Neutral voice"},
             {"id": "echo", "name": "Echo", "description": "Clear voice"}

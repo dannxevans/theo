@@ -399,9 +399,11 @@ class SessionOperations(BaseMemoryOperations):
                     .where(self.sessions.c.id == session_id)
                 ).fetchone()
 
-                if row and not row.title:
-                    title = content.strip().splitlines()[0][:60]
-                    self.save_session_title(session_id, title)
+                if row and not row.title and content.strip():
+                    lines = content.strip().splitlines()
+                    if lines:
+                        title = lines[0][:60]
+                        self.save_session_title(session_id, title)
 
         # Serialize metadata to JSON if it's a dict
         metadata_json = None

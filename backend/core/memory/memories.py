@@ -9,7 +9,7 @@ Handles all memory-related CRUD operations including:
 """
 
 from datetime import datetime
-from sqlalchemy import select, delete, insert, update, func
+from sqlalchemy import select, delete, insert, update, func, case
 
 from .base import BaseMemoryOperations
 
@@ -281,16 +281,17 @@ class MemoryOperations(BaseMemoryOperations):
             decay_amount: Amount to decrease relevance scores
         """
         with self._get_connection() as conn:
+            # Use case expression for SQLite compatibility (no greatest function)
+            new_score = case(
+                (self.memories.c.relevance_score - decay_amount > 0,
+                 self.memories.c.relevance_score - decay_amount),
+                else_=0
+            )
             conn.execute(
                 update(self.memories)
                 .where(self.memories.c.user_id == user_id)
                 .where(self.memories.c.pinned == False)
-                .values(
-                    relevance_score=func.greatest(
-                        self.memories.c.relevance_score - decay_amount,
-                        0
-                    )
-                )
+                .values(relevance_score=new_score)
             )
 
     def get_system_prompt_config(self, user_id):

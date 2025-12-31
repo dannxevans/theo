@@ -16,13 +16,9 @@ def test_get_routing_preferences(client, memory, sample_intent, sample_provider)
 
     assert response.status_code == 200
     data = response.json
-    assert isinstance(data, list)
-    assert len(data) > 0
-
-    # Check structure
-    pref = data[0]
-    assert "intent" in pref
-    assert "provider_id" in pref
+    assert isinstance(data, dict)
+    assert sample_intent["id"] in data
+    assert data[sample_intent["id"]] == sample_provider["id"]
 
 
 def test_get_routing_preferences_empty(client):
@@ -31,7 +27,8 @@ def test_get_routing_preferences_empty(client):
 
     assert response.status_code == 200
     data = response.json
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert len(data) == 0
 
 
 def test_set_routing_preference(client, memory, sample_intent, sample_provider):
@@ -46,9 +43,8 @@ def test_set_routing_preference(client, memory, sample_intent, sample_provider):
 
     # Verify set
     prefs = memory.get_routing_preferences("local")
-    pref = next((p for p in prefs if p["intent"] == sample_intent["id"]), None)
-    assert pref is not None
-    assert pref["provider_id"] == sample_provider["id"]
+    assert sample_intent["id"] in prefs
+    assert prefs[sample_intent["id"]] == sample_provider["id"]
 
 
 def test_set_routing_preference_update(client, memory, sample_intent, sample_provider):
@@ -140,6 +136,7 @@ def test_routing_preferences_multiple_intents(client, memory):
     assert len(data) >= 2
 
     # Verify both preferences exist
-    intents = [p["intent"] for p in data]
-    assert "coding" in intents
-    assert "creative" in intents
+    assert "coding" in data
+    assert "creative" in data
+    assert data["coding"] == "provider1"
+    assert data["creative"] == "provider2"
