@@ -320,21 +320,41 @@ def extract_event_with_llm(user_text: str, user_id: int, memory_store) -> Option
     from core.provider_registry import ProviderRegistry
     import json
 
-    # Get OpenAI provider for parsing
+    # Get system provider for lightweight tasks (configurable)
     try:
         registry = ProviderRegistry(memory_store)
-        provider_cfg = registry.get_by_type("openai")
+
+        # First check for "system" routing preference
+        system_provider_id = memory_store.get_routing_provider(user_id, "system") if memory_store else None
+        provider_cfg = None
+
+        if system_provider_id:
+            # Use configured system provider
+            provider_cfg = registry.get_by_id(system_provider_id)
+            logging.info(f"[HELPERS] Using configured system provider: {system_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Fallback to OpenAI provider
+            provider_cfg = registry.get_by_type("openai")
+            logging.info("[HELPERS] Using fallback OpenAI provider for calendar extraction")
 
         if not provider_cfg or not provider_cfg.get("api_key"):
             # Fallback to basic parsing if no LLM available
-            logging.warning("[HELPERS] No OpenAI provider available, using basic parsing")
+            logging.warning("[HELPERS] No LLM provider available, using basic parsing")
             return parse_event_details(user_text)
 
-        provider = OpenAIProvider(
-            api_key=provider_cfg["api_key"],
-            base_url=provider_cfg.get("base_url"),
-            model=provider_cfg.get("model") or "gpt-4o-mini"
-        )
+        # Instantiate appropriate provider based on type
+        provider_type = provider_cfg.get("type", "openai")
+        if provider_type == "openai":
+            provider = OpenAIProvider(
+                api_key=provider_cfg["api_key"],
+                base_url=provider_cfg.get("base_url"),
+                model=provider_cfg.get("model") or "gpt-4o-mini"
+            )
+        else:
+            # For now, only OpenAI is supported for lightweight tasks
+            logging.warning(f"[HELPERS] Provider type {provider_type} not supported for calendar extraction, using basic parsing")
+            return parse_event_details(user_text)
 
         # Construct extraction prompt
         system_prompt = """You are a calendar event parser. Extract structured event information from user requests.

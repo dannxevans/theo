@@ -93,3 +93,43 @@ def update_system_prompt_settings():
 
     memory.update_system_prompt_config("local", **updates)
     return jsonify({"status": "ok"})
+
+
+@settings_bp.route("/preference/<key>", methods=["GET"])
+def get_user_preference(key):
+    """
+    Get a user preference value.
+    Returns: { "value": "..." }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # For now, using "local" as user_id (will be replaced with actual auth later)
+    value = memory.get_user_preference("local", key)
+
+    return jsonify({"value": value})
+
+
+@settings_bp.route("/preference/<key>", methods=["POST"])
+def set_user_preference(key):
+    """
+    Set a user preference value.
+    Request body: { "value": "..." }
+    Returns: { "status": "ok" }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+    data = request.json
+    value = data.get("value")
+
+    if value is None:
+        return jsonify({"error": "Value is required"}), 400
+
+    # For now, using "local" as user_id
+    memory.set_user_preference("local", key, str(value))
+
+    return jsonify({"status": "ok"})

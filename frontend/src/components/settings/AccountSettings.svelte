@@ -1,5 +1,6 @@
 <script>
-  import { changePassword } from "../../lib/api";
+  import { onMount } from "svelte";
+  import { changePassword, getUserPreference, setUserPreference } from "../../lib/api";
 
   let passwordForm = {
     current: "",
@@ -10,8 +11,34 @@
   let passwordSuccess = null;
   let changingPassword = false;
 
-  let sessionTimeoutHours = parseInt(localStorage.getItem("theo.sessionTimeout")) || 8;
+  let sessionTimeoutHours = 8;
   let sessionTimeoutStatus = null;
+  let loadingTimeout = true;
+
+  onMount(async () => {
+    // Load session timeout from backend
+    try {
+      const value = await getUserPreference("session_timeout");
+      if (value) {
+        sessionTimeoutHours = parseInt(value);
+      } else {
+        // Fallback to localStorage for migration
+        const localValue = localStorage.getItem("theo.sessionTimeout");
+        if (localValue) {
+          sessionTimeoutHours = parseInt(localValue);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load session timeout from backend:", err);
+      // Fallback to localStorage
+      const localValue = localStorage.getItem("theo.sessionTimeout");
+      if (localValue) {
+        sessionTimeoutHours = parseInt(localValue);
+      }
+    } finally {
+      loadingTimeout = false;
+    }
+  });
 
   async function handleChangePassword() {
     passwordError = null;
@@ -46,7 +73,7 @@
     }
   }
 
-  function saveSessionTimeout() {
+  async function saveSessionTimeout() {
     sessionTimeoutStatus = null;
 
     // Validation
@@ -55,9 +82,17 @@
       return;
     }
 
-    // Save to localStorage
-    localStorage.setItem("theo.sessionTimeout", sessionTimeoutHours.toString());
-    sessionTimeoutStatus = `Session timeout set to ${sessionTimeoutHours} hours. The new timeout will take effect on your next login.`;
+    try {
+      // Save to backend
+      await setUserPreference("session_timeout", sessionTimeoutHours.toString());
+
+      // Also save to localStorage for backward compatibility with frontend timeout
+      localStorage.setItem("theo.sessionTimeout", sessionTimeoutHours.toString());
+
+      sessionTimeoutStatus = `Session timeout set to ${sessionTimeoutHours} hours. This will take effect immediately for backend session validation.`;
+    } catch (err) {
+      sessionTimeoutStatus = `Error saving session timeout: ${err.message}`;
+    }
 
     setTimeout(() => {
       sessionTimeoutStatus = null;

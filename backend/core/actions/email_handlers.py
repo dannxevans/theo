@@ -489,19 +489,39 @@ class EmailHandlers(BaseActionHandler):
         from core.provider_registry import ProviderRegistry
 
         try:
-            # Get OpenAI provider
+            # Get system provider for lightweight tasks (configurable)
             registry = ProviderRegistry(self.memory)
-            provider_cfg = registry.get_by_type("openai")
+
+            # First check for "system" routing preference
+            system_provider_id = self.memory.get_routing_provider(user_id, "system") if self.memory else None
+            provider_cfg = None
+
+            if system_provider_id:
+                # Use configured system provider
+                provider_cfg = registry.get(system_provider_id)
+                logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
-                logging.warning("[EMAIL_HANDLERS] No OpenAI provider available for email generation")
+                # Fallback to OpenAI provider
+                provider_cfg = registry.get_by_type("openai")
+                logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                logging.warning("[EMAIL_HANDLERS] No LLM provider available for email generation")
                 return None
 
-            provider = OpenAIProvider(
-                api_key=provider_cfg["api_key"],
-                base_url=provider_cfg.get("base_url"),
-                model=provider_cfg.get("model") or "gpt-4o-mini"
-            )
+            # Instantiate appropriate provider based on type
+            provider_type = provider_cfg.get("type", "openai")
+            if provider_type == "openai":
+                provider = OpenAIProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model") or "gpt-4o-mini"
+                )
+            else:
+                # For now, only OpenAI is supported for lightweight tasks
+                logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for email generation")
+                return None
 
             # Get user's name from memory facts
             user_name = None
@@ -624,19 +644,39 @@ Generate a reply email body:"""
         from core.provider_registry import ProviderRegistry
 
         try:
-            # Get OpenAI provider
+            # Get system provider for lightweight tasks (configurable)
             registry = ProviderRegistry(self.memory)
-            provider_cfg = registry.get_by_type("openai")
+
+            # First check for "system" routing preference
+            system_provider_id = self.memory.get_routing_provider(user_id, "system") if self.memory else None
+            provider_cfg = None
+
+            if system_provider_id:
+                # Use configured system provider
+                provider_cfg = registry.get(system_provider_id)
+                logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
-                logging.warning("[EMAIL_HANDLERS] No OpenAI provider available for email generation")
+                # Fallback to OpenAI provider
+                provider_cfg = registry.get_by_type("openai")
+                logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                logging.warning("[EMAIL_HANDLERS] No LLM provider available for email generation")
                 return None, None
 
-            provider = OpenAIProvider(
-                api_key=provider_cfg["api_key"],
-                base_url=provider_cfg.get("base_url"),
-                model=provider_cfg.get("model") or "gpt-4o-mini"
-            )
+            # Instantiate appropriate provider based on type
+            provider_type = provider_cfg.get("type", "openai")
+            if provider_type == "openai":
+                provider = OpenAIProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model") or "gpt-4o-mini"
+                )
+            else:
+                # For now, only OpenAI is supported for lightweight tasks
+                logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for email generation")
+                return None, None
 
             # Get user's name from memory facts
             user_name = None
@@ -735,23 +775,71 @@ Generate the email with subject and body:"""
             AI-generated summary of emails
         """
         from providers.openai import OpenAIProvider
+        from providers.anthropic import AnthropicProvider
+        from providers.gemini import GoogleProvider
+        from providers.grok import XAIProvider
+        from providers.mistral import MistralProvider
         from core.provider_registry import ProviderRegistry
 
         try:
-            # Get OpenAI provider for summarization
+            # Get system provider for lightweight tasks (configurable)
             registry = ProviderRegistry(self.memory)
-            provider_cfg = registry.get_by_type("openai")
+
+            # First check for "system" routing preference
+            system_provider_id = self.memory.get_routing_provider(user_id, "system") if self.memory else None
+            provider_cfg = None
+
+            if system_provider_id:
+                # Use configured system provider
+                provider_cfg = registry.get(system_provider_id)
+                logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
-                # Fallback to basic formatting if no LLM available
-                logging.warning("[EMAIL_HANDLERS] No OpenAI provider available, using basic email list")
+                # Fallback to OpenAI provider
+                provider_cfg = registry.get_by_type("openai")
+                logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email summarization")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                # No LLM available at all
+                logging.warning("[EMAIL_HANDLERS] No LLM provider available, using basic email list")
                 return self._format_email_list(emails, unread_only)
 
-            provider = OpenAIProvider(
-                api_key=provider_cfg["api_key"],
-                base_url=provider_cfg.get("base_url"),
-                model=provider_cfg.get("model") or "gpt-4o-mini"
-            )
+            # Instantiate appropriate provider based on type
+            provider_type = provider_cfg.get("type", "openai")
+            if provider_type == "openai":
+                provider = OpenAIProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model") or "gpt-4o-mini"
+                )
+            elif provider_type == "anthropic":
+                provider = AnthropicProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "google":
+                provider = GoogleProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "xai":
+                provider = XAIProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            elif provider_type == "mistral":
+                provider = MistralProvider(
+                    api_key=provider_cfg["api_key"],
+                    base_url=provider_cfg.get("base_url"),
+                    model=provider_cfg.get("model")
+                )
+            else:
+                # Unknown provider type
+                logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for lightweight tasks, using basic email list")
+                return self._format_email_list(emails, unread_only)
 
             # Build email context for LLM
             email_context = []
