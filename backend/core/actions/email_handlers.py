@@ -498,7 +498,7 @@ class EmailHandlers(BaseActionHandler):
 
             if system_provider_id:
                 # Use configured system provider
-                provider_cfg = registry.get_by_id(system_provider_id)
+                provider_cfg = registry.get(system_provider_id)
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
@@ -653,7 +653,7 @@ Generate a reply email body:"""
 
             if system_provider_id:
                 # Use configured system provider
-                provider_cfg = registry.get_by_id(system_provider_id)
+                provider_cfg = registry.get(system_provider_id)
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
@@ -791,7 +791,7 @@ Generate the email with subject and body:"""
 
             if system_provider_id:
                 # Use configured system provider
-                provider_cfg = registry.get_by_id(system_provider_id)
+                provider_cfg = registry.get(system_provider_id)
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
