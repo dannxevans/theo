@@ -45,7 +45,10 @@ def run_all_migrations():
     # Get all migration files in order
     migration_files = [
         "009_add_fallback_provider_to_routing.py",  # Add fallback_provider_id column for provider fallback support
-        "010_add_circuit_breaker_cooldown.py"  # Add circuit breaker cooldown columns for time-based auto-retry
+        "010_add_circuit_breaker_cooldown.py",  # Add circuit breaker cooldown columns for time-based auto-retry
+        "011_add_feature_providers.py",  # Add feature_providers table for external service API keys
+        "012_add_feature_provider_usage_logs.py",  # Add usage tracking for feature providers
+        "013_add_planning_metadata.py"  # Add enrichment_data column to actions table for context-aware planning
     ]
 
     # Filter to only existing files
