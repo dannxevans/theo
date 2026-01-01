@@ -408,6 +408,39 @@ export async function setDebugFlag(enabled) {
   return response.json();
 }
 
+export async function getMessageDebugFlag() {
+  const response = await fetch(`${API_BASE}/api/settings/message-debug`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get message debug flag");
+  }
+
+  return response.json();
+}
+
+export async function setMessageDebugFlag(enabled) {
+  const response = await fetch(`${API_BASE}/api/settings/message-debug`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      enabled: Boolean(enabled)
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to save message debug flag");
+  }
+
+  return response.json();
+}
+
 // =============================
 // System Prompt Configuration API
 // =============================
@@ -1158,4 +1191,81 @@ export async function setUserPreference(key, value) {
   }
 
   return await response.json();
+}
+
+// =============================
+// Feature Providers API
+// =============================
+
+/**
+ * Get all feature providers
+ */
+export async function getFeatureProviders() {
+  const response = await fetch(`${API_BASE}/api/feature-providers`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get feature providers");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific feature provider
+ */
+export async function getFeatureProvider(providerType) {
+  const response = await fetch(`${API_BASE}/api/feature-providers/${providerType}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    const err = await response.text();
+    throw new Error(err || "Failed to get feature provider");
+  }
+
+  return response.json();
+}
+
+/**
+ * Configure or update a feature provider
+ */
+export async function configureFeatureProvider(providerType, config) {
+  const response = await fetch(`${API_BASE}/api/feature-providers/${providerType}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to configure feature provider");
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a feature provider
+ */
+export async function deleteFeatureProvider(providerType) {
+  const response = await fetch(`${API_BASE}/api/feature-providers/${providerType}`, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete feature provider");
+  }
+
+  return response.json();
 }

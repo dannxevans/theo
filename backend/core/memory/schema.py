@@ -299,6 +299,7 @@ def create_schema(meta: MetaData):
         Column("model", String, nullable=True),
         Column("intent", String, nullable=True),
         Column("metadata", Text, nullable=True),  # JSON metadata for confirmations, etc.
+        Column("planning_metadata", Text, nullable=True),  # JSON: weather/traffic/calendar context
     )
 
     # =============================
@@ -369,6 +370,7 @@ def create_schema(meta: MetaData):
         Column("max_retries", Integer, default=3),
         Column("is_reversible", Boolean, default=False),
         Column("rollback_action_id", Integer, nullable=True),
+        Column("enrichment_data", Text, nullable=True),  # JSON: weather/traffic/calendar enrichment
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
@@ -411,6 +413,36 @@ def create_schema(meta: MetaData):
         Column("last_error", Text, nullable=True),
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # Feature Providers
+    # =============================
+    feature_providers = Table(
+        "feature_providers",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", String, nullable=False),
+        Column("provider_type", String(50), nullable=False),
+        Column("provider_name", String(100), nullable=False),
+        Column("is_enabled", Boolean, default=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # Feature Provider Usage Logs
+    # =============================
+    feature_provider_usage_logs = Table(
+        "feature_provider_usage_logs",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", String, nullable=False),
+        Column("provider_type", String(50), nullable=False),
+        Column("success", Boolean, default=True),
+        Column("latency_ms", Integer, nullable=True),
+        Column("error_message", String, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
     )
 
     # =============================
@@ -467,6 +499,7 @@ def create_schema(meta: MetaData):
         "provider_metadata": provider_metadata,
         "request_logs": request_logs,
         "voice_usage_logs": voice_usage_logs,
+        "feature_provider_usage_logs": feature_provider_usage_logs,
         "providers": providers,
         "sessions": sessions,
         "summaries": summaries,
@@ -478,4 +511,5 @@ def create_schema(meta: MetaData):
         "m365_credentials": m365_credentials,
         "calendar_events_cache": calendar_events_cache,
         "classification_audit": classification_audit,
+        "feature_providers": feature_providers,
     }

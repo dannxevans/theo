@@ -48,7 +48,7 @@
    * Format model display: "Name · Type · Routing"
    * Examples: "GPT-4o · OpenAI · General", "Sonnet-4.5 · Anthropic · Coding"
    */
-  function formatModelDisplay(provider, model, taskType) {
+  function formatModelDisplay(provider, model, taskType, metadata = {}) {
     // Extract friendly name from model or provider
     let modelName = "";
     let providerType = "";
@@ -56,6 +56,28 @@
     // Special cases for non-AI responses (don't show model badge)
     if (provider === "memory" || provider === "error" || provider === "action_router") {
       return null;
+    }
+
+    // If we have explicit provider info from metadata (e.g., from LLM summarization),
+    // use that for display
+    if (metadata?.llm_provider_name && metadata?.llm_provider_type) {
+      modelName = metadata.llm_provider_name;
+      providerType = metadata.llm_provider_type;
+
+      // Format task type
+      const routing = taskType
+        ? taskType.charAt(0).toUpperCase() + taskType.slice(1).replace(/_/g, " ")
+        : "General";
+
+      return `${modelName} · ${providerType} · ${routing}`;
+    }
+
+    // Weather provider
+    if (provider === "weather") {
+      if (model === "openweather") {
+        return "OpenWeather · Weather";
+      }
+      return `${model} · Weather`;
     }
 
     // Determine provider type based on model string
@@ -146,6 +168,9 @@
   let providers = [];
   let advancedMode = false;
   let usedProviders = new Set(); // Track providers used in this session
+
+  // Debug instruction storage
+  let lastDebugInstruction = null;
 
   // Input textarea reference for height reset
   let inputTextarea = null;
@@ -279,7 +304,8 @@
     });
 
     marked.setOptions({
-      langPrefix: "language-"
+      langPrefix: "language-",
+      breaks: true  // Convert single newlines to <br> tags
     });
 
     const rawHtml = marked.parse(text);
@@ -502,6 +528,14 @@
           // Add provider to used providers set
           if (meta?.provider) {
             usedProviders = new Set([...usedProviders, meta.provider]);
+          }
+
+          // Capture debug instruction if present
+          if (meta?.debug_instruction) {
+            lastDebugInstruction = {
+              ...meta.debug_instruction,
+              expanded: false
+            };
           }
 
           streamedText = "";
@@ -817,14 +851,24 @@
                   {/if}
 
                   {#if m.provider}
-                    {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type)}
+                    {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type, m.metadata)}
                     {@const isActionRouter = m.provider === 'action_router'}
                     {@const isError = m.provider === 'error'}
+                    {@const isWeather = m.provider === 'weather'}
+                    {@const isRouting = m.provider === 'routing'}
                     {@const formattedAction = m.task_type
                       ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
                       : "Action"}
                     <div class="bubble-footer">
-                      {#if formattedModel}
+                      {#if isWeather}
+                        <span class="provider-badge provider-badge-weather">
+                          via OpenWeather · Weather
+                        </span>
+                      {:else if isRouting}
+                        <span class="provider-badge provider-badge-routing">
+                          via HERE · Routing
+                        </span>
+                      {:else if formattedModel}
                         <span class="provider-badge provider-badge-ai">
                           via {formattedModel}
                         </span>
@@ -862,6 +906,41 @@
               </div>
             </div>
           {/each}
+
+          {#if lastDebugInstruction && messages.length > 0}
+            {@const lastMessage = messages[messages.length - 1]}
+            {#if lastMessage.role === "assistant"}
+              <div class="message system">
+                <div class="bubble debug-bubble">
+                  <div class="message-header">
+                    <strong>System Debug</strong>
+                  </div>
+                  <div class="debug-content">
+                    {#if lastDebugInstruction.expanded}
+                      <div class="debug-section">
+                        <h4>System Prompt:</h4>
+                        <pre class="debug-text">{lastDebugInstruction.system}</pre>
+                      </div>
+                      <div class="debug-section">
+                        <h4>Messages:</h4>
+                        <pre class="debug-text">{JSON.stringify(lastDebugInstruction.messages, null, 2)}</pre>
+                      </div>
+                      <button class="debug-toggle" on:click={() => lastDebugInstruction = {...lastDebugInstruction, expanded: false}}>
+                        Show less
+                      </button>
+                    {:else}
+                      <div class="debug-preview">
+                        <pre class="debug-text">{lastDebugInstruction.system.split('\n').slice(0, 10).join('\n')}...</pre>
+                      </div>
+                      <button class="debug-toggle" on:click={() => lastDebugInstruction = {...lastDebugInstruction, expanded: true}}>
+                        Show more
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/if}
+          {/if}
 
           {#if streaming}
             <div class="message assistant">
@@ -1183,6 +1262,18 @@
     color: var(--error-700);
   }
 
+  /* Weather responses - washed out purple */
+  .provider-badge-weather {
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+
+  /* Routing responses - same purple as weather */
+  .provider-badge-routing {
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+
   .bubble-footer {
     margin-top: 0.5rem;
     display: flex;
@@ -1258,5 +1349,65 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  /* Debug bubble styles */
+  .message.system .bubble.debug-bubble {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    margin-top: 1rem;
+  }
+
+  .debug-content {
+    margin-top: 0.75rem;
+  }
+
+  .debug-section {
+    margin-bottom: 1rem;
+  }
+
+  .debug-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: #57606a;
+    font-weight: 600;
+  }
+
+  .debug-text {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.85rem;
+    color: #24292f;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  .debug-preview {
+    margin-bottom: 0.75rem;
+  }
+
+  .debug-toggle {
+    background: #0969da;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .debug-toggle:hover {
+    background: #0860ca;
+  }
+
+  .debug-toggle:active {
+    background: #0757ba;
   }
 </style>

@@ -394,6 +394,238 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
     return None
 
 
+def _log_feature_provider_usage(memory: Optional[MemoryStore], user_id: str, provider_type: str, success: bool, latency_ms: int = None, error_message: str = None):
+    """
+    Log feature provider usage to database.
+
+    Args:
+        memory: MemoryStore instance
+        user_id: User ID
+        provider_type: Type of provider (e.g., 'openweather', 'here')
+        success: Whether the request succeeded
+        latency_ms: Request latency in milliseconds
+        error_message: Error message if request failed
+    """
+    if not memory:
+        return
+
+    try:
+        import sqlite3
+        from config import Config
+
+        db_path = Config.DATABASE_URL.replace("sqlite:///", "")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO feature_provider_usage_logs (user_id, provider_type, success, latency_ms, error_message)
+            VALUES (?, ?, ?, ?, ?)
+        """, (str(user_id), provider_type, int(success), latency_ms, error_message))
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.error(f"[ROUTER] Failed to log feature provider usage: {e}")
+
+
+def _generate_friendly_weather_response(raw_weather: str, user_text: str, memory: Optional[MemoryStore], user_id: str) -> Optional[str]:
+    """
+    Use system LLM to generate a friendly, conversational weather response.
+
+    Args:
+        raw_weather: Raw weather data formatted as text
+        user_text: Original user query
+        memory: MemoryStore instance
+        user_id: User ID
+
+    Returns:
+        Friendly weather response or None if LLM unavailable
+    """
+    try:
+        # Get system provider for lightweight tasks (configurable)
+        registry = ProviderRegistry(memory)
+
+        # First check for "system" routing preference
+        system_provider_id = memory.get_routing_provider(user_id, "system") if memory else None
+        provider_cfg = None
+
+        if system_provider_id:
+            # Use configured system provider
+            provider_cfg = registry.get(system_provider_id)
+            logging.info(f"[WEATHER] Using configured system provider: {system_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Try configured fallback provider for system intent
+            fallback_provider_id = memory.get_fallback_provider(user_id, "system") if memory else None
+            if fallback_provider_id:
+                provider_cfg = registry.get(fallback_provider_id)
+                if provider_cfg and provider_cfg.get("api_key"):
+                    logging.info(f"[WEATHER] Using configured fallback provider: {fallback_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Fallback to OpenAI provider
+            provider_cfg = registry.get_by_type("openai")
+            logging.info("[WEATHER] Using fallback OpenAI provider for weather formatting")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # No LLM available at all
+            logging.warning("[WEATHER] No LLM provider available, using raw weather data")
+            return None
+
+        # Instantiate appropriate provider based on type
+        provider_type = provider_cfg.get("type")
+        api_key = provider_cfg.get("api_key")
+        model = provider_cfg.get("model")
+
+        if provider_type == "openai":
+            provider = OpenAIProvider(api_key=api_key, model=model)
+        elif provider_type == "anthropic":
+            provider = AnthropicProvider(api_key=api_key, model=model)
+        elif provider_type == "google":
+            provider = GoogleProvider(api_key=api_key, model=model)
+        elif provider_type == "xai":
+            provider = XAIProvider(api_key=api_key, model=model)
+        elif provider_type == "mistral":
+            provider = MistralProvider(api_key=api_key, model=model)
+        else:
+            logging.warning(f"[WEATHER] Unknown provider type: {provider_type}")
+            return None
+
+        # Generate friendly response using LLM
+        system_prompt = """You are a friendly weather assistant. Your job is to present weather information in a natural, conversational way.
+
+Guidelines:
+- Be concise and friendly
+- Use natural language instead of bullet points
+- Include relevant details based on the conditions (e.g., mention wind if it's strong, humidity if it's high)
+- Don't repeat the location unnecessarily
+- Keep it to 1-2 sentences unless the user asks for more detail"""
+
+        user_prompt = f"""User asked: "{user_text}"
+
+Weather data:
+{raw_weather}
+
+Present this weather information in a friendly, natural way:"""
+
+        response = provider.chat(
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+
+        response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+
+        if response_text:
+            logging.info(f"[WEATHER] Generated friendly response ({len(response_text)} chars)")
+            return response_text
+        else:
+            logging.warning("[WEATHER] LLM returned empty response")
+            return None
+
+    except Exception as e:
+        logging.error(f"[WEATHER] Failed to generate friendly response: {e}")
+        return None
+
+
+def _generate_friendly_routing_response(raw_route: str, user_text: str, memory: Optional[MemoryStore], user_id: str) -> Optional[str]:
+    """
+    Use system LLM to generate a friendly, conversational routing response.
+
+    Args:
+        raw_route: Raw routing data formatted as text
+        user_text: Original user query
+        memory: MemoryStore instance
+        user_id: User ID
+
+    Returns:
+        Friendly routing response or None if LLM unavailable
+    """
+    try:
+        # Get system provider for lightweight tasks (configurable)
+        registry = ProviderRegistry(memory)
+
+        # First check for "system" routing preference
+        system_provider_id = memory.get_routing_provider(user_id, "system") if memory else None
+        provider_cfg = None
+
+        if system_provider_id:
+            # Use configured system provider
+            provider_cfg = registry.get(system_provider_id)
+            logging.info(f"[ROUTING] Using configured system provider: {system_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Try configured fallback provider for system intent
+            fallback_provider_id = memory.get_fallback_provider(user_id, "system") if memory else None
+            if fallback_provider_id:
+                provider_cfg = registry.get(fallback_provider_id)
+                if provider_cfg and provider_cfg.get("api_key"):
+                    logging.info(f"[ROUTING] Using configured fallback provider: {fallback_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Fallback to OpenAI provider
+            provider_cfg = registry.get_by_type("openai")
+            logging.info("[ROUTING] Using fallback OpenAI provider for routing formatting")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # No LLM available at all
+            logging.warning("[ROUTING] No LLM provider available, using raw routing data")
+            return None
+
+        # Instantiate appropriate provider based on type
+        provider_type = provider_cfg.get("type")
+        api_key = provider_cfg.get("api_key")
+        model = provider_cfg.get("model")
+
+        if provider_type == "openai":
+            provider = OpenAIProvider(api_key=api_key, model=model)
+        elif provider_type == "anthropic":
+            provider = AnthropicProvider(api_key=api_key, model=model)
+        elif provider_type == "google":
+            provider = GoogleProvider(api_key=api_key, model=model)
+        elif provider_type == "xai":
+            provider = XAIProvider(api_key=api_key, model=model)
+        elif provider_type == "mistral":
+            provider = MistralProvider(api_key=api_key, model=model)
+        else:
+            logging.warning(f"[ROUTING] Unknown provider type: {provider_type}")
+            return None
+
+        # Generate friendly response using LLM
+        system_prompt = """You are a friendly navigation assistant. Your job is to present routing information in a natural, conversational way.
+
+Guidelines:
+- Be concise and friendly
+- Use natural language instead of bullet points
+- Convert distance and time into easy-to-understand phrases
+- Don't repeat coordinates unnecessarily
+- Keep it to 1-2 sentences unless the user asks for more detail"""
+
+        user_prompt = f"""User asked: "{user_text}"
+
+Routing data:
+{raw_route}
+
+Present this routing information in a friendly, natural way:"""
+
+        response = provider.chat(
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+
+        response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+
+        if response_text:
+            logging.info(f"[ROUTING] Generated friendly response ({len(response_text)} chars)")
+            return response_text
+        else:
+            logging.warning("[ROUTING] LLM returned empty response")
+            return None
+
+    except Exception as e:
+        logging.error(f"[ROUTING] Failed to generate friendly response: {e}")
+        return None
+
+
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None, user_id: str = "local"):
     fallback_reason = None
     selected_provider = None
@@ -647,6 +879,258 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Incoming text: {text}")
     _debug(memory, f"Classified intent: {intent}")
     _debug(memory, f"Forced provider: {forced}")
+
+    # =============================
+    # Weather Intent Handling
+    # =============================
+    if intent == "weather":
+        _debug(memory, "Handling weather request")
+
+        # Get user_id from context
+        user_id = context.get("user_id") if context.get("user_id") else "local"
+
+        # Get weather API key from user preferences
+        prefs = memory.get_all(user_id) if memory else {}
+        api_key = prefs.get("feature_provider_openweather_api_key")
+
+        if not api_key:
+            return {
+                "text": "Weather service is not configured. Please add your OpenWeather API key in Settings > Feature Providers.",
+                "provider": "error",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": "missing_api_key",
+            }
+
+        # Extract location from the message
+        # Use simple extraction - look for location after common phrases
+        import re
+        text_l = text.lower()
+
+        # Try to extract location using patterns
+        location = None
+        location_patterns = [
+            r'weather (?:in|for|at) ([^?]+)',
+            r'temperature (?:in|for|at) ([^?]+)',
+            r'forecast (?:in|for|at) ([^?]+)',
+        ]
+
+        for pattern in location_patterns:
+            match = re.search(pattern, text_l)
+            if match:
+                location = match.group(1).strip()
+                break
+
+        # If no location found, ask for it
+        if not location:
+            return {
+                "text": "I can get the weather for you! Which location would you like to know about?",
+                "provider": "weather",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": "missing_location",
+            }
+
+        # Fetch weather data
+        from core.weather_service import WeatherService
+        import time
+
+        start_time = time.time()
+        try:
+            weather_service = WeatherService(api_key)
+            weather_data = weather_service.get_weather(location)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            if weather_data:
+                # Log successful usage
+                _log_feature_provider_usage(memory, user_id, "openweather", success=True, latency_ms=latency_ms)
+
+                # Get raw weather data formatted
+                raw_weather = weather_service.format_weather_response(weather_data)
+
+                # Use system LLM to make the response more conversational
+                friendly_response = _generate_friendly_weather_response(
+                    raw_weather,
+                    user_text=text,
+                    memory=memory,
+                    user_id=user_id
+                )
+
+                if friendly_response:
+                    response_text = friendly_response
+                else:
+                    # Fallback to raw format if LLM fails
+                    response_text = raw_weather
+
+                return {
+                    "text": response_text,
+                    "provider": "weather",
+                    "model": "openweather",
+                    "task_type": "weather",
+                    "fallback_reason": None,
+                }
+            else:
+                # Log failed usage
+                _log_feature_provider_usage(memory, user_id, "openweather", success=False, latency_ms=latency_ms, error_message="Failed to fetch weather data")
+
+                return {
+                    "text": f"I couldn't fetch the weather for '{location}'. Please check the location name and try again.",
+                    "provider": "weather",
+                    "model": None,
+                    "task_type": "weather",
+                    "fallback_reason": "weather_fetch_failed",
+                }
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            _log_feature_provider_usage(memory, user_id, "openweather", success=False, latency_ms=latency_ms, error_message=str(e))
+
+            logging.error(f"[ROUTER] Weather service error: {e}")
+            return {
+                "text": f"I encountered an error fetching the weather: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": f"weather_error: {str(e)}",
+            }
+
+    if intent == "routing":
+        _debug(memory, "Handling routing request")
+
+        # Get user_id from context
+        user_id = context.get("user_id") if context.get("user_id") else "local"
+
+        # Get HERE API key from user preferences
+        prefs = memory.get_all(user_id) if memory else {}
+        api_key = prefs.get("feature_provider_here_api_key")
+
+        if not api_key:
+            return {
+                "text": "Routing service is not configured. Please add your HERE API key in Settings > Feature Providers.",
+                "provider": "error",
+                "model": None,
+                "task_type": "routing",
+                "fallback_reason": "missing_api_key",
+            }
+
+        # Extract origin and destination from the message
+        import re
+        text_l = text.lower()
+
+        # Try to extract locations using patterns
+        origin = None
+        destination = None
+
+        # Pattern: "route from X to Y" or "directions from X to Y"
+        from_to_pattern = r'(?:route|directions|navigate|drive|travel) from ([^t]+) to (.+)'
+        match = re.search(from_to_pattern, text_l)
+        if match:
+            origin = match.group(1).strip()
+            destination = match.group(2).strip()
+
+        # If no match, ask for clarification
+        if not origin or not destination:
+            return {
+                "text": "I can provide routing information! Please specify the origin and destination coordinates (e.g., 'route from 52.5308,13.3847 to 52.5264,13.3686').",
+                "provider": "routing",
+                "model": None,
+                "task_type": "routing",
+                "fallback_reason": "missing_locations",
+            }
+
+        # Fetch route data
+        from core.traffic_service import TrafficService
+        import time
+
+        start_time = time.time()
+        try:
+            traffic_service = TrafficService(api_key)
+            # Traffic service handles geocoding automatically
+            route_data = traffic_service.get_traffic_estimate(origin, destination)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            if route_data:
+                # Log successful usage
+                _log_feature_provider_usage(memory, user_id, "here", success=True, latency_ms=latency_ms)
+
+                # Get raw route data formatted
+                raw_route = traffic_service.format_traffic_response(route_data)
+
+                # Use system LLM to make the response more conversational
+                friendly_response = _generate_friendly_routing_response(
+                    raw_route,
+                    user_text=text,
+                    memory=memory,
+                    user_id=user_id
+                )
+
+                if friendly_response:
+                    response_text = friendly_response
+                else:
+                    # Fallback to raw format if LLM fails
+                    response_text = raw_route
+
+                return {
+                    "text": response_text,
+                    "provider": "routing",
+                    "model": "here",
+                    "task_type": "routing",
+                    "fallback_reason": None,
+                }
+            else:
+                # Log failed usage
+                _log_feature_provider_usage(memory, user_id, "here", success=False, latency_ms=latency_ms, error_message="No route data returned")
+
+                return {
+                    "text": f"I couldn't fetch the route from '{origin}' to '{destination}'. Please check the coordinates and try again.",
+                    "provider": "routing",
+                    "model": None,
+                    "task_type": "routing",
+                    "fallback_reason": "routing_fetch_failed",
+                }
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            # Log failed usage
+            _log_feature_provider_usage(memory, user_id, "here", success=False, latency_ms=latency_ms, error_message=str(e))
+
+            logging.error(f"[ROUTER] Routing service error: {e}")
+            return {
+                "text": f"I encountered an error fetching the route: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "routing",
+                "fallback_reason": f"routing_error: {str(e)}",
+            }
+
+    if intent == "planning":
+        _debug(memory, "Handling planning request")
+
+        # Get user_id from context
+        user_id = context.get("user_id") if context.get("user_id") else "local"
+
+        # Use PlanningHandlers to process the request
+        from core.actions.planning_handlers import PlanningHandlers
+
+        try:
+            planning_handlers = PlanningHandlers(memory)
+            result = planning_handlers.handle_planning_query(
+                user_text=text,
+                session_id=context.get("session_id", ""),
+                user_id=int(user_id) if isinstance(user_id, str) and user_id.isdigit() else user_id,
+                context=context
+            )
+
+            return result
+
+        except Exception as e:
+            logging.error(f"[ROUTER] Planning service error: {e}")
+            return {
+                "text": f"I encountered an error processing your planning request: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "planning",
+                "fallback_reason": f"planning_error: {str(e)}",
+            }
 
     # =============================
     # Action Intent Routing
@@ -950,7 +1434,24 @@ def route_request(context: dict, stream: bool = False):
 
     _debug(memory, f"Response length: {len(text_out) if isinstance(text_out, str) else 'unknown'}")
 
-    return {
+    # Check if message debug is enabled
+    debug_instruction = None
+    if memory:
+        # Use user_id if available, otherwise use "local" for unauthenticated users
+        check_user_id = user_id if user_id else "local"
+        prefs = memory.get_all(check_user_id)
+        message_debug_enabled = str(prefs.get("message_debug_enabled", "false")).lower() == "true"
+
+        logging.info(f"[MESSAGE_DEBUG] check_user_id={check_user_id}, message_debug_enabled={message_debug_enabled}, prefs={prefs}")
+
+        if message_debug_enabled:
+            logging.info(f"[MESSAGE_DEBUG] Adding debug instruction to response")
+            debug_instruction = {
+                "system": system_prompt,
+                "messages": messages
+            }
+
+    result = {
         "text": text_out,
         "provider": meta["provider"],
         "model": meta["model"],
@@ -958,3 +1459,8 @@ def route_request(context: dict, stream: bool = False):
         "fallback_reason": meta["fallback_reason"],
         "routing": meta["routing"],
     }
+
+    if debug_instruction:
+        result["debug_instruction"] = debug_instruction
+
+    return result

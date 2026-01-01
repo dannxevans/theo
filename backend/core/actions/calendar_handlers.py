@@ -9,10 +9,31 @@ Provides handlers for calendar-related actions:
 - External service booking assistance
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime, timedelta
 import logging
 import re
+
+
+def get_provider_company_name(provider_type: str) -> str:
+    """
+    Map provider type to company display name.
+
+    Args:
+        provider_type: Provider type (e.g., 'openai', 'anthropic', 'google', etc.)
+
+    Returns:
+        Company display name (e.g., 'OpenAI', 'Anthropic', 'Google', etc.')
+    """
+    company_mapping = {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "google": "Google",
+        "mistral": "Mistral",
+        "grok": "xAI",
+        "xai": "xAI",
+    }
+    return company_mapping.get(provider_type.lower(), provider_type.capitalize())
 
 from .base_handler import BaseActionHandler
 from .helpers import (
@@ -29,6 +50,11 @@ from .helpers import (
 
 class CalendarHandlers(BaseActionHandler):
     """Handlers for calendar-related actions."""
+
+    def __init__(self, action_registry, memory_store, confirmation_manager=None):
+        """Initialize calendar handlers."""
+        super().__init__(action_registry, memory_store, confirmation_manager)
+        self.logger = logging.getLogger(__name__)
 
     def handle_read_calendar(
         self,
@@ -94,6 +120,15 @@ class CalendarHandlers(BaseActionHandler):
                 ) > now
             ]
 
+            # Enrich events with weather data
+            try:
+                from core.planning_service import PlanningService
+                planning_service = PlanningService(self.memory)
+                future_events = planning_service.enrich_calendar_view(future_events, str(user_id))
+            except Exception as e:
+                # If enrichment fails, continue without it
+                self.logger.warning(f"[CALENDAR] Failed to enrich calendar: {e}")
+
             # If this is a flight query, filter to flight/travel events
             if is_flight_query:
                 flight_keywords = ["flight", "train", "travel", "trip", "departure", "arrival", "airline", "airport"]
@@ -124,6 +159,8 @@ class CalendarHandlers(BaseActionHandler):
                 }
 
             # Format response for general calendar queries
+            llm_provider_info = None  # Initialize to None for all cases
+
             if not future_events:
                 date_str = format_date_range(start_date, end_date)
                 response = f"You have no upcoming events {date_str}."
@@ -132,19 +169,54 @@ class CalendarHandlers(BaseActionHandler):
                 is_multiday = (end_date - start_date).days > 1
                 event_list = format_event_list(future_events, show_date=is_multiday)
                 date_str = format_date_range(start_date, end_date)
-                response = f"Here are your upcoming events {date_str}:\n\n{event_list}"
 
-            return {
+                # Check if events have enrichment data (weather/traffic)
+                has_enrichment = any(event.get("weather") or event.get("traffic") for event in future_events)
+
+                if has_enrichment:
+                    # Use LLM to generate friendly summary with enrichment context
+                    response, llm_provider_info = self._generate_enriched_summary(
+                        future_events, date_str, event_list
+                    )
+                else:
+                    # Standard format without enrichment
+                    response = f"Here are your upcoming events {date_str}:\n\n{event_list}"
+
+            # Build response with appropriate provider attribution
+            result = {
                 "text": response,
-                "provider": "action_router",
-                "model": None,
-                "task_type": "read_calendar",
                 "metadata": {
                     "events_count": len(future_events),
                     "date_range": [start_date.isoformat(), end_date.isoformat()],
                     "provider_id": provider_id
                 }
             }
+
+            # If LLM was used for enrichment, attribute to the LLM provider
+            if llm_provider_info:
+                # Use the friendly provider name as the main identifier
+                # and pass both model and provider info for frontend display
+                provider_name = llm_provider_info.get("name", "Unknown")
+                provider_type = llm_provider_info.get("type", "")
+                model_id = llm_provider_info.get("model", "")
+
+                # Map provider type to company name for display
+                company_name = get_provider_company_name(provider_type)
+
+                # For display purposes, use the model ID if it helps with frontend formatting
+                # Otherwise, use the friendly provider name
+                result["provider"] = provider_name
+                result["model"] = model_id
+                result["task_type"] = "summarise_calendar"
+                result["metadata"]["llm_provider_type"] = company_name
+                result["metadata"]["llm_provider_name"] = provider_name
+            else:
+                # Otherwise attribute to action router
+                result["provider"] = "action_router"
+                result["model"] = None
+                result["task_type"] = "read_calendar"
+
+            return result
 
         except Exception as e:
             self._log_error("handle_read_calendar", e)
@@ -153,6 +225,113 @@ class CalendarHandlers(BaseActionHandler):
                 "read_calendar",
                 str(e)
             )
+
+    def _generate_enriched_summary(
+        self,
+        events: List[Dict[str, Any]],
+        date_str: str,
+        event_list: str
+    ) -> tuple:
+        """
+        Use lightweight LLM to generate friendly summary of calendar events with enrichment data.
+
+        Args:
+            events: List of calendar events with weather/traffic enrichment
+            date_str: Formatted date range string
+            event_list: Pre-formatted bulleted event list
+
+        Returns:
+            Tuple of (summary_text, provider_info) where provider_info is a dict with 'name', 'type', 'id'
+            or (summary_text, None) if no provider used
+        """
+        from core.provider_registry import ProviderRegistry
+
+        # Build enrichment context for LLM
+        enrichment_details = []
+        for event in events:
+            details = {
+                "subject": event.get("subject"),
+                "location": event.get("location"),
+                "start_time": event.get("start_time")
+            }
+
+            if event.get("weather"):
+                weather = event.get("weather")
+                details["weather"] = {
+                    "temperature": weather.get("temperature"),
+                    "description": weather.get("description")
+                }
+
+            if event.get("traffic"):
+                traffic = event.get("traffic")
+                details["traffic"] = {
+                    "duration_minutes": traffic.get("duration_minutes"),
+                    "traffic_delay_minutes": traffic.get("traffic_delay_minutes")
+                }
+
+            enrichment_details.append(details)
+
+        # Create prompt for LLM
+        prompt = f"""Generate a friendly, conversational summary of the user's calendar events with contextual advice.
+
+Events:
+{event_list}
+
+Enrichment data:
+{enrichment_details}
+
+Generate a natural, helpful response that:
+1. Mentions what events they have
+2. Highlights important weather details (cold temperatures, rain, etc.)
+3. Mentions traffic issues if present
+4. Gives practical advice (dress warmly, bring umbrella, allow extra time, etc.)
+
+Keep it concise (2-3 sentences max) and conversational."""
+
+        try:
+            registry = ProviderRegistry(self.memory)
+            system_provider_config = registry.get_system_provider()
+
+            if system_provider_config:
+                # Instantiate the actual provider class with api_key and model
+                from providers.anthropic import AnthropicProvider
+                from providers.openai import OpenAIProvider
+                from providers.gemini import GoogleProvider
+
+                provider_type = system_provider_config.get("type")
+                api_key = system_provider_config.get("api_key")
+                model = system_provider_config.get("model")
+                provider = None
+
+                if provider_type == "anthropic":
+                    provider = AnthropicProvider(api_key=api_key, model=model)
+                elif provider_type == "openai":
+                    provider = OpenAIProvider(api_key=api_key, model=model)
+                elif provider_type == "google":
+                    provider = GoogleProvider(api_key=api_key, model=model)
+
+                if provider:
+                    # Use chat() method like email handlers do
+                    system_prompt = "You are a helpful assistant that summarizes calendar events with weather and traffic context."
+                    response = provider.chat(
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    # Return both summary and provider info
+                    provider_info = {
+                        "id": system_provider_config.get("id"),
+                        "name": system_provider_config.get("name"),
+                        "type": system_provider_config.get("type"),
+                        "model": system_provider_config.get("model")
+                    }
+                    return response.strip(), provider_info
+
+            # Fallback to standard format
+            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
+
+        except Exception as e:
+            self.logger.warning(f"[CALENDAR] Failed to generate enriched summary: {e}")
+            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
 
     def handle_book_appointment(
         self,

@@ -220,6 +220,10 @@ def stream_chat_sse(session_id):
                 "routing": result.get("routing"),
             }
 
+            # Include debug instruction if present
+            if result.get("debug_instruction"):
+                end_payload["debug_instruction"] = result.get("debug_instruction")
+
             yield "event: end\n"
             yield f"data: {json.dumps(end_payload)}\n\n"
 

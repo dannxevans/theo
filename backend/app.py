@@ -110,6 +110,8 @@ from routes.settings_routes import settings_bp
 from routes.calendar_routes import calendar_bp
 from routes.confirmation_routes import confirmation_bp
 from routes.voice_routes import voice_bp
+from routes.feature_provider_routes import feature_provider_bp
+from routes.planning_routes import planning_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(auth_bp)
@@ -126,6 +128,8 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(calendar_bp)
 app.register_blueprint(confirmation_bp)
 app.register_blueprint(voice_bp, url_prefix="/api/voice")
+app.register_blueprint(feature_provider_bp)
+app.register_blueprint(planning_bp)
 
 # Set g.user_id for all requests based on auth token
 @app.before_request

@@ -1,13 +1,15 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { setDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
+  import { setDebugFlag, setMessageDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
     m365_integration: { connected: false },
-    service_providers: []
+    service_providers: [],
+    feature_providers: []
   };
   export let debugEnabled = false;
+  export let messageDebugEnabled = false;
   export let advancedMode = false;
 
   const dispatch = createEventDispatcher();
@@ -17,6 +19,7 @@
   let testingM365 = false;
   let m365TestResult = null;
   let savingDebug = false;
+  let savingMessageDebug = false;
 
   // Cost tracking state
   let costData = null;
@@ -77,6 +80,13 @@
     await setDebugFlag(value);
     debugEnabled = value;
     savingDebug = false;
+  }
+
+  async function toggleMessageDebug(value) {
+    savingMessageDebug = true;
+    await setMessageDebugFlag(value);
+    messageDebugEnabled = value;
+    savingMessageDebug = false;
   }
 
   function toggleAdvancedMode(value) {
@@ -500,9 +510,80 @@
     {/if}
   </div>
 
+  <!-- Section 5: Feature Providers -->
+  <div class="section">
+    <h3>Feature Providers</h3>
+    <p class="hint">External API integrations for weather, routing, and other features</p>
+
+    {#if healthData.feature_providers && healthData.feature_providers.length === 0}
+      <p class="empty-state">No feature providers configured yet. Add providers in the Feature Providers section.</p>
+    {:else if healthData.feature_providers}
+      <div class="health-grid">
+        {#each healthData.feature_providers as provider}
+          <div class="health-card">
+            <div class="health-card-header">
+              <h4>{provider.provider_name}</h4>
+              <span class="health-badge"
+                class:badge-healthy={provider.health_status === 'healthy'}
+                class:badge-degraded={provider.health_status === 'warning'}
+                class:badge-unhealthy={provider.health_status === 'error'}
+                class:badge-inactive={!provider.is_enabled}>
+                {#if provider.health_status === 'healthy'}
+                  Healthy
+                {:else if provider.health_status === 'warning'}
+                  Warning
+                {:else if provider.health_status === 'error'}
+                  Error
+                {:else if !provider.is_enabled}
+                  ⏸ Disabled
+                {:else}
+                  Unknown
+                {/if}
+              </span>
+            </div>
+            <div class="health-card-body">
+              <p><strong>Type:</strong> {provider.provider_type}</p>
+
+              {#if provider.total_requests > 0}
+                <div class="metric-group">
+                  <p><strong>Requests:</strong> {provider.total_requests} total, {provider.failed_requests} failed</p>
+                  <div class="success-rate-bar">
+                    <div class="success-rate-fill"
+                      class:rate-good={provider.success_rate >= 95}
+                      class:rate-warning={provider.success_rate >= 80 && provider.success_rate < 95}
+                      class:rate-poor={provider.success_rate < 80}
+                      style="width: {provider.success_rate}%"></div>
+                  </div>
+                  <p class="metric-small">Success Rate: {provider.success_rate}%</p>
+                </div>
+
+                <p><strong>Avg Latency:</strong>
+                  <span class:latency-good={provider.avg_latency_ms < 500}
+                    class:latency-warning={provider.avg_latency_ms >= 500 && provider.avg_latency_ms < 1000}
+                    class:latency-poor={provider.avg_latency_ms >= 1000}>
+                    {provider.avg_latency_ms}ms
+                  </span>
+                </p>
+
+                {#if provider.last_success_at}
+                  <p class="metric-small">Last Success: {formatRelativeTime(provider.last_success_at)}</p>
+                {/if}
+                {#if provider.last_failure_at}
+                  <p class="metric-small error-text">Last Failure: {formatRelativeTime(provider.last_failure_at)}</p>
+                {/if}
+              {:else}
+                <p class="metric-small">No requests yet</p>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+
   <!-- Debug Settings -->
   <div class="section">
-    <h3>Debug Settings</h3>
+    <h3>Advanced</h3>
     <div class="rule">
       <label for="debug-logs">Debug logs</label>
       <input
@@ -514,6 +595,20 @@
       />
       <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
         Enable detailed logging for troubleshooting
+      </small>
+    </div>
+
+    <div class="rule">
+      <label for="message-debug">Message debug</label>
+      <input
+        id="message-debug"
+        type="checkbox"
+        checked={messageDebugEnabled}
+        disabled={savingMessageDebug}
+        on:change={(e) => toggleMessageDebug(e.target.checked)}
+      />
+      <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+        Display full LLM instructions in chat
       </small>
     </div>
 

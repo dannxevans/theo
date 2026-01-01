@@ -85,7 +85,7 @@ class IntentClassifier:
 
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
-            "read_calendar", "compose_email", "read_email"
+            "read_calendar", "compose_email", "read_email", "weather", "routing", "planning"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -228,13 +228,18 @@ class IntentClassifier:
         read_calendar_keywords = [
             "what's on my calendar", "what's in my calendar", "whats on my calendar",
             "whats in my calendar", "check my calendar", "my availability",
-            "when am i free", "what's on", "schedule for", "what do i have",
-            "any meetings", "any appointments"
+            "when am i free", "schedule for", "what do i have",
+            "any meetings", "any appointments", "my calendar for", "calendar for",
+            "show my calendar", "show me my calendar"
         ]
 
         for keyword in read_calendar_keywords:
             if keyword in text_l:
                 return "read_calendar", 0.85
+
+        # Also check for "what's on" followed by "calendar" or time reference
+        if "what" in text_l and "calendar" in text_l:
+            return "read_calendar", 0.85
 
         # Read email/inbox
         read_email_keywords = [
@@ -254,6 +259,72 @@ class IntentClassifier:
         email_action_pattern = r'\b(show|read|open|display)\b.{0,50}\bemail\b'
         if re.search(email_action_pattern, text_l):
             return "read_email", 0.80
+
+        # Weather keywords
+        weather_keywords = [
+            "what's the weather", "whats the weather", "weather in",
+            "weather for", "how's the weather", "hows the weather",
+            "temperature in", "temperature for", "forecast for",
+            "is it raining", "will it rain", "sunny in"
+        ]
+
+        for keyword in weather_keywords:
+            if keyword in text_l:
+                return "weather", 0.90
+
+        # Check for simple weather queries
+        weather_simple = ["weather", "temperature", "forecast"]
+        location_indicators = ["in", "at", "for"]
+
+        for weather_word in weather_simple:
+            if weather_word in text_l:
+                # Check if there's a location indicator nearby
+                if any(loc in text_l for loc in location_indicators):
+                    return "weather", 0.85
+
+        # Routing keywords
+        routing_keywords = [
+            "route from", "route to", "directions from", "directions to",
+            "how do i get from", "how do i get to", "how to get from",
+            "how to get to", "navigate from", "navigate to",
+            "distance from", "distance to", "drive from", "drive to",
+            "travel from", "travel to"
+        ]
+
+        for keyword in routing_keywords:
+            if keyword in text_l:
+                return "routing", 0.90
+
+        # Check for simple routing queries
+        routing_simple = ["route", "directions", "navigate", "navigation"]
+        route_indicators = ["from", "to", "between"]
+
+        for route_word in routing_simple:
+            if route_word in text_l:
+                # Check if there's a route indicator nearby
+                if any(ind in text_l for ind in route_indicators):
+                    return "routing", 0.85
+
+        # Planning keywords
+        planning_keywords = [
+            "going to", "planning to", "want to go", "need to go",
+            "meeting at", "appointment at", "shopping at",
+            "visiting", "heading to", "tomorrow at", "later at",
+            "this afternoon at", "tonight at", "going shopping",
+            "have an appointment", "need to be at"
+        ]
+
+        for keyword in planning_keywords:
+            if keyword in text_l:
+                # Check if there's a time or location indicator
+                time_indicators = ["tomorrow", "today", "tonight", "afternoon", "morning", "at", "pm", "am"]
+                location_indicators = ["at", "in", "to"]
+
+                has_time = any(ind in text_l for ind in time_indicators)
+                has_location = any(ind in text_l for ind in location_indicators)
+
+                if has_time or has_location:
+                    return "planning", 0.90
 
         # Check user-defined intents (if memory available)
         if self.memory:

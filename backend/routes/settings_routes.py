@@ -56,6 +56,80 @@ def set_debug_setting():
     return jsonify({"status": "ok", "enabled": enabled})
 
 
+@settings_bp.route("/message-debug", methods=["GET"])
+def get_message_debug_setting():
+    """
+    Get message debug mode setting.
+    Returns: { "enabled": bool }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from datetime import datetime
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user or use "local" for unauthenticated
+    user_id = "local"
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user_id = session["user_id"]
+
+    # Read from preferences
+    prefs = memory.get_all(user_id)
+    value = prefs.get("message_debug_enabled")
+
+    if value is None:
+        enabled = False
+    else:
+        enabled = str(value).lower() == "true"
+
+    return jsonify({"enabled": enabled})
+
+
+@settings_bp.route("/message-debug", methods=["POST"])
+def set_message_debug_setting():
+    """
+    Set message debug mode setting.
+    Request body: { "enabled": bool }
+    Returns: { "status": "ok", "enabled": bool }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from datetime import datetime
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user or use "local" for unauthenticated
+    user_id = "local"
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user_id = session["user_id"]
+
+    data = request.json
+    enabled = bool(data.get("enabled", False))
+
+    # Persist as preference
+    import logging
+    logging.info(f"[MESSAGE_DEBUG_POST] Saving preference for user_id={user_id}, enabled={enabled}")
+    memory.remember(
+        user_id=user_id,
+        key="message_debug_enabled",
+        value=str(enabled).lower()
+    )
+
+    # Verify it was saved
+    prefs_check = memory.get_all(user_id)
+    logging.info(f"[MESSAGE_DEBUG_POST] After save, prefs for user_id={user_id}: {prefs_check}")
+
+    return jsonify({"status": "ok", "enabled": enabled})
+
+
 @settings_bp.route("/system-prompt", methods=["GET"])
 def get_system_prompt_settings():
     """
