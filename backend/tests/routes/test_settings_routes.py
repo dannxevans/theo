@@ -177,3 +177,74 @@ def test_update_system_prompt_clear_custom_instructions(client, memory):
 
     config = memory.get_system_prompt_config("local")
     assert config["custom_instructions"] is None
+
+
+def test_get_message_debug_setting_default(client, memory):
+    """Test get message debug setting default value."""
+    response = client.get("/api/settings/message-debug")
+
+    assert response.status_code == 200
+    data = response.json
+    assert "enabled" in data
+    assert isinstance(data["enabled"], bool)
+
+
+def test_get_message_debug_setting_enabled(client, memory):
+    """Test get message debug setting when enabled."""
+    memory.remember("local", "message_debug_enabled", "true")
+
+    response = client.get("/api/settings/message-debug")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["enabled"] is True
+
+
+def test_get_message_debug_setting_disabled(client, memory):
+    """Test get message debug setting when disabled."""
+    memory.remember("local", "message_debug_enabled", "false")
+
+    response = client.get("/api/settings/message-debug")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["enabled"] is False
+
+
+def test_set_message_debug_setting_enable(client, memory):
+    """Test enable message debug setting."""
+    response = client.post("/api/settings/message-debug", json={
+        "enabled": True
+    })
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["status"] == "ok"
+    assert data["enabled"] is True
+
+    # Verify persisted
+    prefs = memory.get_all("local")
+    assert prefs.get("message_debug_enabled") == "true"
+
+
+def test_set_message_debug_setting_disable(client, memory):
+    """Test disable message debug setting."""
+    response = client.post("/api/settings/message-debug", json={
+        "enabled": False
+    })
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["enabled"] is False
+
+    # Verify persisted
+    prefs = memory.get_all("local")
+    assert prefs.get("message_debug_enabled") == "false"
+
+
+def test_set_message_debug_setting_default_false(client):
+    """Test set message debug defaults to false."""
+    response = client.post("/api/settings/message-debug", json={})
+
+    assert response.status_code == 200
+    assert response.json["enabled"] is False

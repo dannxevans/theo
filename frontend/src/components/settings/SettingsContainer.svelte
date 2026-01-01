@@ -18,6 +18,7 @@
     getIntents,
     getRoutingRules,
     getDebugFlag,
+    getMessageDebugFlag,
     getSystemPromptConfig,
     getMemories,
     listProviders,
@@ -30,6 +31,7 @@
   let intents = [];
   let rules = {};
   let debugEnabled = false;
+  let messageDebugEnabled = false;
   let advancedMode = false;
   let loaded = false;
 
@@ -145,6 +147,9 @@
     rules = await getRoutingRules();
     const flag = await getDebugFlag();
     debugEnabled = flag === true || flag === "true" || flag?.enabled === true;
+
+    const messageDebugFlag = await getMessageDebugFlag();
+    messageDebugEnabled = messageDebugFlag === true || messageDebugFlag === "true" || messageDebugFlag?.enabled === true;
 
     // Load advanced mode from localStorage
     const storedAdvanced = localStorage.getItem("theo.advancedMode");
@@ -458,6 +463,7 @@
       <HealthMonitorSettings
         {healthData}
         {debugEnabled}
+        {messageDebugEnabled}
         {advancedMode}
         on:reload={() => loadHealthData()}
       />
