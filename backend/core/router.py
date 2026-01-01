@@ -950,7 +950,24 @@ def route_request(context: dict, stream: bool = False):
 
     _debug(memory, f"Response length: {len(text_out) if isinstance(text_out, str) else 'unknown'}")
 
-    return {
+    # Check if message debug is enabled
+    debug_instruction = None
+    if memory:
+        # Use user_id if available, otherwise use "local" for unauthenticated users
+        check_user_id = user_id if user_id else "local"
+        prefs = memory.get_all(check_user_id)
+        message_debug_enabled = str(prefs.get("message_debug_enabled", "false")).lower() == "true"
+
+        logging.info(f"[MESSAGE_DEBUG] check_user_id={check_user_id}, message_debug_enabled={message_debug_enabled}, prefs={prefs}")
+
+        if message_debug_enabled:
+            logging.info(f"[MESSAGE_DEBUG] Adding debug instruction to response")
+            debug_instruction = {
+                "system": system_prompt,
+                "messages": messages
+            }
+
+    result = {
         "text": text_out,
         "provider": meta["provider"],
         "model": meta["model"],
@@ -958,3 +975,8 @@ def route_request(context: dict, stream: bool = False):
         "fallback_reason": meta["fallback_reason"],
         "routing": meta["routing"],
     }
+
+    if debug_instruction:
+        result["debug_instruction"] = debug_instruction
+
+    return result

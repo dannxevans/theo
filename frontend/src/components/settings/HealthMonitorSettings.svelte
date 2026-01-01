@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { setDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
+  import { setDebugFlag, setMessageDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
@@ -8,6 +8,7 @@
     service_providers: []
   };
   export let debugEnabled = false;
+  export let messageDebugEnabled = false;
   export let advancedMode = false;
 
   const dispatch = createEventDispatcher();
@@ -17,6 +18,7 @@
   let testingM365 = false;
   let m365TestResult = null;
   let savingDebug = false;
+  let savingMessageDebug = false;
 
   // Cost tracking state
   let costData = null;
@@ -77,6 +79,13 @@
     await setDebugFlag(value);
     debugEnabled = value;
     savingDebug = false;
+  }
+
+  async function toggleMessageDebug(value) {
+    savingMessageDebug = true;
+    await setMessageDebugFlag(value);
+    messageDebugEnabled = value;
+    savingMessageDebug = false;
   }
 
   function toggleAdvancedMode(value) {
@@ -514,6 +523,20 @@
       />
       <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
         Enable detailed logging for troubleshooting
+      </small>
+    </div>
+
+    <div class="rule">
+      <label for="message-debug">Message debug</label>
+      <input
+        id="message-debug"
+        type="checkbox"
+        checked={messageDebugEnabled}
+        disabled={savingMessageDebug}
+        on:change={(e) => toggleMessageDebug(e.target.checked)}
+      />
+      <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+        Display full LLM instructions in chat
       </small>
     </div>
 

@@ -408,6 +408,39 @@ export async function setDebugFlag(enabled) {
   return response.json();
 }
 
+export async function getMessageDebugFlag() {
+  const response = await fetch(`${API_BASE}/api/settings/message-debug`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to get message debug flag");
+  }
+
+  return response.json();
+}
+
+export async function setMessageDebugFlag(enabled) {
+  const response = await fetch(`${API_BASE}/api/settings/message-debug`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      enabled: Boolean(enabled)
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to save message debug flag");
+  }
+
+  return response.json();
+}
+
 // =============================
 // System Prompt Configuration API
 // =============================

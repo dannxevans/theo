@@ -147,6 +147,9 @@
   let advancedMode = false;
   let usedProviders = new Set(); // Track providers used in this session
 
+  // Debug instruction storage
+  let lastDebugInstruction = null;
+
   // Input textarea reference for height reset
   let inputTextarea = null;
 
@@ -502,6 +505,14 @@
           // Add provider to used providers set
           if (meta?.provider) {
             usedProviders = new Set([...usedProviders, meta.provider]);
+          }
+
+          // Capture debug instruction if present
+          if (meta?.debug_instruction) {
+            lastDebugInstruction = {
+              ...meta.debug_instruction,
+              expanded: false
+            };
           }
 
           streamedText = "";
@@ -862,6 +873,41 @@
               </div>
             </div>
           {/each}
+
+          {#if lastDebugInstruction && messages.length > 0}
+            {@const lastMessage = messages[messages.length - 1]}
+            {#if lastMessage.role === "assistant"}
+              <div class="message system">
+                <div class="bubble debug-bubble">
+                  <div class="message-header">
+                    <strong>System Debug</strong>
+                  </div>
+                  <div class="debug-content">
+                    {#if lastDebugInstruction.expanded}
+                      <div class="debug-section">
+                        <h4>System Prompt:</h4>
+                        <pre class="debug-text">{lastDebugInstruction.system}</pre>
+                      </div>
+                      <div class="debug-section">
+                        <h4>Messages:</h4>
+                        <pre class="debug-text">{JSON.stringify(lastDebugInstruction.messages, null, 2)}</pre>
+                      </div>
+                      <button class="debug-toggle" on:click={() => lastDebugInstruction = {...lastDebugInstruction, expanded: false}}>
+                        Show less
+                      </button>
+                    {:else}
+                      <div class="debug-preview">
+                        <pre class="debug-text">{lastDebugInstruction.system.split('\n').slice(0, 10).join('\n')}...</pre>
+                      </div>
+                      <button class="debug-toggle" on:click={() => lastDebugInstruction = {...lastDebugInstruction, expanded: true}}>
+                        Show more
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/if}
+          {/if}
 
           {#if streaming}
             <div class="message assistant">
@@ -1258,5 +1304,65 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  /* Debug bubble styles */
+  .message.system .bubble.debug-bubble {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    margin-top: 1rem;
+  }
+
+  .debug-content {
+    margin-top: 0.75rem;
+  }
+
+  .debug-section {
+    margin-bottom: 1rem;
+  }
+
+  .debug-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: #57606a;
+    font-weight: 600;
+  }
+
+  .debug-text {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.85rem;
+    color: #24292f;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  .debug-preview {
+    margin-bottom: 0.75rem;
+  }
+
+  .debug-toggle {
+    background: #0969da;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .debug-toggle:hover {
+    background: #0860ca;
+  }
+
+  .debug-toggle:active {
+    background: #0757ba;
   }
 </style>
