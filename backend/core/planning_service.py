@@ -165,21 +165,31 @@ class PlanningService:
 
             # Extract location from event
             location = event.get("location")
-            start_time = event.get("start")
+            # Support both "start_time" (M365 events) and "start" (test format)
+            start_time = event.get("start_time") or event.get("start")
 
             if location and start_time:
                 # Fetch weather for event location/time
+                self.logger.info(f"[PLANNING] Attempting to fetch weather for location: '{location}'")
                 weather_data = self._fetch_weather(location, user_id)
                 if weather_data:
+                    self.logger.info(f"[PLANNING] Successfully got weather data, enriching event")
                     enriched_event["weather"] = {
                         "temperature": weather_data.get("temperature"),
                         "description": weather_data.get("description"),
                         "icon": self._get_weather_icon(weather_data.get("description", ""))
                     }
+                else:
+                    self.logger.info(f"[PLANNING] No weather data available for location: '{location}'")
 
-                # Fetch traffic for event location
-                # Note: Would need user's current location - simplified for now
-                # traffic_data = self._fetch_traffic_to_event(location, start_time, user_id)
+                # Fetch traffic for event location from user's home/work location
+                self.logger.info(f"[PLANNING] Attempting to fetch traffic to event location")
+                traffic_data = self._fetch_traffic_to_event(location, start_time, user_id)
+                if traffic_data:
+                    self.logger.info(f"[PLANNING] Successfully got traffic data, enriching event")
+                    enriched_event["traffic"] = traffic_data
+                else:
+                    self.logger.info(f"[PLANNING] No traffic data available for event")
 
             enriched_events.append(enriched_event)
 
@@ -271,6 +281,54 @@ class PlanningService:
 
         return "activity"
 
+    def _parse_city_from_location(self, location: str) -> str:
+        """
+        Extract city name from a full address.
+
+        Examples:
+            "Colgate Ln, Salford, England, M5 3LZ, GB" -> "Salford, GB"
+            "Soapworks" -> "Soapworks"
+            "London" -> "London"
+            "123 Main St, Manchester, UK" -> "Manchester, UK"
+        """
+        # If location contains commas, it's likely a full address
+        if "," in location:
+            parts = [p.strip() for p in location.split(",")]
+
+            # Common address format: Street, City, Region, Postcode, Country
+            # Try to find city (usually 2nd component) and country (last component)
+            if len(parts) >= 2:
+                # Filter out postcodes (contain numbers) and 2-letter country codes
+                city_candidates = []
+                country_code = None
+
+                for i, part in enumerate(parts):
+                    # Check for 2-letter country code (GB, UK, US, etc.)
+                    if len(part) == 2 and part.isupper():
+                        country_code = part
+                    # Skip postcodes (contain numbers or spaces with numbers)
+                    elif not any(char.isdigit() for char in part) and len(part) > 2:
+                        city_candidates.append((i, part))
+
+                # Use index 1 (second part) as city if available, otherwise first candidate
+                city = None
+                for idx, candidate in city_candidates:
+                    if idx == 1:  # Prefer second component
+                        city = candidate
+                        break
+
+                if not city and city_candidates:
+                    city = city_candidates[0][1]
+
+                # Return city with country code if available
+                if city:
+                    if country_code:
+                        return f"{city}, {country_code}"
+                    return city
+
+        # Return original if we can't parse it
+        return location
+
     def _fetch_weather(self, location: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Fetch weather data for location."""
         try:
@@ -281,11 +339,50 @@ class PlanningService:
                 self.logger.warning("[PLANNING] OpenWeather API key not configured")
                 return None
 
+            # Parse city from full address
+            parsed_location = self._parse_city_from_location(location)
+            if parsed_location != location:
+                self.logger.info(f"[PLANNING] Parsed location '{location}' -> '{parsed_location}'")
+
             weather_service = WeatherService(api_key)
-            return weather_service.get_weather(location)
+            return weather_service.get_weather(parsed_location)
 
         except Exception as e:
             self.logger.error(f"[PLANNING] Failed to fetch weather: {e}")
+            return None
+
+    def _get_user_location(self, user_id: str, location_type: str) -> Optional[str]:
+        """
+        Get user's home or work location from facts.
+
+        Args:
+            user_id: User ID
+            location_type: 'home' or 'work'
+
+        Returns:
+            Location string or None
+        """
+        try:
+            # Get facts from memories - user_id is stored as 'local' in the database
+            memories = self.memory.get_memories('local', memory_type='fact')
+            self.logger.info(f"[PLANNING] Got {len(memories)} fact memories for user {user_id}")
+
+            # Look for location facts
+            location_key = f"{location_type} location"
+            self.logger.info(f"[PLANNING] Looking for key: '{location_key}'")
+
+            for mem in memories:
+                mem_key = mem.get('key', '')
+                self.logger.info(f"[PLANNING] Checking memory key: '{mem_key}' (value: {mem.get('value', '')[:50]})")
+                if mem_key.lower() == location_key.lower():
+                    value = mem.get('value')
+                    self.logger.info(f"[PLANNING] Found {location_type} location: {value}")
+                    return value
+
+            self.logger.info(f"[PLANNING] No {location_type} location found")
+            return None
+        except Exception as e:
+            self.logger.error(f"[PLANNING] Failed to get {location_type} location: {e}")
             return None
 
     def _fetch_traffic(self, activity_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
@@ -298,10 +395,10 @@ class PlanningService:
                 self.logger.warning("[PLANNING] HERE API key not configured")
                 return None
 
-            # Get origin from user's home or work location
+            # Get origin from user's home or work location (from facts)
             origin = None
-            home_location = prefs.get("home location")
-            work_location = prefs.get("work location")
+            home_location = self._get_user_location(user_id, 'home')
+            work_location = self._get_user_location(user_id, 'work')
 
             # Use home location as default, fall back to work if home not set
             if home_location:
@@ -333,6 +430,66 @@ class PlanningService:
 
         except Exception as e:
             self.logger.error(f"[PLANNING] Failed to fetch traffic: {e}")
+            return None
+
+    def _fetch_traffic_to_event(self, destination: str, start_time: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch traffic estimate from user's home/work location to event location.
+
+        Args:
+            destination: Event location
+            start_time: Event start time (ISO format string)
+            user_id: User ID
+
+        Returns:
+            Traffic estimate dict or None
+        """
+        try:
+            prefs = self.memory.get_all(str(user_id))
+            api_key = prefs.get("feature_provider_here_api_key")
+
+            if not api_key:
+                self.logger.warning("[PLANNING] HERE API key not configured")
+                return None
+
+            # Get origin from user's home or work location (from facts)
+            origin = None
+            home_location = self._get_user_location(user_id, 'home')
+            work_location = self._get_user_location(user_id, 'work')
+
+            # Use home location as default, fall back to work if home not set
+            if home_location:
+                origin = home_location
+                self.logger.info(f"[PLANNING] Using home location as origin: {origin}")
+            elif work_location:
+                origin = work_location
+                self.logger.info(f"[PLANNING] Using work location as origin: {origin}")
+            else:
+                # No location configured - can't calculate traffic
+                self.logger.info("[PLANNING] No home/work location configured, skipping traffic")
+                return None
+
+            if not destination:
+                return None
+
+            traffic_service = TrafficService(api_key)
+
+            # Parse departure time
+            departure_time = None
+            if start_time:
+                # Handle both ISO format with and without microseconds
+                import re
+                cleaned_time = re.sub(r'\.(\d{6})\d+', r'.\1', start_time).replace("Z", "+00:00")
+                departure_time = datetime.fromisoformat(cleaned_time)
+
+            return traffic_service.get_traffic_estimate(
+                origin=origin,
+                destination=destination,
+                departure_time=departure_time
+            )
+
+        except Exception as e:
+            self.logger.error(f"[PLANNING] Failed to fetch traffic to event: {e}")
             return None
 
     def _check_calendar_conflicts(self, time_str: str, user_id: str) -> List[Dict[str, Any]]:

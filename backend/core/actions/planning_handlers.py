@@ -216,7 +216,7 @@ class PlanningHandlers(BaseActionHandler):
         if context_data.get("recommendations"):
             lines.append("💡 Recommendations:")
             for rec in context_data["recommendations"]:
-                lines.append(f"   {rec}")
+                lines.append(f"   • {rec}")
 
         lines.append("")
         lines.append("Would you like me to add this to your calendar?")

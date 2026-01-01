@@ -19,10 +19,13 @@ class TestPlanningService:
         memory = Mock()
         memory.get_all.return_value = {
             "feature_provider_openweather_api_key": "test_weather_key",
-            "feature_provider_here_api_key": "test_here_key",
-            "home location": "Liverpool, UK",
-            "work location": "Manchester, UK"
+            "feature_provider_here_api_key": "test_here_key"
         }
+        # Mock get_memories to return location facts
+        memory.get_memories.return_value = [
+            {"key": "Home Location", "value": "Liverpool, UK", "type": "fact"},
+            {"key": "Work Location", "value": "Manchester, UK", "type": "fact"}
+        ]
         memory.get_m365_credentials.return_value = None
         return memory
 
@@ -444,9 +447,12 @@ class TestPlanningService:
     def test_fetch_traffic_uses_work_location_fallback(self, mock_traffic_service_class, service, mock_memory):
         """Test traffic fetching falls back to work location if no home location."""
         mock_memory.get_all.return_value = {
-            "feature_provider_here_api_key": "test_key",
-            "work location": "Manchester, UK"
+            "feature_provider_here_api_key": "test_key"
         }
+        # Only work location in facts (no home location)
+        mock_memory.get_memories.return_value = [
+            {"key": "Work Location", "value": "Manchester, UK", "type": "fact"}
+        ]
 
         mock_traffic = MagicMock()
         mock_traffic.get_traffic_estimate.return_value = {}
@@ -469,6 +475,8 @@ class TestPlanningService:
         mock_memory.get_all.return_value = {
             "feature_provider_here_api_key": "test_key"
         }
+        # No location facts available
+        mock_memory.get_memories.return_value = []
 
         mock_traffic = MagicMock()
         mock_traffic.get_traffic_estimate.return_value = {}
@@ -606,3 +614,39 @@ class TestPlanningService:
 
         assert len(enriched) == 1
         assert "weather" not in enriched[0]
+
+    # Test _parse_city_from_location
+
+    def test_parse_city_from_full_address(self, service):
+        """Test parsing city from full UK address."""
+        location = "Colgate Ln, Salford, England, M5 3LZ, GB"
+        result = service._parse_city_from_location(location)
+
+        # Should extract "Salford, GB"
+        assert "Salford" in result
+        assert "GB" in result
+
+    def test_parse_city_from_simple_address(self, service):
+        """Test parsing city from simple address."""
+        location = "123 Main St, Manchester, UK"
+        result = service._parse_city_from_location(location)
+
+        # Should extract "Manchester, UK"
+        assert "Manchester" in result
+        assert "UK" in result
+
+    def test_parse_city_single_word(self, service):
+        """Test parsing city from single word location."""
+        location = "London"
+        result = service._parse_city_from_location(location)
+
+        # Should return as-is
+        assert result == "London"
+
+    def test_parse_city_venue_name(self, service):
+        """Test parsing city from venue name."""
+        location = "Soapworks"
+        result = service._parse_city_from_location(location)
+
+        # Should return as-is
+        assert result == "Soapworks"

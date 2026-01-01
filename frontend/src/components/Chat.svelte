@@ -290,7 +290,8 @@
     });
 
     marked.setOptions({
-      langPrefix: "language-"
+      langPrefix: "language-",
+      breaks: true  // Convert single newlines to <br> tags
     });
 
     const rawHtml = marked.parse(text);

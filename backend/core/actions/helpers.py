@@ -204,6 +204,13 @@ def format_event_list(events: list, show_date: bool = False) -> str:
             if temp is not None:
                 event_line += f" {icon} {temp}°C"
 
+        # Add traffic information if available
+        traffic = event.get("traffic")
+        if traffic:
+            duration = traffic.get("duration_in_traffic_minutes", traffic.get("duration_minutes"))
+            if duration:
+                event_line += f" 🚗 {int(duration)} mins"
+
         # Add attendees on next line if present
         attendees = event.get("attendees", [])
         if attendees and len(attendees) > 0:
