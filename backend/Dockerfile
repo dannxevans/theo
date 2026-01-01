@@ -29,8 +29,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend source
 COPY . /app
 
+# Copy and set entrypoint script permissions
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Expose THEO backend port
 EXPOSE 1066
 
 # Default command
-CMD ["gunicorn", "-w", "1", "-k", "sync", "--timeout", "0", "--graceful-timeout", "0", "--keep-alive", "75", "-b", "0.0.0.0:1066", "app:app"]
+ENTRYPOINT ["/app/entrypoint.sh"]
