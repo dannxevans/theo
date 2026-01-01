@@ -131,6 +131,10 @@ class MemoryStore:
         """Permanently delete a memory by ID."""
         return self._memory_ops.delete_memory(user_id, memory_id)
 
+    def update_memory(self, user_id, memory_id, memory_type=None, key=None, value=None):
+        """Update an existing memory by ID."""
+        return self._memory_ops.update_memory(user_id, memory_id, memory_type, key, value)
+
     def pin_memory(self, user_id, memory_id, pinned=True):
         """Pin or unpin a memory."""
         return self._memory_ops.pin_memory(user_id, memory_id, pinned)

@@ -40,7 +40,19 @@
       priority: intent.priority || 50,
       enabled: intent.enabled !== false
     };
-    showIntentForm = true;
+    // Don't show the top form when editing inline
+  }
+
+  function cancelEdit() {
+    editingIntent = null;
+    intentForm = {
+      id: "",
+      name: "",
+      description: "",
+      keywords: "",
+      priority: 50,
+      enabled: true
+    };
   }
 
   function cancelIntentForm() {
@@ -66,6 +78,8 @@
           priority: parseInt(intentForm.priority),
           enabled: intentForm.enabled
         });
+        dispatch("reload");
+        cancelEdit();
       } else {
         await createIntent({
           id: intentForm.id,
@@ -75,10 +89,9 @@
           priority: parseInt(intentForm.priority),
           enabled: intentForm.enabled
         });
+        dispatch("reload");
+        cancelIntentForm();
       }
-
-      dispatch("reload");
-      cancelIntentForm();
     } catch (e) {
       alert(`Failed to save intent: ${e.message}`);
     }
@@ -208,46 +221,97 @@
     <p class="subtitle">These intents are used to route requests to appropriate LLM providers via the Routing settings.</p>
     <div class="intents-list">
       {#each intents.filter(i => !i.is_action && i.id !== 'system') as intent}
-        <div class="intent-card" class:disabled={!intent.enabled}>
-          <div class="intent-header">
-            <div class="intent-info">
-              <h4>
-                {intent.name}
-                <span class="intent-id">({intent.id})</span>
-                {#if !intent.enabled}
-                  <span class="status-badge status-badge--error">Disabled</span>
-                {/if}
-              </h4>
-              {#if intent.description}
-                <p class="intent-description">{intent.description}</p>
-              {/if}
-            </div>
-            <div class="intent-priority">
-              Priority: {intent.priority}
-            </div>
-          </div>
-
-          {#if intent.keywords}
-            <div class="intent-keywords">
-              <strong>Keywords:</strong> {intent.keywords}
+        <div class="intent-card" class:disabled={!intent.enabled} class:editing={editingIntent === intent.id}>
+          {#if editingIntent === intent.id}
+            <!-- Inline Edit Mode -->
+            <div class="edit-form">
+              <div class="form-row">
+                <label>
+                  ID
+                  <input type="text" value={intentForm.id} disabled class="input-disabled" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Name
+                  <input type="text" bind:value={intentForm.name} placeholder="Intent name" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Description
+                  <textarea bind:value={intentForm.description} placeholder="What is this intent used for?" rows="2"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Keywords (comma-separated)
+                  <textarea bind:value={intentForm.keywords} placeholder="e.g., analyze,data,chart" rows="2"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Priority (0-100)
+                  <input type="number" bind:value={intentForm.priority} min="0" max="100" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <input type="checkbox" bind:checked={intentForm.enabled} />
+                  Enabled
+                </label>
+              </div>
+              <div class="intent-actions">
+                <button class="btn-small btn-primary" on:click={saveIntent}>
+                  Save
+                </button>
+                <button class="btn-small btn-secondary" on:click={cancelEdit}>
+                  Cancel
+                </button>
+              </div>
             </div>
           {:else}
-            <div class="intent-keywords empty">
-              No keywords (fallback intent)
+            <!-- View Mode -->
+            <div class="intent-header">
+              <div class="intent-info">
+                <h4>
+                  {intent.name}
+                  <span class="intent-id">({intent.id})</span>
+                  {#if !intent.enabled}
+                    <span class="status-badge status-badge--error">Disabled</span>
+                  {/if}
+                </h4>
+                {#if intent.description}
+                  <p class="intent-description">{intent.description}</p>
+                {/if}
+              </div>
+              <div class="intent-priority">
+                Priority: {intent.priority}
+              </div>
+            </div>
+
+            {#if intent.keywords}
+              <div class="intent-keywords">
+                <strong>Keywords:</strong> {intent.keywords}
+              </div>
+            {:else}
+              <div class="intent-keywords empty">
+                No keywords (fallback intent)
+              </div>
+            {/if}
+
+            <div class="intent-actions">
+              <button class="btn-small" on:click={() => editIntent(intent)}>
+                Edit
+              </button>
+              <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
+                {intent.enabled ? "Disable" : "Enable"}
+              </button>
+              <button class="btn-small btn-danger" on:click={() => removeIntent(intent.id)}>
+                Delete
+              </button>
             </div>
           {/if}
-
-          <div class="intent-actions">
-            <button class="btn-small" on:click={() => editIntent(intent)}>
-              Edit
-            </button>
-            <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
-              {intent.enabled ? "Disable" : "Enable"}
-            </button>
-            <button class="btn-small btn-danger" on:click={() => removeIntent(intent.id)}>
-              Delete
-            </button>
-          </div>
         </div>
       {/each}
     </div>
@@ -259,43 +323,94 @@
     <p class="subtitle">These intents trigger actions (calendar, email, etc.). They have predefined routing but keywords can be customized.</p>
     <div class="intents-list">
       {#each intents.filter(i => i.is_action) as intent}
-        <div class="intent-card" class:disabled={!intent.enabled}>
-          <div class="intent-header">
-            <div class="intent-info">
-              <h4>
-                {intent.name}
-                <span class="intent-id">({intent.id})</span>
-                {#if !intent.enabled}
-                  <span class="status-badge status-badge--error">Disabled</span>
-                {/if}
-              </h4>
-              {#if intent.description}
-                <p class="intent-description">{intent.description}</p>
-              {/if}
-            </div>
-            <div class="intent-priority">
-              Priority: {intent.priority}
-            </div>
-          </div>
-
-          {#if intent.keywords}
-            <div class="intent-keywords">
-              <strong>Keywords:</strong> {intent.keywords}
+        <div class="intent-card" class:disabled={!intent.enabled} class:editing={editingIntent === intent.id}>
+          {#if editingIntent === intent.id}
+            <!-- Inline Edit Mode -->
+            <div class="edit-form">
+              <div class="form-row">
+                <label>
+                  ID
+                  <input type="text" value={intentForm.id} disabled class="input-disabled" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Name
+                  <input type="text" bind:value={intentForm.name} placeholder="Intent name" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Description
+                  <textarea bind:value={intentForm.description} placeholder="What is this intent used for?" rows="2"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Keywords (comma-separated)
+                  <textarea bind:value={intentForm.keywords} placeholder="e.g., analyze,data,chart" rows="2"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  Priority (0-100)
+                  <input type="number" bind:value={intentForm.priority} min="0" max="100" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <input type="checkbox" bind:checked={intentForm.enabled} />
+                  Enabled
+                </label>
+              </div>
+              <div class="intent-actions">
+                <button class="btn-small btn-primary" on:click={saveIntent}>
+                  Save
+                </button>
+                <button class="btn-small btn-secondary" on:click={cancelEdit}>
+                  Cancel
+                </button>
+              </div>
             </div>
           {:else}
-            <div class="intent-keywords empty">
-              No keywords
+            <!-- View Mode -->
+            <div class="intent-header">
+              <div class="intent-info">
+                <h4>
+                  {intent.name}
+                  <span class="intent-id">({intent.id})</span>
+                  {#if !intent.enabled}
+                    <span class="status-badge status-badge--error">Disabled</span>
+                  {/if}
+                </h4>
+                {#if intent.description}
+                  <p class="intent-description">{intent.description}</p>
+                {/if}
+              </div>
+              <div class="intent-priority">
+                Priority: {intent.priority}
+              </div>
+            </div>
+
+            {#if intent.keywords}
+              <div class="intent-keywords">
+                <strong>Keywords:</strong> {intent.keywords}
+              </div>
+            {:else}
+              <div class="intent-keywords empty">
+                No keywords
+              </div>
+            {/if}
+
+            <div class="intent-actions">
+              <button class="btn-small" on:click={() => editIntent(intent)}>
+                Edit
+              </button>
+              <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
+                {intent.enabled ? "Disable" : "Enable"}
+              </button>
             </div>
           {/if}
-
-          <div class="intent-actions">
-            <button class="btn-small" on:click={() => editIntent(intent)}>
-              Edit
-            </button>
-            <button class="btn-small" on:click={() => toggleIntentEnabled(intent)}>
-              {intent.enabled ? "Disable" : "Enable"}
-            </button>
-          </div>
         </div>
       {/each}
     </div>
@@ -440,5 +555,62 @@
   .btn-small.btn-danger:hover {
     background: var(--error-500);
     color: white;
+  }
+
+  /* Inline Editing Styles */
+  .intent-card.editing {
+    border-color: var(--info-500);
+    background: var(--info-50);
+  }
+
+  .edit-form {
+    padding: var(--space-2);
+  }
+
+  .edit-form .form-row {
+    margin-bottom: var(--space-3);
+  }
+
+  .edit-form label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-1);
+  }
+
+  .edit-form input[type="text"],
+  .edit-form input[type="number"],
+  .edit-form textarea {
+    width: 100%;
+    padding: var(--space-2);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .edit-form input[type="text"]:focus,
+  .edit-form input[type="number"]:focus,
+  .edit-form textarea:focus {
+    outline: none;
+    border-color: var(--info-500);
+    box-shadow: 0 0 0 3px var(--info-100);
+  }
+
+  .edit-form .input-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+  }
+
+  .edit-form textarea {
+    resize: vertical;
+  }
+
+  .edit-form input[type="checkbox"] {
+    margin-right: var(--space-2);
   }
 </style>
