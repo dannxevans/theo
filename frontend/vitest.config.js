@@ -10,11 +10,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.js'],
     watch: false,
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true
-      }
-    },
+    singleThread: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json'],
