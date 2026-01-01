@@ -21,7 +21,7 @@ class IntentOperations(BaseMemoryOperations):
     # Routing Preferences
     # =============================
 
-    def set_routing_preference(self, user_id, intent, provider_id):
+    def set_routing_preference(self, user_id, intent, provider_id, fallback_provider_id=None):
         """
         Set routing preference for an intent.
 
@@ -29,6 +29,7 @@ class IntentOperations(BaseMemoryOperations):
             user_id: User identifier
             intent: Intent ID
             provider_id: Provider ID to route to
+            fallback_provider_id: Optional fallback provider ID
         """
         with self._get_connection() as conn:
             conn.execute(
@@ -41,6 +42,7 @@ class IntentOperations(BaseMemoryOperations):
                     user_id=user_id,
                     intent=intent,
                     provider_id=provider_id,
+                    fallback_provider_id=fallback_provider_id,
                     updated_at=datetime.utcnow(),
                 )
             )
@@ -53,14 +55,20 @@ class IntentOperations(BaseMemoryOperations):
             user_id: User identifier
 
         Returns:
-            Dictionary mapping intent to provider_id
+            Dictionary mapping intent to {provider_id, fallback_provider_id}
         """
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(self.routing_preferences)
                 .where(self.routing_preferences.c.user_id == user_id)
             ).fetchall()
-            return {r.intent: r.provider_id for r in rows}
+            return {
+                r.intent: {
+                    "provider_id": r.provider_id,
+                    "fallback_provider_id": getattr(r, 'fallback_provider_id', None)
+                }
+                for r in rows
+            }
 
     def delete_routing_preference(self, user_id, intent):
         """
@@ -95,6 +103,25 @@ class IntentOperations(BaseMemoryOperations):
                 .where(self.routing_preferences.c.intent == intent)
             ).fetchone()
             return row.provider_id if row else None
+
+    def get_fallback_provider(self, user_id, intent):
+        """
+        Get fallback provider ID for a specific intent.
+
+        Args:
+            user_id: User identifier
+            intent: Intent ID
+
+        Returns:
+            Fallback provider ID or None if not set
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                select(self.routing_preferences.c.fallback_provider_id)
+                .where(self.routing_preferences.c.user_id == user_id)
+                .where(self.routing_preferences.c.intent == intent)
+            ).fetchone()
+            return row.fallback_provider_id if row else None
 
     def set_routing_provider(self, user_id, intent, provider_id):
         """

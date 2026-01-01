@@ -205,3 +205,89 @@ def test_seed_default_intents_idempotent(memory):
 
     # Should not create duplicates
     assert count1 == count2
+
+
+# ====================
+# Fallback Provider Tests
+# ====================
+
+def test_set_routing_preference_with_fallback(memory):
+    """Test set routing preference with fallback provider."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+
+    provider = memory.get_routing_provider("user1", "general")
+    fallback = memory.get_fallback_provider("user1", "general")
+
+    assert provider == "gpt4"
+    assert fallback == "claude"
+
+
+def test_set_routing_preference_update_fallback(memory):
+    """Test update routing preference with new fallback."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="gemini")
+
+    fallback = memory.get_fallback_provider("user1", "general")
+    assert fallback == "gemini"
+
+
+def test_set_routing_preference_remove_fallback(memory):
+    """Test remove fallback by setting to None."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id=None)
+
+    fallback = memory.get_fallback_provider("user1", "general")
+    assert fallback is None
+
+
+def test_get_fallback_provider_nonexistent(memory):
+    """Test get fallback provider for nonexistent routing rule."""
+    fallback = memory.get_fallback_provider("user1", "nonexistent")
+    assert fallback is None
+
+
+def test_get_fallback_provider_no_fallback_set(memory):
+    """Test get fallback when only primary provider is set."""
+    memory.set_routing_preference("user1", "general", "gpt4")
+
+    fallback = memory.get_fallback_provider("user1", "general")
+    assert fallback is None
+
+
+def test_fallback_provider_persists_across_updates(memory):
+    """Test fallback provider persists when updating primary."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+
+    # Update primary provider without specifying fallback
+    memory.set_routing_preference("user1", "general", "gemini")
+
+    # Fallback should be cleared since we didn't specify it
+    fallback = memory.get_fallback_provider("user1", "general")
+    assert fallback is None
+
+
+def test_delete_routing_preference_removes_fallback(memory):
+    """Test delete routing preference also removes fallback."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+
+    memory.delete_routing_preference("user1", "general")
+
+    provider = memory.get_routing_provider("user1", "general")
+    fallback = memory.get_fallback_provider("user1", "general")
+
+    assert provider is None
+    assert fallback is None
+
+
+def test_get_routing_preferences_includes_fallback(memory):
+    """Test get routing preferences includes fallback provider info."""
+    memory.set_routing_preference("user1", "general", "gpt4", fallback_provider_id="claude")
+    memory.set_routing_preference("user1", "coding", "gemini", fallback_provider_id="gpt4")
+
+    prefs = memory.get_routing_preferences("user1")
+
+    assert len(prefs) == 2
+    assert prefs["general"]["provider_id"] == "gpt4"
+    assert prefs["general"]["fallback_provider_id"] == "claude"
+    assert prefs["coding"]["provider_id"] == "gemini"
+    assert prefs["coding"]["fallback_provider_id"] == "gpt4"

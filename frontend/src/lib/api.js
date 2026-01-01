@@ -337,7 +337,7 @@ export async function getRoutingRules() {
   return response.json();
 }
 
-export async function setRoutingRule(intent, providerId) {
+export async function setRoutingRule(intent, providerId, fallbackProviderId = null) {
   const response = await fetch(`${API_BASE}/api/routing`, {
     method: "POST",
     headers: {
@@ -346,7 +346,8 @@ export async function setRoutingRule(intent, providerId) {
     },
     body: JSON.stringify({
       intent,
-      provider_id: providerId
+      provider_id: providerId,
+      fallback_provider_id: fallbackProviderId
     })
   });
 

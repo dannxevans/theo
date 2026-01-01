@@ -28,7 +28,7 @@ def get_routing_preferences():
 def set_routing_preference():
     """
     Set a routing preference for an intent.
-    Request body: { "intent": "...", "provider_id": "..." }
+    Request body: { "intent": "...", "provider_id": "...", "fallback_provider_id": "..." }
     Returns: { "status": "ok" }
     """
     import app
@@ -41,6 +41,7 @@ def set_routing_preference():
         user_id=user_id,
         intent=data["intent"],
         provider_id=data["provider_id"],
+        fallback_provider_id=data.get("fallback_provider_id"),
     )
 
     return jsonify({"status": "ok"})

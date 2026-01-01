@@ -53,7 +53,7 @@ def _debug(memory: Optional[MemoryStore], msg: str, **context):
     try:
         debug_enabled = False
         if memory:
-            prefs = memory.get_routing_preferences("local")
+            prefs = memory.get_all("local")
             value = prefs.get("debug_enabled")
             if isinstance(value, str):
                 debug_enabled = value.lower() == "true"
@@ -405,7 +405,25 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
     def is_provider_healthy(provider_id):
         health = health_summary.get(provider_id, {})
         if health.get("circuit_breaker_open"):
-            return False, "circuit breaker open (5+ consecutive failures)"
+            # Check if cooldown period has elapsed (half-open state)
+            opened_at = health.get("circuit_breaker_opened_at")
+            cooldown_minutes = health.get("circuit_breaker_cooldown_minutes", 60)
+
+            if opened_at:
+                from datetime import datetime, timedelta
+                if isinstance(opened_at, str):
+                    opened_at = datetime.fromisoformat(opened_at.replace('Z', '+00:00'))
+
+                elapsed = datetime.utcnow() - opened_at
+                cooldown_delta = timedelta(minutes=cooldown_minutes)
+
+                if elapsed >= cooldown_delta:
+                    # Cooldown period has elapsed - enter half-open state
+                    # Allow this request to try the provider
+                    logging.info(f"[ROUTER] Circuit breaker cooldown elapsed for {provider_id} ({elapsed.total_seconds()/60:.1f} minutes). Entering half-open state - will retry provider.")
+                    return True, None
+
+            return False, f"circuit breaker open (cooldown: {cooldown_minutes} min)"
         if health.get("health_status") == "unhealthy":
             return False, f"unhealthy (failure rate: {health.get('failure_rate', 0)}%)"
         return True, None
@@ -439,7 +457,7 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
                 _debug_log(memory, f"[ROUTER] Forced provider '{forced_provider}' not found by ID or model")
 
     if not selected_provider and memory:
-        routed = memory.get_routing_provider("local", intent)
+        routed = memory.get_routing_provider(user_id, intent)
         if routed and provider_registry:
             routed_provider = provider_registry.get(routed)
             if routed_provider:
@@ -450,6 +468,20 @@ def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider:
                 else:
                     fallback_reason = f"Routing rule provider {routed} unavailable: {reason}"
                     routing_explanation.append(fallback_reason)
+
+                    # Check for user-configured fallback provider
+                    fallback_provider_id = memory.get_fallback_provider(user_id, intent)
+                    if fallback_provider_id and provider_registry:
+                        fallback_provider = provider_registry.get(fallback_provider_id)
+                        if fallback_provider:
+                            healthy_fallback, fallback_health_reason = is_provider_healthy(fallback_provider_id)
+                            if healthy_fallback:
+                                selected_provider = fallback_provider
+                                routing_explanation.append(f"User configured fallback: {routed} → {fallback_provider_id}")
+                                fallback_reason = f"Primary provider {routed} failed: {reason}, using configured fallback"
+                            else:
+                                routing_explanation.append(f"Configured fallback {fallback_provider_id} also unhealthy: {fallback_health_reason}")
+                                fallback_reason = f"Both primary ({routed}) and configured fallback ({fallback_provider_id}) unavailable"
 
     if not selected_provider and provider_registry:
         preferred_type = INTENT_TO_PROVIDER_TYPE.get(intent, "openai")
@@ -821,8 +853,20 @@ def route_request(context: dict, stream: bool = False):
         # Step 3: Smart fallback - try alternative provider
         _debug(memory, "Attempting fallback to alternative provider")
 
-        # Select alternative provider (excluding the failed one)
-        alternative_cfg = select_provider(intent, memory, forced_provider=None, user_id=user_id)
+        # First check for user-configured fallback provider
+        alternative_cfg = None
+        if memory and user_id:
+            fallback_provider_id = memory.get_fallback_provider(user_id, intent)
+            if fallback_provider_id:
+                from core.provider_registry import ProviderRegistry
+                registry = ProviderRegistry(memory)
+                alternative_cfg = registry.get(fallback_provider_id)
+                if alternative_cfg:
+                    _debug(memory, f"Using configured fallback provider: {fallback_provider_id}")
+
+        # If no configured fallback, use automatic selection
+        if not alternative_cfg:
+            alternative_cfg = select_provider(intent, memory, forced_provider=None, user_id=user_id)
 
         if alternative_cfg["id"] != provider_cfg["id"] and alternative_cfg["id"] != "mock":
             _debug(memory, f"Fallback to {alternative_cfg['id']}")
