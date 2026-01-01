@@ -63,10 +63,13 @@ def get_feature_providers():
     # Get API keys from preferences (stored separately for security)
     prefs = memory.get_all(str(user_id))
 
-    # Add API key status (whether it exists, not the actual key)
+    # Add API key and APP ID status (whether they exist, not the actual values)
     for provider in providers:
         key_name = f"feature_provider_{provider['provider_type']}_api_key"
         provider["has_api_key"] = key_name in prefs and bool(prefs[key_name])
+
+        app_id_name = f"feature_provider_{provider['provider_type']}_app_id"
+        provider["has_app_id"] = app_id_name in prefs and bool(prefs[app_id_name])
 
     return jsonify(providers)
 
@@ -121,10 +124,13 @@ def get_feature_provider(provider_type):
         "updated_at": row["updated_at"]
     }
 
-    # Get API key status from preferences
+    # Get API key and APP ID status from preferences
     prefs = memory.get_all(str(user_id))
     key_name = f"feature_provider_{provider_type}_api_key"
     provider["has_api_key"] = key_name in prefs and bool(prefs[key_name])
+
+    app_id_name = f"feature_provider_{provider_type}_app_id"
+    provider["has_app_id"] = app_id_name in prefs and bool(prefs[app_id_name])
 
     return jsonify(provider)
 
@@ -133,7 +139,7 @@ def get_feature_provider(provider_type):
 def configure_feature_provider(provider_type):
     """
     Configure or update a feature provider.
-    Request body: { "provider_name": "...", "api_key": "...", "is_enabled": bool }
+    Request body: { "provider_name": "...", "api_key": "...", "app_id": "...", "is_enabled": bool }
     Returns: { "status": "ok" }
     """
     from core.memory import MemoryStore
@@ -153,6 +159,7 @@ def configure_feature_provider(provider_type):
     data = request.json
     provider_name = data.get("provider_name")
     api_key = data.get("api_key")
+    app_id = data.get("app_id")
     is_enabled = data.get("is_enabled", True)
 
     if not provider_name:
@@ -196,6 +203,11 @@ def configure_feature_provider(provider_type):
         key_name = f"feature_provider_{provider_type}_api_key"
         memory.remember(str(user_id), key_name, api_key)
 
+    # Store APP ID in preferences if provided
+    if app_id:
+        app_id_name = f"feature_provider_{provider_type}_app_id"
+        memory.remember(str(user_id), app_id_name, app_id)
+
     return jsonify({"status": "ok"})
 
 
@@ -236,16 +248,17 @@ def delete_feature_provider(provider_type):
     conn.commit()
     conn.close()
 
-    # Delete API key from preferences
+    # Delete API key and APP ID from preferences
     key_name = f"feature_provider_{provider_type}_api_key"
+    app_id_name = f"feature_provider_{provider_type}_app_id"
 
     # Use direct SQL to delete from preferences since there's no delete method in MemoryStore
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         DELETE FROM preferences
-        WHERE user_id = ? AND key = ?
-    """, (str(user_id), key_name))
+        WHERE user_id = ? AND key IN (?, ?)
+    """, (str(user_id), key_name, app_id_name))
     conn.commit()
     conn.close()
 

@@ -429,6 +429,21 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Feature Provider Usage Logs
+    # =============================
+    feature_provider_usage_logs = Table(
+        "feature_provider_usage_logs",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", String, nullable=False),
+        Column("provider_type", String(50), nullable=False),
+        Column("success", Boolean, default=True),
+        Column("latency_ms", Integer, nullable=True),
+        Column("error_message", String, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
     # Calendar Events Cache
     # =============================
     calendar_events_cache = Table(
@@ -482,6 +497,7 @@ def create_schema(meta: MetaData):
         "provider_metadata": provider_metadata,
         "request_logs": request_logs,
         "voice_usage_logs": voice_usage_logs,
+        "feature_provider_usage_logs": feature_provider_usage_logs,
         "providers": providers,
         "sessions": sessions,
         "summaries": summaries,

@@ -840,6 +840,7 @@
                     {@const isActionRouter = m.provider === 'action_router'}
                     {@const isError = m.provider === 'error'}
                     {@const isWeather = m.provider === 'weather'}
+                    {@const isRouting = m.provider === 'routing'}
                     {@const formattedAction = m.task_type
                       ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
                       : "Action"}
@@ -847,6 +848,10 @@
                       {#if isWeather}
                         <span class="provider-badge provider-badge-weather">
                           via OpenWeather · Weather
+                        </span>
+                      {:else if isRouting}
+                        <span class="provider-badge provider-badge-routing">
+                          via HERE · Routing
                         </span>
                       {:else if formattedModel}
                         <span class="provider-badge provider-badge-ai">
@@ -1244,6 +1249,12 @@
 
   /* Weather responses - washed out purple */
   .provider-badge-weather {
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+
+  /* Routing responses - same purple as weather */
+  .provider-badge-routing {
     background: #f3e8ff;
     color: #7c3aed;
   }
