@@ -583,7 +583,7 @@
 
   <!-- Debug Settings -->
   <div class="section">
-    <h3>Debug Settings</h3>
+    <h3>Advanced</h3>
     <div class="rule">
       <label for="debug-logs">Debug logs</label>
       <input

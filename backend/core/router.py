@@ -1038,13 +1038,14 @@ def route_request(context: dict, stream: bool = False):
             }
 
         # Fetch route data
-        from core.here_service import HereService
+        from core.traffic_service import TrafficService
         import time
 
         start_time = time.time()
         try:
-            here_service = HereService(api_key)
-            route_data = here_service.get_route(origin, destination)
+            traffic_service = TrafficService(api_key)
+            # Traffic service handles geocoding automatically
+            route_data = traffic_service.get_traffic_estimate(origin, destination)
             latency_ms = int((time.time() - start_time) * 1000)
 
             if route_data:
@@ -1052,7 +1053,7 @@ def route_request(context: dict, stream: bool = False):
                 _log_feature_provider_usage(memory, user_id, "here", success=True, latency_ms=latency_ms)
 
                 # Get raw route data formatted
-                raw_route = here_service.format_route_response(route_data)
+                raw_route = traffic_service.format_traffic_response(route_data)
 
                 # Use system LLM to make the response more conversational
                 friendly_response = _generate_friendly_routing_response(
