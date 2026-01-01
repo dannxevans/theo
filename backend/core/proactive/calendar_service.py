@@ -398,11 +398,26 @@ def _send_event_notification(memory_store, user_id: int, event: Dict, lead_time_
         bool: True if notification sent successfully
     """
     try:
-        # Generate notification content
-        notification_text = _generate_notification(event, lead_time_minutes)
+        # Record notification in database FIRST (prevent duplicate sends in race conditions)
+        _record_notification(memory_store, user_id, event, "")
 
-        # Record notification in database
-        _record_notification(memory_store, user_id, event, notification_text)
+        # Generate notification content (pass memory_store and user_id for routing)
+        notification_text, provider_id, model = _generate_notification(event, lead_time_minutes, memory_store, user_id)
+
+        # Post proactive message to turns table (visible in chat)
+        from core.proactive.message_poster import post_proactive_message
+        message_posted = post_proactive_message(
+            memory_store=memory_store,
+            user_id=user_id,
+            message_type='calendar_reminder',
+            content=notification_text,
+            source_ids=[event.get('id')],
+            provider_id=provider_id,
+            model=model
+        )
+
+        if not message_posted:
+            logger.warning(f"[CALENDAR_SERVICE] Failed to post message to chat for user {user_id}")
 
         # Update rate limiter
         from core.proactive.notification_limiter import record_notification_sent
@@ -416,25 +431,26 @@ def _send_event_notification(memory_store, user_id: int, event: Dict, lead_time_
         return False
 
 
-def _generate_notification(event: Dict, lead_time_minutes: int) -> str:
+def _generate_notification(event: Dict, lead_time_minutes: int, memory_store=None, user_id: int = None) -> tuple:
     """
-    Generate notification text for an event.
-
-    For now, uses a simple template. In the future, could use system LLM
-    for more natural language generation.
+    Generate notification text for an event using LLM summarization.
 
     Args:
         event: Event dictionary
         lead_time_minutes: Lead time in minutes
+        memory_store: MemoryStore instance (for routing configuration)
+        user_id: User ID (for routing configuration)
 
     Returns:
-        str: Notification text
+        tuple: (notification_text, provider_id, model) or (notification_text, None, None) for template
     """
     subject = event.get('subject', 'Untitled Event')
     start = event.get('start_time')  # M365Provider returns 'start_time', not 'start'
     location = event.get('location')
+    body = event.get('body', '')
 
     # Parse start time for friendly display
+    start_time = "Unknown time"
     if isinstance(start, str):
         try:
             # Microsoft Graph returns format like '2026-01-01T21:10:00.0000000'
@@ -468,11 +484,58 @@ def _generate_notification(event: Dict, lead_time_minutes: int) -> str:
             start_dt = datetime.fromisoformat(cleaned_start)
             start_time = start_dt.strftime('%I:%M %p').lstrip('0')
         except Exception:
-            start_time = start
-    else:
-        start_time = start.strftime('%I:%M %p').lstrip('0') if start else 'Unknown time'
+            start_time = str(start)
+    elif start:
+        start_time = start.strftime('%I:%M %p').lstrip('0')
 
-    # Build notification
+    # Try LLM summarization first
+    try:
+        from core.router import route_request
+
+        # Build context for LLM
+        event_context = f"Title: {subject}\nStarts: {start_time} (in {lead_time_minutes} minutes)"
+        if location:
+            event_context += f"\nLocation: {location}"
+        if body and len(body) > 0:
+            event_context += f"\nDetails: {body[:500]}"  # Limit to first 500 chars
+
+        prompt = f"""You are a helpful assistant that creates friendly calendar reminders.
+
+Event details:
+{event_context}
+
+Generate a brief, natural reminder message (1-2 sentences) that:
+1. Addresses the user as "Hey Danny" (casual, friendly tone)
+2. Reminds them about the upcoming event
+3. Mentions when it starts and how much time they have
+4. If there's a location, mention it naturally
+
+Example: "Hey Danny, just a heads up - your Team Meeting is starting at 2:00 PM in 15 minutes. It's in Conference Room A."
+
+Generate the reminder:"""
+
+        # Route to LLM for summarization using "system" intent and user's routing preferences
+        context = {
+            "text": prompt,
+            "session_id": "proactive_summarization",
+            "memory": memory_store,
+            "user_id": str(user_id) if user_id is not None else "local",
+            "forced_provider": None
+        }
+
+        result = route_request(context)
+        llm_summary = result.get("text", "").strip()
+        provider_id = result.get("provider")
+        model = result.get("model")
+
+        if llm_summary and len(llm_summary) > 10:  # Valid summary
+            logger.info(f"[CALENDAR_SERVICE] Generated LLM summary for calendar notification (provider: {provider_id}, model: {model})")
+            return llm_summary, provider_id, model
+
+    except Exception as e:
+        logger.warning(f"[CALENDAR_SERVICE] Failed to generate LLM summary, falling back to template: {e}")
+
+    # Fallback to template-based notification
     parts = [
         f"Upcoming Event: {subject}",
         f"Starts at {start_time} (in {lead_time_minutes} minutes)"
@@ -481,7 +544,7 @@ def _generate_notification(event: Dict, lead_time_minutes: int) -> str:
     if location:
         parts.append(f"Location: {location}")
 
-    return "\n".join(parts)
+    return "\n".join(parts), None, None
 
 
 def _record_notification(memory_store, user_id: int, event: Dict, notification_text: str):

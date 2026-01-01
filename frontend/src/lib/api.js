@@ -1053,6 +1053,22 @@ export async function rejectConfirmation(confirmationId, reason = null) {
   return response.json();
 }
 
+export async function dismissProactiveNotification(turnId) {
+  const response = await fetch(`${API_BASE}/api/proactive/dismiss/${turnId}`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || "Failed to dismiss notification");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Session Mode API
 // =============================

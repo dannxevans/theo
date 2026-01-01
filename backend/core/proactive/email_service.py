@@ -394,14 +394,7 @@ def _send_important_email_notification(memory_store, user_id: int, email: Dict) 
 
         logger.info(f"[EMAIL_SERVICE] Sending important email notification for user {user_id}: {reason}")
 
-        # Generate notification content
-        notification_text = _generate_email_notification(email)
-
-        # Update rate limiter
-        from core.proactive.notification_limiter import record_notification_sent
-        record_notification_sent(memory_store, 'important_email', str(user_id))
-
-        # Update tracking to record notification sent
+        # Update tracking to record notification FIRST (prevent duplicate sends in race conditions)
         with memory_store.engine.connect() as conn:
             conn.execute(
                 text("""
@@ -417,6 +410,28 @@ def _send_important_email_notification(memory_store, user_id: int, email: Dict) 
             )
             conn.commit()
 
+        # Generate notification content (pass memory_store and user_id for routing)
+        notification_text, provider_id, model = _generate_email_notification(email, memory_store, user_id)
+
+        # Post proactive message to turns table (visible in chat)
+        from core.proactive.message_poster import post_proactive_message
+        message_posted = post_proactive_message(
+            memory_store=memory_store,
+            user_id=user_id,
+            message_type='important_email',
+            content=notification_text,
+            source_ids=[email.get('id')],
+            provider_id=provider_id,
+            model=model
+        )
+
+        if not message_posted:
+            logger.warning(f"[EMAIL_SERVICE] Failed to post message to chat for user {user_id}")
+
+        # Update rate limiter
+        from core.proactive.notification_limiter import record_notification_sent
+        record_notification_sent(memory_store, 'important_email', str(user_id))
+
         logger.info(f"[EMAIL_SERVICE] Sent notification for important email: {email.get('subject', 'Untitled')} (user {user_id})")
         return True
 
@@ -425,61 +440,78 @@ def _send_important_email_notification(memory_store, user_id: int, email: Dict) 
         return False
 
 
-def _generate_email_notification(email: Dict) -> str:
+def _generate_email_notification(email: Dict, memory_store=None, user_id: int = None) -> tuple:
     """
-    Generate notification text for an important email.
+    Generate notification text for an important email using LLM summarization.
 
     Args:
         email: Email dictionary
+        memory_store: MemoryStore instance (for routing configuration)
+        user_id: User ID (for routing configuration)
 
     Returns:
-        str: Notification text
+        tuple: (notification_text, provider_id, model) or (notification_text, None, None) for template
     """
     subject = email.get('subject', 'No Subject')
     from_address = email.get('from', 'Unknown Sender')
     preview = email.get('preview', '')
-    received_at = email.get('received_at')
+    body = email.get('body', preview)  # Use full body if available, otherwise preview
 
-    # Calculate how long ago
-    time_ago = "just now"
-    if received_at:
-        if isinstance(received_at, str):
-            received_at = datetime.fromisoformat(received_at.replace('Z', '+00:00'))
+    # Try LLM summarization first
+    try:
+        from core.router import route_request
 
-        # Make sure we're comparing timezone-aware datetimes
-        from datetime import timezone
-        now = datetime.now(timezone.utc)
-        # Remove timezone info for comparison (both in UTC)
-        if received_at.tzinfo is not None:
-            received_at = received_at.replace(tzinfo=None)
-        now = now.replace(tzinfo=None)
+        # Build context for LLM
+        email_context = f"Subject: {subject}\nFrom: {from_address}\n\n{body[:1000]}"  # Limit to first 1000 chars
 
-        delta = now - received_at
-        if delta.total_seconds() < 60:
-            time_ago = "just now"
-        elif delta.total_seconds() < 3600:
-            minutes = int(delta.total_seconds() / 60)
-            time_ago = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-        elif delta.total_seconds() < 86400:
-            hours = int(delta.total_seconds() / 3600)
-            time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
-        else:
-            days = int(delta.total_seconds() / 86400)
-            time_ago = f"{days} day{'s' if days > 1 else ''} ago"
+        prompt = f"""You are a helpful assistant that summarizes important emails for notifications.
 
-    # Build notification
+Email details:
+{email_context}
+
+Generate a brief, natural notification message (1-2 sentences) that:
+1. Addresses the user as "Hey Danny" (casual, friendly tone)
+2. States what needs their attention
+3. Mentions the sender in a natural way (e.g., "from the Solicitors" or "from John")
+4. Summarizes the key action or information
+
+Example: "Hey Danny, an email has arrived that needs your attention. It's from the Solicitors regarding paperwork that needs to be signed."
+
+Generate the notification:"""
+
+        # Route to LLM for summarization using "system" intent and user's routing preferences
+        context = {
+            "text": prompt,
+            "session_id": "proactive_summarization",
+            "memory": memory_store,
+            "user_id": str(user_id) if user_id is not None else "local",
+            "forced_provider": None
+        }
+
+        result = route_request(context)
+        llm_summary = result.get("text", "").strip()
+        provider_id = result.get("provider")
+        model = result.get("model")
+
+        if llm_summary and len(llm_summary) > 10:  # Valid summary
+            logger.info(f"[EMAIL_SERVICE] Generated LLM summary for email notification (provider: {provider_id}, model: {model})")
+            return llm_summary, provider_id, model
+
+    except Exception as e:
+        logger.warning(f"[EMAIL_SERVICE] Failed to generate LLM summary, falling back to template: {e}")
+
+    # Fallback to template-based notification
     parts = [
         f"Important Email from {from_address}",
-        f"Subject: {subject}",
-        f"Received {time_ago}"
+        f"Subject: {subject}"
     ]
 
-    # Add preview if available and not too long
+    # Add preview if available
     if preview and len(preview) > 0:
         preview_text = preview[:200] + "..." if len(preview) > 200 else preview
         parts.append(f"\n{preview_text}")
 
-    return "\n".join(parts)
+    return "\n".join(parts), None, None
 
 
 def _generate_digest_for_user(memory_store, user_id: int) -> bool:
@@ -532,6 +564,18 @@ def _generate_digest_for_user(memory_store, user_id: int) -> bool:
 
         # Generate digest content
         digest_text = f"Email Digest ({email_count} unread email{'s' if email_count != 1 else ''})\n\nYou have {email_count} unread email{'s' if email_count != 1 else ''} in your inbox."
+
+        # Post proactive message to turns table (visible in chat)
+        from core.proactive.message_poster import post_proactive_message
+        message_posted = post_proactive_message(
+            memory_store=memory_store,
+            user_id=user_id,
+            message_type='email_digest',
+            content=digest_text
+        )
+
+        if not message_posted:
+            logger.warning(f"[EMAIL_SERVICE] Failed to post digest message to chat for user {user_id}")
 
         # Update rate limiter
         from core.proactive.notification_limiter import record_notification_sent

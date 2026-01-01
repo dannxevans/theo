@@ -91,6 +91,7 @@ def get_session_messages(session_id):
     # Normalise shape for frontend
     return jsonify([
         {
+            "id": t.get("id"),
             "role": t["role"],
             "content": t["content"],
             "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
