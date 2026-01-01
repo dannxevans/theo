@@ -92,7 +92,12 @@
             formBookingUrl = provider.api_base_url || '';
         }
 
-        showAddModal = true;
+        // Don't show modal for inline editing
+    }
+
+    function cancelEdit() {
+        editingProvider = null;
+        resetForm();
     }
 
     function resetForm() {
@@ -157,7 +162,11 @@
                 throw new Error('Failed to save provider');
             }
 
-            showAddModal = false;
+            if (editingProvider) {
+                cancelEdit();
+            } else {
+                showAddModal = false;
+            }
             await loadProviders();
         } catch (err) {
             error = err.message;
@@ -229,28 +238,98 @@
     {:else}
         <div class="providers-list">
             {#each providers as provider}
-                <div class="provider-card">
-                    <div class="provider-header">
-                        <h3>{provider.name}</h3>
-                        <div class="provider-actions">
-                            <button class="btn-small" on:click={() => openEditModal(provider)}>
-                                Edit
-                            </button>
-                            <button class="btn-small btn-danger" on:click={() => deleteProvider(provider.id)}>
-                                Delete
-                            </button>
+                <div class="provider-card" class:editing={editingProvider?.id === provider.id}>
+                    {#if editingProvider?.id === provider.id}
+                        <!-- Inline Edit Mode -->
+                        <div class="inline-edit-form">
+                            <h3>Editing: {provider.name}</h3>
+
+                            <div class="form-group">
+                                <label>Provider Name</label>
+                                <input type="text" bind:value={formName} placeholder="e.g., Cuts Barber - Rory">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select bind:value={formCategory}>
+                                    {#each categories as cat}
+                                        <option value={cat.value}>{cat.label}</option>
+                                    {/each}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Provider Type</label>
+                                <select bind:value={formProviderType}>
+                                    {#each providerTypes as type}
+                                        <option value={type.value}>{type.label}</option>
+                                    {/each}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Booking URL</label>
+                                <input type="url" bind:value={formBookingUrl} placeholder="https://...">
+                                <small>The link where you book appointments</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Typical Duration (minutes)</label>
+                                <input type="number" bind:value={formDuration} min="5" max="240">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Travel Time from Home (minutes)</label>
+                                    <input type="number" bind:value={formTravelTimeHome} min="0" max="120">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Travel Time from Office (minutes)</label>
+                                    <input type="number" bind:value={formTravelTimeOffice} min="0" max="120">
+                                </div>
+                            </div>
+
+                            <div class="form-group checkbox">
+                                <label>
+                                    <input type="checkbox" bind:checked={formPreferred}>
+                                    Preferred provider for this category
+                                </label>
+                            </div>
+
+                            {#if error}
+                                <div class="error-message">{error}</div>
+                            {/if}
+
+                            <div class="form-actions">
+                                <button class="btn-small btn-primary" on:click={saveProvider}>Save</button>
+                                <button class="btn-small btn-secondary" on:click={cancelEdit}>Cancel</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="provider-details">
-                        <p><strong>Category:</strong> {provider.category}</p>
-                        <p><strong>Type:</strong> {provider.provider_type === 'manual' ? 'Manual Booking' : 'API Integration'}</p>
-                        {#if provider.preferred_for_category}
-                            <span class="status-badge status-badge--success">Preferred</span>
-                        {/if}
-                        {#if getBookingUrl(provider)}
-                            <p><strong>Booking URL:</strong> <a href={getBookingUrl(provider)} target="_blank">Open</a></p>
-                        {/if}
-                    </div>
+                    {:else}
+                        <!-- View Mode -->
+                        <div class="provider-header">
+                            <h3>{provider.name}</h3>
+                            <div class="provider-actions">
+                                <button class="btn-small" on:click={() => openEditModal(provider)}>
+                                    Edit
+                                </button>
+                                <button class="btn-small btn-danger" on:click={() => deleteProvider(provider.id)}>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="provider-details">
+                            <p><strong>Category:</strong> {provider.category}</p>
+                            <p><strong>Type:</strong> {provider.provider_type === 'manual' ? 'Manual Booking' : 'API Integration'}</p>
+                            {#if provider.preferred_for_category}
+                                <span class="status-badge status-badge--success">Preferred</span>
+                            {/if}
+                            {#if getBookingUrl(provider)}
+                                <p><strong>Booking URL:</strong> <a href={getBookingUrl(provider)} target="_blank">Open</a></p>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             {/each}
         </div>
@@ -380,6 +459,11 @@
         background: var(--bg-tertiary);
     }
 
+    .provider-card.editing {
+        border-color: var(--info-500);
+        background: var(--info-50);
+    }
+
     .provider-header {
         display: flex;
         justify-content: space-between;
@@ -435,6 +519,36 @@
         text-align: center;
         padding: var(--space-10);
         color: var(--text-secondary);
+    }
+
+    /* Inline Edit Form Styling */
+    .inline-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .inline-edit-form h3 {
+        margin: 0 0 var(--space-3) 0;
+        color: var(--text-primary);
+        font-size: var(--font-size-lg);
+    }
+
+    .inline-edit-form .form-group {
+        margin-bottom: var(--space-3);
+    }
+
+    .inline-edit-form .form-actions {
+        display: flex;
+        gap: var(--space-2);
+        margin-top: var(--space-2);
+    }
+
+    .inline-edit-form small {
+        display: block;
+        margin-top: var(--space-1);
+        font-size: var(--font-size-xs);
+        color: var(--text-tertiary);
     }
 
     /* All other styles now imported from global CSS:

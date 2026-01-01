@@ -253,6 +253,37 @@ class MemoryOperations(BaseMemoryOperations):
                 .where(self.memories.c.user_id == user_id)
             )
 
+    def update_memory(self, user_id, memory_id, memory_type=None, key=None, value=None):
+        """
+        Update an existing memory by ID.
+
+        Args:
+            user_id: User identifier
+            memory_id: Memory ID to update
+            memory_type: Optional new memory type
+            key: Optional new key
+            value: Optional new value
+        """
+        with self._get_connection() as conn:
+            # Build update values dict with only provided fields
+            updates = {}
+            if memory_type is not None:
+                updates["type"] = memory_type
+            if key is not None:
+                updates["key"] = key
+            if value is not None:
+                updates["value"] = value
+
+            # Only update if there are changes
+            if updates:
+                updates["last_accessed_at"] = datetime.utcnow()
+                conn.execute(
+                    update(self.memories)
+                    .where(self.memories.c.id == memory_id)
+                    .where(self.memories.c.user_id == user_id)
+                    .values(**updates)
+                )
+
     def pin_memory(self, user_id, memory_id, pinned=True):
         """
         Pin or unpin a memory.

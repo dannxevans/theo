@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { createMemory, deleteMemory, pinMemory } from "../../lib/api";
+  import { createMemory, deleteMemory, pinMemory, updateMemory } from "../../lib/api";
 
   export let memories = [];
   export let loadingMemories = false;
@@ -15,6 +15,9 @@
     value: "",
     pinned: false
   };
+
+  let editingMemoryId = null;
+  let editMemory = null;
 
   async function handleCreateMemory() {
     if (!newMemory.key.trim() || !newMemory.value.trim()) {
@@ -50,6 +53,37 @@
       dispatch("reload");
     } catch (err) {
       console.error("Failed to toggle pin", err);
+    }
+  }
+
+  function startEditMemory(mem) {
+    editingMemoryId = mem.id;
+    editMemory = {
+      type: mem.type,
+      key: mem.key,
+      value: mem.value
+    };
+  }
+
+  function cancelEdit() {
+    editingMemoryId = null;
+    editMemory = null;
+  }
+
+  async function saveEdit(memoryId) {
+    if (!editMemory.key.trim() || !editMemory.value.trim()) {
+      alert("Key and value are required");
+      return;
+    }
+
+    try {
+      await updateMemory(memoryId, editMemory);
+      dispatch("reload");
+      editingMemoryId = null;
+      editMemory = null;
+    } catch (err) {
+      console.error("Failed to update memory", err);
+      alert("Failed to update memory");
     }
   }
 
@@ -171,20 +205,52 @@
   {:else}
     <div class="memory-list">
       {#each memories as mem (mem.id)}
-        <div class="memory-item" class:pinned={mem.pinned}>
+        <div class="memory-item" class:pinned={mem.pinned} class:editing={editingMemoryId === mem.id}>
           <div class="memory-header-row">
-            <span class="status-badge status-badge--info">
-              {mem.type}
-            </span>
+            {#if editingMemoryId === mem.id}
+              <select bind:value={editMemory.type} class="edit-type-select">
+                <option value="fact">fact</option>
+                <option value="preference">preference</option>
+                <option value="goal">goal</option>
+                <option value="context">context</option>
+              </select>
+            {:else}
+              <span class="status-badge status-badge--info">
+                {mem.type}
+              </span>
+            {/if}
             {#if mem.pinned}
               <span class="pin-badge">📌 Pinned</span>
             {/if}
             <span class="memory-score">Score: {mem.relevance_score}</span>
           </div>
 
-          <div class="memory-content">
-            <strong>{mem.key}:</strong> {mem.value}
-          </div>
+          {#if editingMemoryId === mem.id}
+            <div class="memory-edit-form">
+              <div class="edit-field">
+                <label>Key:</label>
+                <input
+                  type="text"
+                  bind:value={editMemory.key}
+                  class="edit-input"
+                  placeholder="Memory key"
+                />
+              </div>
+              <div class="edit-field">
+                <label>Value:</label>
+                <textarea
+                  bind:value={editMemory.value}
+                  class="edit-textarea"
+                  placeholder="Memory value"
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+          {:else}
+            <div class="memory-content">
+              <strong>{mem.key}:</strong> {mem.value}
+            </div>
+          {/if}
 
           <div class="memory-meta">
             <span>Created {formatDate(mem.created_at)}</span>
@@ -195,18 +261,39 @@
           </div>
 
           <div class="memory-actions">
-            <button
-              class="btn-pin"
-              on:click={() => handleTogglePin(mem.id, mem.pinned)}
-            >
-              {mem.pinned ? "Unpin" : "Pin"}
-            </button>
-            <button
-              class="btn-delete"
-              on:click={() => handleDeleteMemory(mem.id)}
-            >
-              Delete
-            </button>
+            {#if editingMemoryId === mem.id}
+              <button
+                class="btn-save"
+                on:click={() => saveEdit(mem.id)}
+              >
+                Save
+              </button>
+              <button
+                class="btn-cancel"
+                on:click={cancelEdit}
+              >
+                Cancel
+              </button>
+            {:else}
+              <button
+                class="btn-edit"
+                on:click={() => startEditMemory(mem)}
+              >
+                Edit
+              </button>
+              <button
+                class="btn-pin"
+                on:click={() => handleTogglePin(mem.id, mem.pinned)}
+              >
+                {mem.pinned ? "Unpin" : "Pin"}
+              </button>
+              <button
+                class="btn-delete"
+                on:click={() => handleDeleteMemory(mem.id)}
+              >
+                Delete
+              </button>
+            {/if}
           </div>
         </div>
       {/each}
@@ -380,5 +467,113 @@
     background: var(--error-50);
     border-color: var(--error-500);
     color: var(--error-600);
+  }
+
+  .btn-edit {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-xs);
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-edit:hover {
+    background: var(--info-50);
+    border-color: var(--info-500);
+    color: var(--info-600);
+  }
+
+  .btn-save {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-xs);
+    border: 1px solid var(--success-500);
+    background: var(--success-500);
+    color: white;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-save:hover {
+    background: var(--success-600);
+    border-color: var(--success-600);
+  }
+
+  .btn-cancel {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-xs);
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-cancel:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-tertiary);
+  }
+
+  .memory-item.editing {
+    border-color: var(--info-500);
+    background: var(--info-50);
+  }
+
+  .edit-type-select {
+    font-size: var(--font-size-xs);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-primary);
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .memory-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+  }
+
+  .edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .edit-field label {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .edit-input,
+  .edit-textarea {
+    padding: var(--space-2);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    transition: border-color 0.2s;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .edit-input:focus,
+  .edit-textarea:focus {
+    outline: none;
+    border-color: var(--info-500);
+    box-shadow: 0 0 0 3px var(--info-100);
+  }
+
+  .edit-textarea {
+    resize: vertical;
+    min-height: 60px;
   }
 </style>

@@ -954,6 +954,9 @@
             </div>
           {/if}
         </div>
+        <div class="info-banner">
+          THEO and the AI providers it uses can make mistakes, so please always double-check responses for accuracy.
+        </div>
         <div class="input">
           <textarea
             bind:this={inputTextarea}
@@ -1297,6 +1300,17 @@
     border-radius: 6px;
     text-align: center;
     font-weight: 500;
+  }
+
+  /* Info Banner */
+  .info-banner {
+    background: #f9fafb;
+    color: #6b7280;
+    padding: 0.5rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
   }
 
   /* Mode Switch Notification */
