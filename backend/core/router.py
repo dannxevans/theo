@@ -1102,6 +1102,36 @@ def route_request(context: dict, stream: bool = False):
                 "fallback_reason": f"routing_error: {str(e)}",
             }
 
+    if intent == "planning":
+        _debug(memory, "Handling planning request")
+
+        # Get user_id from context
+        user_id = context.get("user_id") if context.get("user_id") else "local"
+
+        # Use PlanningHandlers to process the request
+        from core.actions.planning_handlers import PlanningHandlers
+
+        try:
+            planning_handlers = PlanningHandlers(memory)
+            result = planning_handlers.handle_planning_query(
+                user_text=text,
+                session_id=context.get("session_id", ""),
+                user_id=int(user_id) if isinstance(user_id, str) and user_id.isdigit() else user_id,
+                context=context
+            )
+
+            return result
+
+        except Exception as e:
+            logging.error(f"[ROUTER] Planning service error: {e}")
+            return {
+                "text": f"I encountered an error processing your planning request: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "planning",
+                "fallback_reason": f"planning_error: {str(e)}",
+            }
+
     # =============================
     # Action Intent Routing
     # =============================

@@ -94,6 +94,15 @@ class CalendarHandlers(BaseActionHandler):
                 ) > now
             ]
 
+            # Enrich events with weather data
+            try:
+                from core.planning_service import PlanningService
+                planning_service = PlanningService(self.memory)
+                future_events = planning_service.enrich_calendar_view(future_events, str(user_id))
+            except Exception as e:
+                # If enrichment fails, continue without it
+                self.logger.warning(f"[CALENDAR] Failed to enrich calendar: {e}")
+
             # If this is a flight query, filter to flight/travel events
             if is_flight_query:
                 flight_keywords = ["flight", "train", "travel", "trip", "departure", "arrival", "airline", "airport"]

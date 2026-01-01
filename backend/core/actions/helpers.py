@@ -195,6 +195,15 @@ def format_event_list(events: list, show_date: bool = False) -> str:
         if location:
             event_line += f" • {location}"
 
+        # Add weather information if available
+        weather = event.get("weather")
+        if weather:
+            temp = weather.get("temperature")
+            icon = weather.get("icon", "")
+            desc = weather.get("description", "")
+            if temp is not None:
+                event_line += f" {icon} {temp}°C"
+
         # Add attendees on next line if present
         attendees = event.get("attendees", [])
         if attendees and len(attendees) > 0:

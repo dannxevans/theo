@@ -187,18 +187,24 @@ class PlanningService:
 
     def _extract_location(self, text: str) -> Optional[str]:
         """Extract location from user text."""
+        # Time words to exclude from locations
+        time_words = ["tomorrow", "today", "tonight", "morning", "afternoon", "evening", "later", "at", "pm", "am"]
+
         # Pattern: "at X", "to X", "in X"
+        # Match capitalized location names (1-4 words)
         patterns = [
-            r"(?:at|to|in)\s+([A-Z][A-Za-z\s]+(?:London|Mall|Center|Street|Avenue|Road))",
-            r"(?:at|to|in)\s+([A-Z][A-Za-z\s]{2,})",
+            # Specific endings like "London", "Mall", etc.
+            r"(?:at|to|in)\s+([A-Z][A-Za-z\s]+(?:London|Mall|Center|Centre|Street|Avenue|Road|Oaks))",
+            # General pattern: capture 1-4 capitalized words after at/to/in
+            r"(?:at|to|in)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text)
             if match:
                 location = match.group(1).strip()
-                # Filter out common time words
-                if location.lower() not in ["tomorrow", "today", "tonight", "morning", "afternoon"]:
+                # Filter out time words and very short matches
+                if location.lower() not in time_words and len(location) > 2:
                     return location
 
         return None
@@ -227,6 +233,9 @@ class PlanningService:
                 return now.replace(hour=19, minute=0, second=0).isoformat()
             if "afternoon" in text_lower:
                 return now.replace(hour=14, minute=0, second=0).isoformat()
+            if "today" in text_lower:
+                # Default to current time + 1 hour for "today"
+                return (now + timedelta(hours=1)).replace(minute=0, second=0).isoformat()
 
         # Specific time patterns
         time_match = re.search(r"at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", text_lower)
@@ -289,9 +298,23 @@ class PlanningService:
                 self.logger.warning("[PLANNING] HERE API key not configured")
                 return None
 
-            # For now, assume origin is user's home/current location
-            # In production, would get from user preferences or current location
-            origin = "51.5074,-0.1278"  # London default
+            # Get origin from user's home or work location
+            origin = None
+            home_location = prefs.get("home location")
+            work_location = prefs.get("work location")
+
+            # Use home location as default, fall back to work if home not set
+            if home_location:
+                origin = home_location
+                self.logger.info(f"[PLANNING] Using home location as origin: {origin}")
+            elif work_location:
+                origin = work_location
+                self.logger.info(f"[PLANNING] Using work location as origin: {origin}")
+            else:
+                # Fallback to Liverpool center if no location set
+                origin = "53.4084,-2.9916"
+                self.logger.warning("[PLANNING] No home/work location set, using Liverpool default")
+
             destination = activity_data.get("location")
 
             if not destination:
