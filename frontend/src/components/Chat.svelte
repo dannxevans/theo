@@ -48,7 +48,7 @@
    * Format model display: "Name · Type · Routing"
    * Examples: "GPT-4o · OpenAI · General", "Sonnet-4.5 · Anthropic · Coding"
    */
-  function formatModelDisplay(provider, model, taskType) {
+  function formatModelDisplay(provider, model, taskType, metadata = {}) {
     // Extract friendly name from model or provider
     let modelName = "";
     let providerType = "";
@@ -56,6 +56,20 @@
     // Special cases for non-AI responses (don't show model badge)
     if (provider === "memory" || provider === "error" || provider === "action_router") {
       return null;
+    }
+
+    // If we have explicit provider info from metadata (e.g., from LLM summarization),
+    // use that for display
+    if (metadata?.llm_provider_name && metadata?.llm_provider_type) {
+      modelName = metadata.llm_provider_name;
+      providerType = metadata.llm_provider_type;
+
+      // Format task type
+      const routing = taskType
+        ? taskType.charAt(0).toUpperCase() + taskType.slice(1).replace(/_/g, " ")
+        : "General";
+
+      return `${modelName} · ${providerType} · ${routing}`;
     }
 
     // Weather provider
@@ -837,7 +851,7 @@
                   {/if}
 
                   {#if m.provider}
-                    {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type)}
+                    {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type, m.metadata)}
                     {@const isActionRouter = m.provider === 'action_router'}
                     {@const isError = m.provider === 'error'}
                     {@const isWeather = m.provider === 'weather'}

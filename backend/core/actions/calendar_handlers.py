@@ -14,6 +14,27 @@ from datetime import datetime, timedelta
 import logging
 import re
 
+
+def get_provider_company_name(provider_type: str) -> str:
+    """
+    Map provider type to company display name.
+
+    Args:
+        provider_type: Provider type (e.g., 'openai', 'anthropic', 'google', etc.)
+
+    Returns:
+        Company display name (e.g., 'OpenAI', 'Anthropic', 'Google', etc.')
+    """
+    company_mapping = {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "google": "Google",
+        "mistral": "Mistral",
+        "grok": "xAI",
+        "xai": "xAI",
+    }
+    return company_mapping.get(provider_type.lower(), provider_type.capitalize())
+
 from .base_handler import BaseActionHandler
 from .helpers import (
     parse_date_range,
@@ -138,6 +159,8 @@ class CalendarHandlers(BaseActionHandler):
                 }
 
             # Format response for general calendar queries
+            llm_provider_info = None  # Initialize to None for all cases
+
             if not future_events:
                 date_str = format_date_range(start_date, end_date)
                 response = f"You have no upcoming events {date_str}."
@@ -152,24 +175,48 @@ class CalendarHandlers(BaseActionHandler):
 
                 if has_enrichment:
                     # Use LLM to generate friendly summary with enrichment context
-                    response = self._generate_enriched_summary(
+                    response, llm_provider_info = self._generate_enriched_summary(
                         future_events, date_str, event_list
                     )
                 else:
                     # Standard format without enrichment
                     response = f"Here are your upcoming events {date_str}:\n\n{event_list}"
 
-            return {
+            # Build response with appropriate provider attribution
+            result = {
                 "text": response,
-                "provider": "action_router",
-                "model": None,
-                "task_type": "read_calendar",
                 "metadata": {
                     "events_count": len(future_events),
                     "date_range": [start_date.isoformat(), end_date.isoformat()],
                     "provider_id": provider_id
                 }
             }
+
+            # If LLM was used for enrichment, attribute to the LLM provider
+            if llm_provider_info:
+                # Use the friendly provider name as the main identifier
+                # and pass both model and provider info for frontend display
+                provider_name = llm_provider_info.get("name", "Unknown")
+                provider_type = llm_provider_info.get("type", "")
+                model_id = llm_provider_info.get("model", "")
+
+                # Map provider type to company name for display
+                company_name = get_provider_company_name(provider_type)
+
+                # For display purposes, use the model ID if it helps with frontend formatting
+                # Otherwise, use the friendly provider name
+                result["provider"] = provider_name
+                result["model"] = model_id
+                result["task_type"] = "summarise_calendar"
+                result["metadata"]["llm_provider_type"] = company_name
+                result["metadata"]["llm_provider_name"] = provider_name
+            else:
+                # Otherwise attribute to action router
+                result["provider"] = "action_router"
+                result["model"] = None
+                result["task_type"] = "read_calendar"
+
+            return result
 
         except Exception as e:
             self._log_error("handle_read_calendar", e)
@@ -184,7 +231,7 @@ class CalendarHandlers(BaseActionHandler):
         events: List[Dict[str, Any]],
         date_str: str,
         event_list: str
-    ) -> str:
+    ) -> tuple:
         """
         Use lightweight LLM to generate friendly summary of calendar events with enrichment data.
 
@@ -194,7 +241,8 @@ class CalendarHandlers(BaseActionHandler):
             event_list: Pre-formatted bulleted event list
 
         Returns:
-            Conversational summary with enrichment context
+            Tuple of (summary_text, provider_info) where provider_info is a dict with 'name', 'type', 'id'
+            or (summary_text, None) if no provider used
         """
         from core.provider_registry import ProviderRegistry
 
@@ -269,14 +317,21 @@ Keep it concise (2-3 sentences max) and conversational."""
                         system=system_prompt,
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    return response.strip()
+                    # Return both summary and provider info
+                    provider_info = {
+                        "id": system_provider_config.get("id"),
+                        "name": system_provider_config.get("name"),
+                        "type": system_provider_config.get("type"),
+                        "model": system_provider_config.get("model")
+                    }
+                    return response.strip(), provider_info
 
             # Fallback to standard format
-            return f"Here are your upcoming events {date_str}:\n\n{event_list}"
+            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
 
         except Exception as e:
             self.logger.warning(f"[CALENDAR] Failed to generate enriched summary: {e}")
-            return f"Here are your upcoming events {date_str}:\n\n{event_list}"
+            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
 
     def handle_book_appointment(
         self,
