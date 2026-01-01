@@ -48,7 +48,9 @@ def run_all_migrations():
         "010_add_circuit_breaker_cooldown.py",  # Add circuit breaker cooldown columns for time-based auto-retry
         "011_add_feature_providers.py",  # Add feature_providers table for external service API keys
         "012_add_feature_provider_usage_logs.py",  # Add usage tracking for feature providers
-        "013_add_planning_metadata.py"  # Add enrichment_data column to actions table for context-aware planning
+        "013_add_planning_metadata.py",  # Add enrichment_data column to actions table for context-aware planning
+        "014_add_proactive_settings.py",  # Add proactive_settings table for user notification preferences
+        "015_add_proactive_tracking_tables.py"  # Add proactive notification tracking tables
     ]
 
     # Filter to only existing files
