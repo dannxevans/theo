@@ -176,7 +176,7 @@ class CalendarHandlers(BaseActionHandler):
                 if has_enrichment:
                     # Use LLM to generate friendly summary with enrichment context
                     response, llm_provider_info = self._generate_enriched_summary(
-                        future_events, date_str, event_list
+                        future_events, date_str, event_list, user_id
                     )
                 else:
                     # Standard format without enrichment
@@ -230,21 +230,24 @@ class CalendarHandlers(BaseActionHandler):
         self,
         events: List[Dict[str, Any]],
         date_str: str,
-        event_list: str
+        event_list: str,
+        user_id: int = None
     ) -> tuple:
         """
-        Use lightweight LLM to generate friendly summary of calendar events with enrichment data.
+        Use LLM to generate friendly summary of calendar events with enrichment data.
+        Uses user's routing preferences to select the appropriate provider.
 
         Args:
             events: List of calendar events with weather/traffic enrichment
             date_str: Formatted date range string
             event_list: Pre-formatted bulleted event list
+            user_id: User ID for routing preferences lookup
 
         Returns:
-            Tuple of (summary_text, provider_info) where provider_info is a dict with 'name', 'type', 'id'
+            Tuple of (summary_text, provider_info) where provider_info is a dict with 'name', 'type', 'id', 'model'
             or (summary_text, None) if no provider used
         """
-        from core.provider_registry import ProviderRegistry
+        from core.router import route_request
 
         # Build enrichment context for LLM
         enrichment_details = []
@@ -289,48 +292,36 @@ Generate a natural, helpful response that:
 Keep it concise (2-3 sentences max) and conversational."""
 
         try:
-            registry = ProviderRegistry(self.memory)
-            system_provider_config = registry.get_system_provider()
+            # Use route_request to respect user's routing preferences
+            # IMPORTANT: Use a system message to prevent the LLM from triggering intent classification
+            system_message = "You are a calendar assistant. Respond ONLY with a friendly summary of the events. Do not ask questions or include any conversational elements that might trigger actions."
 
-            if system_provider_config:
-                # Instantiate the actual provider class with api_key and model
-                from providers.anthropic import AnthropicProvider
-                from providers.openai import OpenAIProvider
-                from providers.gemini import GoogleProvider
+            router_context = {
+                "text": prompt,
+                "session_id": "calendar_enrichment",
+                "memory": self.memory,
+                "user_id": str(user_id) if user_id else "local",
+                "forced_provider": None,
+                "force_intent": "system",  # Use system intent for internal summarization (prevents infinite loop)
+                "system_message": system_message
+            }
 
-                provider_type = system_provider_config.get("type")
-                api_key = system_provider_config.get("api_key")
-                model = system_provider_config.get("model")
-                provider = None
+            result = route_request(router_context)
+            summary_text = result.get("text", "").strip()
 
-                if provider_type == "anthropic":
-                    provider = AnthropicProvider(api_key=api_key, model=model)
-                elif provider_type == "openai":
-                    provider = OpenAIProvider(api_key=api_key, model=model)
-                elif provider_type == "google":
-                    provider = GoogleProvider(api_key=api_key, model=model)
+            # Extract provider info from result
+            provider_info = {
+                "id": result.get("provider_id"),
+                "name": result.get("provider_id"),
+                "type": result.get("provider_id").split("-")[0] if result.get("provider_id") else "unknown",
+                "model": result.get("model")
+            }
 
-                if provider:
-                    # Use chat() method like email handlers do
-                    system_prompt = "You are a helpful assistant that summarizes calendar events with weather and traffic context."
-                    response = provider.chat(
-                        system=system_prompt,
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    # Return both summary and provider info
-                    provider_info = {
-                        "id": system_provider_config.get("id"),
-                        "name": system_provider_config.get("name"),
-                        "type": system_provider_config.get("type"),
-                        "model": system_provider_config.get("model")
-                    }
-                    return response.strip(), provider_info
-
-            # Fallback to standard format
-            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
+            return summary_text, provider_info
 
         except Exception as e:
             self.logger.warning(f"[CALENDAR] Failed to generate enriched summary: {e}")
+            # Fallback to standard format
             return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
 
     def handle_book_appointment(

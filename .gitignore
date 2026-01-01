@@ -65,6 +65,7 @@ Thumbs.db
 docs/
 theo.wiki/
 wiki/
+dev-docs/
 
 # Python package build artifacts
 *.egg-info/
