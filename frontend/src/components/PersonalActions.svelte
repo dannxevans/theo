@@ -9,6 +9,7 @@
     approveConfirmation,
     rejectConfirmation,
   } from "../lib/api.js";
+  import ProactiveSettings from "./settings/ProactiveSettings.svelte";
 
   let m365Connected = false;
   let m365Status = null;
@@ -244,6 +245,14 @@
       </div>
     {/if}
   </div>
+
+  <!-- Proactive Notifications Section -->
+  {#if m365Connected}
+    <div class="section">
+      <h3>Proactive Notifications</h3>
+      <ProactiveSettings />
+    </div>
+  {/if}
 
   <!-- Pending Actions Section -->
   {#if m365Connected}
