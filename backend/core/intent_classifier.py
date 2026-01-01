@@ -328,7 +328,9 @@ class IntentClassifier:
 
         # Check user-defined intents (if memory available)
         if self.memory:
-            intents = self.memory.list_intents("local")
+            # Use actual user_id, default to "local" only if user_id is None
+            lookup_user_id = str(user_id) if user_id is not None else "local"
+            intents = self.memory.list_intents(lookup_user_id)
             enabled_intents = [i for i in intents if i.get("enabled", True)]
 
             for intent_obj in enabled_intents:

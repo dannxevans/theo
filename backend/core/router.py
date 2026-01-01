@@ -231,7 +231,9 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
         return "general"
 
     # Get user intents, ordered by priority
-    intents = memory.list_intents("local")
+    # Use actual user_id, default to "local" only if user_id is None
+    lookup_user_id = str(user_id) if user_id is not None else "local"
+    intents = memory.list_intents(lookup_user_id)
 
     # Filter to enabled intents only
     enabled_intents = [i for i in intents if i.get("enabled", True)]
