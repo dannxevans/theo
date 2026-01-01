@@ -94,6 +94,14 @@ except Exception as e:
 from auth import init_default_user
 init_default_user(memory)
 
+# Initialize proactive scheduler
+try:
+    from core.scheduler import init_scheduler
+    proactive_scheduler = init_scheduler(memory)
+    logging.info("[APP] Proactive scheduler initialized and started")
+except Exception as e:
+    logging.warning(f"[APP] Failed to initialize proactive scheduler: {e}")
+
 # Register route blueprints
 from routes.health_routes import health_bp
 from routes.auth_routes import auth_bp

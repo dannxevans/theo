@@ -207,3 +207,158 @@ def set_user_preference(key):
     memory.set_user_preference("local", key, str(value))
 
     return jsonify({"status": "ok"})
+
+
+@settings_bp.route("/proactive", methods=["GET"])
+def get_proactive_settings():
+    """
+    Get proactive notification settings.
+    Returns: Proactive settings object
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from sqlalchemy import text
+
+    memory = MemoryStore(Config.DATABASE_URL)
+    user_id = "local"  # For now, using "local" as user_id
+
+    try:
+        with memory.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT calendar_enabled, email_enabled,
+                       calendar_lead_time_minutes, calendar_check_frequency_minutes,
+                       email_check_frequency_minutes, email_digest_frequency_minutes,
+                       max_messages_per_hour,
+                       quiet_hours_enabled, quiet_hours_start, quiet_hours_end,
+                       frontend_poll_interval_minutes
+                FROM proactive_settings
+                WHERE user_id = :user_id
+            """), {"user_id": user_id})
+
+            row = result.fetchone()
+
+            if row:
+                return jsonify({
+                    "calendar_enabled": bool(row[0]),
+                    "email_enabled": bool(row[1]),
+                    "calendar_lead_time_minutes": row[2],
+                    "calendar_check_frequency_minutes": row[3],
+                    "email_check_frequency_minutes": row[4],
+                    "email_digest_frequency_minutes": row[5],
+                    "max_messages_per_hour": row[6],
+                    "quiet_hours_enabled": bool(row[7]),
+                    "quiet_hours_start": row[8],
+                    "quiet_hours_end": row[9],
+                    "frontend_poll_interval_minutes": row[10]
+                })
+            else:
+                # Return defaults if no settings found
+                return jsonify({
+                    "calendar_enabled": True,
+                    "email_enabled": True,
+                    "calendar_lead_time_minutes": 15,
+                    "calendar_check_frequency_minutes": 15,
+                    "email_check_frequency_minutes": 15,
+                    "email_digest_frequency_minutes": 60,
+                    "max_messages_per_hour": 10,
+                    "quiet_hours_enabled": False,
+                    "quiet_hours_start": None,
+                    "quiet_hours_end": None,
+                    "frontend_poll_interval_minutes": 5
+                })
+
+    except Exception as e:
+        import logging
+        logging.error(f"[SETTINGS] Error fetching proactive settings: {e}")
+        return jsonify({"error": "Failed to fetch proactive settings"}), 500
+
+
+@settings_bp.route("/proactive", methods=["POST"])
+def update_proactive_settings():
+    """
+    Update proactive notification settings.
+    Request body: Proactive settings object
+    Returns: { "status": "ok" }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from sqlalchemy import text
+
+    memory = MemoryStore(Config.DATABASE_URL)
+    user_id = "local"  # For now, using "local" as user_id
+    data = request.json
+
+    try:
+        # Build UPDATE statement dynamically based on provided fields
+        allowed_fields = {
+            "calendar_enabled": "calendar_enabled",
+            "email_enabled": "email_enabled",
+            "calendar_lead_time_minutes": "calendar_lead_time_minutes",
+            "calendar_check_frequency_minutes": "calendar_check_frequency_minutes",
+            "email_check_frequency_minutes": "email_check_frequency_minutes",
+            "email_digest_frequency_minutes": "email_digest_frequency_minutes",
+            "max_messages_per_hour": "max_messages_per_hour",
+            "quiet_hours_enabled": "quiet_hours_enabled",
+            "quiet_hours_start": "quiet_hours_start",
+            "quiet_hours_end": "quiet_hours_end",
+            "frontend_poll_interval_minutes": "frontend_poll_interval_minutes"
+        }
+
+        updates = {}
+        for key, db_field in allowed_fields.items():
+            if key in data:
+                updates[db_field] = data[key]
+
+        if not updates:
+            return jsonify({"error": "No valid fields to update"}), 400
+
+        with memory.engine.connect() as conn:
+            # Build SQL
+            set_clause = ", ".join([f"{field} = :{field}" for field in updates.keys()])
+            set_clause += ", updated_at = CURRENT_TIMESTAMP"
+
+            # Add user_id to params
+            params = {**updates, "user_id": user_id}
+
+            sql = text(f"""
+                UPDATE proactive_settings
+                SET {set_clause}
+                WHERE user_id = :user_id
+            """)
+
+            result = conn.execute(sql, params)
+            conn.commit()
+
+            # If no rows updated, insert default settings
+            if result.rowcount == 0:
+                # Insert with provided values
+                fields = ["user_id"] + list(updates.keys())
+                placeholders = ", ".join([f":{field}" for field in fields])
+                field_names = ", ".join(fields)
+
+                insert_sql = text(f"""
+                    INSERT INTO proactive_settings ({field_names})
+                    VALUES ({placeholders})
+                """)
+
+                conn.execute(insert_sql, params)
+                conn.commit()
+
+        # Reschedule jobs if scheduler is running
+        try:
+            from core.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            if scheduler and scheduler.is_running():
+                scheduler.reschedule_jobs()
+                import logging
+                logging.info("[SETTINGS] Proactive jobs rescheduled after settings update")
+        except Exception as e:
+            import logging
+            logging.warning(f"[SETTINGS] Could not reschedule jobs: {e}")
+
+        return jsonify({"status": "ok"})
+
+    except Exception as e:
+        import logging
+        logging.error(f"[SETTINGS] Error updating proactive settings: {e}")
+        return jsonify({"error": "Failed to update proactive settings"}), 500

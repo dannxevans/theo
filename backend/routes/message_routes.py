@@ -239,3 +239,29 @@ def stream_chat_sse(session_id):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@message_bp.route("/proactive/dismiss/<int:turn_id>", methods=["POST"])
+def dismiss_proactive_notification(turn_id):
+    """
+    Dismiss a proactive notification.
+    URL param: turn_id (the turn ID to dismiss)
+    Requires authentication.
+    Returns: { "success": true/false, "message": "..." }
+    """
+    from app import memory
+    from flask import g
+    from core.proactive.message_poster import dismiss_proactive_message
+
+    # Get authenticated user
+    user_id = g.get('user_id')
+    if not user_id:
+        return jsonify({"success": False, "message": "Authentication required"}), 401
+
+    # Dismiss the message
+    success = dismiss_proactive_message(memory, turn_id, user_id)
+
+    if success:
+        return jsonify({"success": True, "message": "Notification dismissed"})
+    else:
+        return jsonify({"success": False, "message": "Failed to dismiss notification"}), 400
