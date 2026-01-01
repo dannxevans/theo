@@ -249,15 +249,23 @@ def _fetch_upcoming_events(memory_store, user_id: int, lead_time_minutes: int) -
                     if '.' in cleaned_start:
                         # Split on the decimal point
                         base, fractional = cleaned_start.split('.', 1)
-                        # Strip all trailing zeros and any non-digit characters
-                        fractional_digits = fractional.rstrip('0123456789')
-                        fractional_numbers = fractional[:len(fractional) - len(fractional_digits)] if fractional_digits else fractional
-                        fractional_numbers = fractional_numbers.rstrip('0')
+                        # Extract only the digit portion (strip any non-digits like timezone info)
+                        fractional_digits = ''
+                        for char in fractional:
+                            if char.isdigit():
+                                fractional_digits += char
+                            else:
+                                break
 
-                        if fractional_numbers:
-                            # Keep up to 6 digits
-                            fractional_numbers = fractional_numbers[:6]
-                            cleaned_start = f"{base}.{fractional_numbers}"
+                        # Strip trailing zeros
+                        fractional_digits = fractional_digits.rstrip('0')
+
+                        if fractional_digits and len(fractional_digits) <= 6:
+                            # Use fractional seconds (1-6 digits)
+                            cleaned_start = f"{base}.{fractional_digits}"
+                        elif fractional_digits and len(fractional_digits) > 6:
+                            # Truncate to 6 digits
+                            cleaned_start = f"{base}.{fractional_digits[:6]}"
                         else:
                             # No fractional seconds, just use base
                             cleaned_start = base
@@ -316,15 +324,23 @@ def _should_notify_event(memory_store, user_id: int, event: Dict) -> bool:
                 if '.' in cleaned_start:
                     # Split on the decimal point
                     base, fractional = cleaned_start.split('.', 1)
-                    # Strip all trailing zeros and any non-digit characters
-                    fractional_digits = fractional.rstrip('0123456789')
-                    fractional_numbers = fractional[:len(fractional) - len(fractional_digits)] if fractional_digits else fractional
-                    fractional_numbers = fractional_numbers.rstrip('0')
+                    # Extract only the digit portion (strip any non-digits like timezone info)
+                    fractional_digits = ''
+                    for char in fractional:
+                        if char.isdigit():
+                            fractional_digits += char
+                        else:
+                            break
 
-                    if fractional_numbers:
-                        # Keep up to 6 digits
-                        fractional_numbers = fractional_numbers[:6]
-                        cleaned_start = f"{base}.{fractional_numbers}"
+                    # Strip trailing zeros
+                    fractional_digits = fractional_digits.rstrip('0')
+
+                    if fractional_digits and len(fractional_digits) <= 6:
+                        # Use fractional seconds (1-6 digits)
+                        cleaned_start = f"{base}.{fractional_digits}"
+                    elif fractional_digits and len(fractional_digits) > 6:
+                        # Truncate to 6 digits
+                        cleaned_start = f"{base}.{fractional_digits[:6]}"
                     else:
                         # No fractional seconds, just use base
                         cleaned_start = base
@@ -428,15 +444,23 @@ def _generate_notification(event: Dict, lead_time_minutes: int) -> str:
             if '.' in cleaned_start:
                 # Split on the decimal point
                 base, fractional = cleaned_start.split('.', 1)
-                # Strip all trailing zeros and any non-digit characters
-                fractional_digits = fractional.rstrip('0123456789')
-                fractional_numbers = fractional[:len(fractional) - len(fractional_digits)] if fractional_digits else fractional
-                fractional_numbers = fractional_numbers.rstrip('0')
+                # Extract only the digit portion (strip any non-digits like timezone info)
+                fractional_digits = ''
+                for char in fractional:
+                    if char.isdigit():
+                        fractional_digits += char
+                    else:
+                        break
 
-                if fractional_numbers:
-                    # Keep up to 6 digits
-                    fractional_numbers = fractional_numbers[:6]
-                    cleaned_start = f"{base}.{fractional_numbers}"
+                # Strip trailing zeros
+                fractional_digits = fractional_digits.rstrip('0')
+
+                if fractional_digits and len(fractional_digits) <= 6:
+                    # Use fractional seconds (1-6 digits)
+                    cleaned_start = f"{base}.{fractional_digits}"
+                elif fractional_digits and len(fractional_digits) > 6:
+                    # Truncate to 6 digits
+                    cleaned_start = f"{base}.{fractional_digits[:6]}"
                 else:
                     # No fractional seconds, just use base
                     cleaned_start = base
@@ -483,15 +507,23 @@ def _record_notification(memory_store, user_id: int, event: Dict, notification_t
             if '.' in cleaned_start:
                 # Split on the decimal point
                 base, fractional = cleaned_start.split('.', 1)
-                # Strip all trailing zeros and any non-digit characters
-                fractional_digits = fractional.rstrip('0123456789')
-                fractional_numbers = fractional[:len(fractional) - len(fractional_digits)] if fractional_digits else fractional
-                fractional_numbers = fractional_numbers.rstrip('0')
+                # Extract only the digit portion (strip any non-digits like timezone info)
+                fractional_digits = ''
+                for char in fractional:
+                    if char.isdigit():
+                        fractional_digits += char
+                    else:
+                        break
 
-                if fractional_numbers:
-                    # Keep up to 6 digits
-                    fractional_numbers = fractional_numbers[:6]
-                    cleaned_start = f"{base}.{fractional_numbers}"
+                # Strip trailing zeros
+                fractional_digits = fractional_digits.rstrip('0')
+
+                if fractional_digits and len(fractional_digits) <= 6:
+                    # Use fractional seconds (1-6 digits)
+                    cleaned_start = f"{base}.{fractional_digits}"
+                elif fractional_digits and len(fractional_digits) > 6:
+                    # Truncate to 6 digits
+                    cleaned_start = f"{base}.{fractional_digits[:6]}"
                 else:
                     # No fractional seconds, just use base
                     cleaned_start = base
