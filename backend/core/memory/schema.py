@@ -414,6 +414,21 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Feature Providers
+    # =============================
+    feature_providers = Table(
+        "feature_providers",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", String, nullable=False),
+        Column("provider_type", String(50), nullable=False),
+        Column("provider_name", String(100), nullable=False),
+        Column("is_enabled", Boolean, default=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
     # Calendar Events Cache
     # =============================
     calendar_events_cache = Table(
@@ -478,4 +493,5 @@ def create_schema(meta: MetaData):
         "m365_credentials": m365_credentials,
         "calendar_events_cache": calendar_events_cache,
         "classification_audit": classification_audit,
+        "feature_providers": feature_providers,
     }
