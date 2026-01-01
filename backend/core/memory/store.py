@@ -151,9 +151,9 @@ class MemoryStore:
     # Intent Operations (delegated)
     # =============================
 
-    def set_routing_preference(self, user_id, intent, provider_id):
+    def set_routing_preference(self, user_id, intent, provider_id, fallback_provider_id=None):
         """Set routing preference for an intent."""
-        return self._intent_ops.set_routing_preference(user_id, intent, provider_id)
+        return self._intent_ops.set_routing_preference(user_id, intent, provider_id, fallback_provider_id)
 
     def get_routing_preferences(self, user_id):
         """Get all routing preferences for a user."""
@@ -166,6 +166,10 @@ class MemoryStore:
     def get_routing_provider(self, user_id, intent):
         """Get provider ID for a specific intent."""
         return self._intent_ops.get_routing_provider(user_id, intent)
+
+    def get_fallback_provider(self, user_id, intent):
+        """Get fallback provider ID for a specific intent."""
+        return self._intent_ops.get_fallback_provider(user_id, intent)
 
     def set_routing_provider(self, user_id, intent, provider_id):
         """Alias for set_routing_preference."""
@@ -302,6 +306,10 @@ class MemoryStore:
     def reset_provider_health(self, provider_id):
         """Reset health metrics for a provider."""
         return self._provider_ops.reset_provider_health(provider_id)
+
+    def update_circuit_breaker_cooldown(self, provider_id, cooldown_minutes):
+        """Update circuit breaker cooldown period for a provider."""
+        return self._provider_ops.update_circuit_breaker_cooldown(provider_id, cooldown_minutes)
 
     def reset_all_provider_usage(self):
         """Reset ALL provider usage data (destructive operation)."""

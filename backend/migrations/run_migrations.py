@@ -43,11 +43,8 @@ def run_all_migrations():
 
     # Get all migration files in order
     migration_files = [
-        "001_add_action_tables.py",
-        "002_add_turns_metadata.py",
-        "003_add_mode_to_sessions.py",
-        "007_configurable_intents_and_session_timeout.py",  # Consolidated migration for issues #115, #116, #117
-        "008_add_suitable_for_official_to_providers.py"  # Add suitable_for_official column for Work Mode provider filtering
+        "009_add_fallback_provider_to_routing.py",  # Add fallback_provider_id column for provider fallback support
+        "010_add_circuit_breaker_cooldown.py"  # Add circuit breaker cooldown columns for time-based auto-retry
     ]
 
     # Filter to only existing files

@@ -600,7 +600,8 @@ describe('API Layer Tests', () => {
         const result = await api.deleteIntent('test')
 
         expect(fetchMock).toHaveBeenCalledWith('/api/intents/test', {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: {}
         })
         expect(result).toEqual({ success: true })
       })

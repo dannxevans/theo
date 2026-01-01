@@ -180,6 +180,7 @@ def create_schema(meta: MetaData):
         Column("user_id", String, nullable=False),
         Column("intent", String, nullable=False),
         Column("provider_id", String, nullable=False),
+        Column("fallback_provider_id", String, nullable=True),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
 
@@ -199,6 +200,8 @@ def create_schema(meta: MetaData):
         Column("last_failure_at", DateTime, nullable=True),
         Column("health_status", String, default="unknown"),  # healthy, degraded, unhealthy, unknown
         Column("circuit_breaker_open", Boolean, default=False),
+        Column("circuit_breaker_opened_at", DateTime, nullable=True),  # when circuit breaker was opened
+        Column("circuit_breaker_cooldown_minutes", Integer, default=60),  # cooldown period in minutes
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
 

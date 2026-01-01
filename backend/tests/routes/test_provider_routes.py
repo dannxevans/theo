@@ -216,3 +216,95 @@ def test_update_provider_metadata_defaults(client, memory, sample_provider):
     metadata = memory.get_provider_metadata(sample_provider["id"])
     assert metadata["cost_per_1k_input_tokens"] == 0
     assert metadata["cost_per_1k_output_tokens"] == 0
+
+
+# ====================
+# Circuit Breaker Cooldown Tests
+# ====================
+
+def test_update_provider_metadata_with_cooldown(client, memory, sample_provider):
+    """Test update provider metadata with circuit breaker cooldown."""
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+        "cost_per_1k_input": 100,
+        "cost_per_1k_output": 300,
+        "circuit_breaker_cooldown_minutes": 90
+    })
+
+    assert response.status_code == 200
+    assert response.json["status"] == "ok"
+
+    # Verify cooldown was set
+    metadata = memory.get_provider_metadata(sample_provider["id"])
+    assert metadata["circuit_breaker_cooldown_minutes"] == 90
+
+
+def test_update_provider_metadata_cooldown_only(client, memory, sample_provider):
+    """Test update only circuit breaker cooldown without cost data."""
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+        "circuit_breaker_cooldown_minutes": 120
+    })
+
+    assert response.status_code == 200
+
+    # Verify cooldown was set
+    metadata = memory.get_provider_metadata(sample_provider["id"])
+    assert metadata["circuit_breaker_cooldown_minutes"] == 120
+
+
+def test_update_provider_metadata_cooldown_validation(client, memory, sample_provider):
+    """Test circuit breaker cooldown validation in metadata endpoint."""
+    # Test minimum value
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+        "circuit_breaker_cooldown_minutes": 0
+    })
+
+    assert response.status_code == 200
+    metadata = memory.get_provider_metadata(sample_provider["id"])
+    assert metadata["circuit_breaker_cooldown_minutes"] == 1  # Should be clamped to 1
+
+    # Test maximum value
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+        "circuit_breaker_cooldown_minutes": 2000
+    })
+
+    assert response.status_code == 200
+    metadata = memory.get_provider_metadata(sample_provider["id"])
+    assert metadata["circuit_breaker_cooldown_minutes"] == 1440  # Should be clamped to 1440
+
+
+def test_get_provider_metadata_includes_cooldown(client, memory, sample_provider):
+    """Test GET provider metadata includes cooldown information."""
+    # Set cooldown
+    memory.update_circuit_breaker_cooldown(sample_provider["id"], 75)
+
+    response = client.get(f"/api/providers/{sample_provider['id']}/metadata")
+
+    assert response.status_code == 200
+    data = response.json
+
+    assert "circuit_breaker_cooldown_minutes" in data
+    assert data["circuit_breaker_cooldown_minutes"] == 75
+
+
+def test_get_provider_metadata_includes_opened_at(client, memory, sample_provider):
+    """Test GET provider metadata includes circuit_breaker_opened_at."""
+    # Trigger circuit breaker - use log_request
+    for i in range(5):
+        memory.log_request(
+            session_id=f"session{i}",
+            provider_id=sample_provider["id"],
+            intent="general",
+            success=False,
+            latency_ms=0,
+            error_message="Test failure"
+        )
+
+    response = client.get(f"/api/providers/{sample_provider['id']}/metadata")
+
+    assert response.status_code == 200
+    data = response.json
+
+    assert "circuit_breaker_open" in data
+    assert "circuit_breaker_opened_at" in data
+    assert data["circuit_breaker_open"] is True
+    assert data["circuit_breaker_opened_at"] is not None

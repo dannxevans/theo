@@ -281,20 +281,31 @@ class ProviderOperations(BaseMemoryOperations):
             ).scalar()
 
             circuit_breaker_open = recent_failures >= 5
+            was_open = metadata.circuit_breaker_open if metadata else False
+
+            # Prepare update values
+            update_values = {
+                "total_requests": total,
+                "failed_requests": failed,
+                "avg_latency_ms": int(new_avg),
+                "last_success_at": now if success else metadata.last_success_at,
+                "last_failure_at": now if not success else metadata.last_failure_at,
+                "health_status": health_status,
+                "circuit_breaker_open": circuit_breaker_open,
+                "updated_at": now,
+            }
+
+            # Record timestamp when circuit breaker opens
+            if circuit_breaker_open and not was_open:
+                update_values["circuit_breaker_opened_at"] = now
+            # Clear timestamp when circuit breaker closes (successful request)
+            elif not circuit_breaker_open and success:
+                update_values["circuit_breaker_opened_at"] = None
 
             conn.execute(
                 update(self.provider_metadata)
                 .where(self.provider_metadata.c.provider_id == provider_id)
-                .values(
-                    total_requests=total,
-                    failed_requests=failed,
-                    avg_latency_ms=int(new_avg),
-                    last_success_at=now if success else metadata.last_success_at,
-                    last_failure_at=now if not success else metadata.last_failure_at,
-                    health_status=health_status,
-                    circuit_breaker_open=circuit_breaker_open,
-                    updated_at=now,
-                )
+                .values(**update_values)
             )
 
     def get_provider_health_summary(self):
@@ -313,6 +324,8 @@ class ProviderOperations(BaseMemoryOperations):
                 summary[row.provider_id] = {
                     "health_status": row.health_status,
                     "circuit_breaker_open": row.circuit_breaker_open,
+                    "circuit_breaker_opened_at": row.circuit_breaker_opened_at.isoformat() if hasattr(row, 'circuit_breaker_opened_at') and row.circuit_breaker_opened_at else None,
+                    "circuit_breaker_cooldown_minutes": getattr(row, 'circuit_breaker_cooldown_minutes', 60),
                     "total_requests": row.total_requests,
                     "failure_rate": round(failure_rate * 100, 2),
                     "avg_latency_ms": row.avg_latency_ms,
@@ -343,6 +356,36 @@ class ProviderOperations(BaseMemoryOperations):
                 )
             )
             conn.commit()
+
+    def update_circuit_breaker_cooldown(self, provider_id, cooldown_minutes):
+        """
+        Update circuit breaker cooldown period for a provider.
+
+        Args:
+            provider_id: Provider identifier
+            cooldown_minutes: Cooldown period in minutes (1-1440)
+        """
+        # Validate cooldown range
+        cooldown_minutes = max(1, min(1440, int(cooldown_minutes)))
+
+        with self._get_connection() as conn:
+            # Ensure metadata exists
+            existing = conn.execute(
+                select(self.provider_metadata.c.provider_id)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+            ).fetchone()
+
+            if not existing:
+                self.init_provider_metadata(provider_id)
+
+            conn.execute(
+                update(self.provider_metadata)
+                .where(self.provider_metadata.c.provider_id == provider_id)
+                .values(
+                    circuit_breaker_cooldown_minutes=cooldown_minutes,
+                    updated_at=datetime.utcnow(),
+                )
+            )
 
     def reset_all_provider_usage(self):
         """
