@@ -102,7 +102,30 @@ def delete_memory_endpoint(memory_id):
 
     memory = MemoryStore(Config.DATABASE_URL)
     memory.delete_memory("local", memory_id)
-    
+
+    return jsonify({"status": "ok"})
+
+
+@memory_bp.route("/memories/<int:memory_id>", methods=["PUT"])
+def update_memory_endpoint(memory_id):
+    """
+    Update a memory by ID.
+    Request body: { "type": "...", "key": "...", "value": "..." }
+    Returns: { "status": "ok" }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+    data = request.json
+
+    memory.update_memory(
+        user_id="local",
+        memory_id=memory_id,
+        memory_type=data.get("type"),
+        key=data.get("key"),
+        value=data.get("value"),
+    )
     return jsonify({"status": "ok"})
 
 

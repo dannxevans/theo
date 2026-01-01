@@ -185,7 +185,11 @@
         });
       }
 
-      cancelProviderForm();
+      if (editingProvider) {
+        cancelEdit();
+      } else {
+        cancelProviderForm();
+      }
       dispatch("reload");
     } catch (e) {
       providerError = e.message;
@@ -241,7 +245,24 @@
       console.error("Failed to load metadata:", e);
     }
 
-    showAddProviderForm = true;
+    // Don't show top form for inline editing
+  }
+
+  function cancelEdit() {
+    editingProvider = null;
+    providerForm = {
+      id: "",
+      name: "",
+      type: "",
+      base_url: "",
+      model: "",
+      api_key: "",
+      enabled: true,
+      cost_per_1k_input: "",
+      cost_per_1k_output: "",
+      circuit_breaker_cooldown_minutes: 60
+    };
+    providerError = null;
   }
 
   async function handleResetHealth(providerId) {
@@ -360,65 +381,137 @@
   {#if providersList.length > 0}
     <div class="providers-list">
       {#each providersList as p (p.id)}
-        <div class="provider-card">
-          <div class="provider-header">
-            <h3>{p.name}</h3>
-            <span class="health-badge" style="background-color: {getHealthBadge(p.id).color}">
-              {getHealthBadge(p.id).label}
-            </span>
-          </div>
-          <div class="provider-details">
-            <div><strong>ID:</strong> {p.id}</div>
-            <div><strong>Type:</strong> {p.type}</div>
-            {#if p.model}
-              <div><strong>Model:</strong> {p.model}</div>
-            {/if}
-            <div><strong>Status:</strong> {p.enabled ? "Enabled" : "Disabled"}</div>
-            {#if getHealthStats(p.id)}
-              <div class="health-stats">
-                <span>Requests: {getHealthStats(p.id).requests}</span>
-                <span>Failures: {getHealthStats(p.id).failureRate}%</span>
-                <span>Latency: {getHealthStats(p.id).avgLatency}ms</span>
-              </div>
-            {/if}
-          </div>
+        <div class="provider-card" class:editing={editingProvider === p.id}>
+          {#if editingProvider === p.id}
+            <!-- Inline Edit Mode -->
+            <div class="inline-edit-form">
+              <h3>Editing: {p.name}</h3>
 
-          <!-- OFFICIAL Classification Risk Assessment -->
-          {#if p.type !== 'mock'}
-            {@const riskAssessment = getProviderRiskAssessment(p.type, p.base_url)}
-            <div class="risk-assessment">
-              <div class="risk-header">
-                <strong>OFFICIAL Classification Risk Assessment</strong>
-                <span class="risk-badge" style="background-color: {getRiskLevelColor(riskAssessment.riskLevel)}">
-                  {riskAssessment.riskLevel} RISK
-                </span>
+              <div class="form-group">
+                <label>Name</label>
+                <input type="text" bind:value={providerForm.name} placeholder="e.g., Anthropic Claude"/>
               </div>
-              <div class="risk-details">
-                <div class="risk-row">
-                  <span class="risk-label">Data Location:</span>
-                  <span class="risk-value">{riskAssessment.dataLocation}</span>
-                </div>
-                <div class="risk-row">
-                  <span class="risk-label">Suitable for OFFICIAL:</span>
-                  <span class="risk-value" style="color: {riskAssessment.suitableForOfficial ? '#10b981' : '#ef4444'}">
-                    {riskAssessment.suitableForOfficial ? 'Yes' : 'No'}
-                  </span>
-                </div>
-                <div class="risk-notes">
-                  <p><strong>Notes:</strong> {riskAssessment.notes}</p>
-                  <p><strong>Recommendation:</strong> {riskAssessment.recommendation}</p>
-                </div>
+
+              <div class="form-group">
+                <label>Type</label>
+                <select bind:value={providerForm.type}>
+                  <option value="">Select type...</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="xai">xAI</option>
+                  <option value="mistral">Mistral</option>
+                  <option value="google">Google</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="mock">Mock (for testing)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Model</label>
+                <input type="text" bind:value={providerForm.model} placeholder="e.g., claude-3-5-sonnet-20241022"/>
+              </div>
+
+              <div class="form-group">
+                <label>Base URL (optional)</label>
+                <input type="text" bind:value={providerForm.base_url} placeholder="Custom API endpoint"/>
+              </div>
+
+              <div class="form-group">
+                <label>API Key (leave empty to keep existing)</label>
+                <input type="password" bind:value={providerForm.api_key} placeholder="sk-..."/>
+              </div>
+
+              <div class="form-group">
+                <label>Cost per 1K Input Tokens (USD)</label>
+                <input type="number" step="0.000001" min="0" bind:value={providerForm.cost_per_1k_input} placeholder="0.00"/>
+              </div>
+
+              <div class="form-group">
+                <label>Cost per 1K Output Tokens (USD)</label>
+                <input type="number" step="0.000001" min="0" bind:value={providerForm.cost_per_1k_output} placeholder="0.00"/>
+              </div>
+
+              <div class="form-group">
+                <label>Circuit Breaker Cooldown (minutes)</label>
+                <input type="number" step="1" min="1" max="1440" bind:value={providerForm.circuit_breaker_cooldown_minutes} placeholder="60"/>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" bind:checked={providerForm.enabled}/> Enabled
+                </label>
+              </div>
+
+              {#if providerError}
+                <div class="save-status error">{providerError}</div>
+              {/if}
+
+              <div class="form-actions">
+                <button class="btn-small btn-primary" on:click={saveProvider}>Save</button>
+                <button class="btn-small btn-secondary" on:click={cancelEdit}>Cancel</button>
               </div>
             </div>
-          {/if}
+          {:else}
+            <!-- View Mode -->
+            <div class="provider-header">
+              <h3>{p.name}</h3>
+              <span class="health-badge" style="background-color: {getHealthBadge(p.id).color}">
+                {getHealthBadge(p.id).label}
+              </span>
+            </div>
+            <div class="provider-details">
+              <div><strong>ID:</strong> {p.id}</div>
+              <div><strong>Type:</strong> {p.type}</div>
+              {#if p.model}
+                <div><strong>Model:</strong> {p.model}</div>
+              {/if}
+              <div><strong>Status:</strong> {p.enabled ? "Enabled" : "Disabled"}</div>
+              {#if getHealthStats(p.id)}
+                <div class="health-stats">
+                  <span>Requests: {getHealthStats(p.id).requests}</span>
+                  <span>Failures: {getHealthStats(p.id).failureRate}%</span>
+                  <span>Latency: {getHealthStats(p.id).avgLatency}ms</span>
+                </div>
+              {/if}
+            </div>
 
-          <div class="provider-actions">
-            <button class="btn-small" on:click={() => editProvider(p)}>Edit</button>
-            {#if getHealthStats(p.id) && (getHealthStats(p.id).failureRate > 0 || healthSummary[p.id]?.circuit_breaker_open)}
-              <button class="btn-small btn-warning" on:click={() => handleResetHealth(p.id)}>Reset Health</button>
+            <!-- OFFICIAL Classification Risk Assessment -->
+            {#if p.type !== 'mock'}
+              {@const riskAssessment = getProviderRiskAssessment(p.type, p.base_url)}
+              <div class="risk-assessment">
+                <div class="risk-header">
+                  <strong>OFFICIAL Classification Risk Assessment</strong>
+                  <span class="risk-badge" style="background-color: {getRiskLevelColor(riskAssessment.riskLevel)}">
+                    {riskAssessment.riskLevel} RISK
+                  </span>
+                </div>
+                <div class="risk-details">
+                  <div class="risk-row">
+                    <span class="risk-label">Data Location:</span>
+                    <span class="risk-value">{riskAssessment.dataLocation}</span>
+                  </div>
+                  <div class="risk-row">
+                    <span class="risk-label">Suitable for OFFICIAL:</span>
+                    <span class="risk-value" style="color: {riskAssessment.suitableForOfficial ? '#10b981' : '#ef4444'}">
+                      {riskAssessment.suitableForOfficial ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div class="risk-notes">
+                    <p><strong>Notes:</strong> {riskAssessment.notes}</p>
+                    <p><strong>Recommendation:</strong> {riskAssessment.recommendation}</p>
+                  </div>
+                </div>
+              </div>
             {/if}
-            <button class="btn-small btn-danger" on:click={() => handleDeleteProvider(p.id)}>Delete</button>
-          </div>
+
+            <div class="provider-actions">
+              <button class="btn-small" on:click={() => editProvider(p)}>Edit</button>
+              {#if getHealthStats(p.id) && (getHealthStats(p.id).failureRate > 0 || healthSummary[p.id]?.circuit_breaker_open)}
+                <button class="btn-small btn-warning" on:click={() => handleResetHealth(p.id)}>Reset Health</button>
+              {/if}
+              <button class="btn-small btn-danger" on:click={() => handleDeleteProvider(p.id)}>Delete</button>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -491,6 +584,11 @@
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     background: var(--bg-tertiary);
+  }
+
+  .provider-card.editing {
+    border-color: var(--info-500);
+    background: var(--info-50);
   }
 
   .provider-header {
@@ -608,5 +706,38 @@
 
   .risk-notes strong {
     color: var(--text-primary);
+  }
+
+  /* Inline Edit Form Styling */
+  .inline-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .inline-edit-form h3 {
+    margin: 0 0 var(--space-3) 0;
+    color: var(--text-primary);
+    font-size: var(--font-size-lg);
+  }
+
+  .inline-edit-form .form-group {
+    margin-bottom: var(--space-3);
+  }
+
+  .inline-edit-form .form-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .save-status.error {
+    padding: var(--space-2);
+    background: var(--error-50);
+    border: 1px solid var(--error-500);
+    border-radius: var(--radius-sm);
+    color: var(--error-600);
+    font-size: var(--font-size-sm);
+    margin-top: var(--space-2);
   }
 </style>

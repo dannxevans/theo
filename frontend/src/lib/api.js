@@ -587,6 +587,27 @@ export async function deleteMemory(memoryId) {
   return response.json();
 }
 
+export async function updateMemory(memoryId, { type, key, value }) {
+  const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      type,
+      key,
+      value
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update memory");
+  }
+
+  return response.json();
+}
+
 export async function pinMemory(memoryId, pinned) {
   const response = await fetch(`${API_BASE}/api/memories/${memoryId}/pin`, {
     method: "POST",

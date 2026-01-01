@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { getMemories, createMemory, deleteMemory, pinMemory } from "../lib/api.js";
+  import { getMemories, createMemory, deleteMemory, pinMemory, updateMemory } from "../lib/api.js";
 
   let memories = [];
   let loading = true;
@@ -13,6 +13,8 @@
   };
 
   let showAddForm = false;
+  let editingMemoryId = null;
+  let editMemory = null;
 
   onMount(async () => {
     await loadMemories();
@@ -64,6 +66,37 @@
       await loadMemories();
     } catch (err) {
       console.error("Failed to toggle pin", err);
+    }
+  }
+
+  function startEditMemory(mem) {
+    editingMemoryId = mem.id;
+    editMemory = {
+      type: mem.type,
+      key: mem.key,
+      value: mem.value
+    };
+  }
+
+  function cancelEdit() {
+    editingMemoryId = null;
+    editMemory = null;
+  }
+
+  async function saveEdit(memoryId) {
+    if (!editMemory.key.trim() || !editMemory.value.trim()) {
+      alert("Key and value are required");
+      return;
+    }
+
+    try {
+      await updateMemory(memoryId, editMemory);
+      await loadMemories();
+      editingMemoryId = null;
+      editMemory = null;
+    } catch (err) {
+      console.error("Failed to update memory", err);
+      alert("Failed to update memory");
     }
   }
 
@@ -185,20 +218,52 @@
   {:else}
     <div class="memory-list">
       {#each memories as mem (mem.id)}
-        <div class="memory-item" class:pinned={mem.pinned}>
+        <div class="memory-item" class:pinned={mem.pinned} class:editing={editingMemoryId === mem.id}>
           <div class="memory-header-row">
-            <span class="memory-type" style="background-color: {getTypeColor(mem.type)}">
-              {mem.type}
-            </span>
+            {#if editingMemoryId === mem.id}
+              <select bind:value={editMemory.type} class="edit-type-select">
+                <option value="fact">fact</option>
+                <option value="preference">preference</option>
+                <option value="goal">goal</option>
+                <option value="context">context</option>
+              </select>
+            {:else}
+              <span class="memory-type" style="background-color: {getTypeColor(mem.type)}">
+                {mem.type}
+              </span>
+            {/if}
             {#if mem.pinned}
               <span class="pin-badge">📌 Pinned</span>
             {/if}
             <span class="memory-score">Score: {mem.relevance_score}</span>
           </div>
 
-          <div class="memory-content">
-            <strong>{mem.key}:</strong> {mem.value}
-          </div>
+          {#if editingMemoryId === mem.id}
+            <div class="memory-edit-form">
+              <div class="edit-field">
+                <label>Key:</label>
+                <input
+                  type="text"
+                  bind:value={editMemory.key}
+                  class="edit-input"
+                  placeholder="Memory key"
+                />
+              </div>
+              <div class="edit-field">
+                <label>Value:</label>
+                <textarea
+                  bind:value={editMemory.value}
+                  class="edit-textarea"
+                  placeholder="Memory value"
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+          {:else}
+            <div class="memory-content">
+              <strong>{mem.key}:</strong> {mem.value}
+            </div>
+          {/if}
 
           <div class="memory-meta">
             <span>Created {formatDate(mem.created_at)}</span>
@@ -209,18 +274,39 @@
           </div>
 
           <div class="memory-actions">
-            <button
-              class="btn-pin"
-              on:click={() => handleTogglePin(mem.id, mem.pinned)}
-            >
-              {mem.pinned ? "Unpin" : "Pin"}
-            </button>
-            <button
-              class="btn-delete"
-              on:click={() => handleDeleteMemory(mem.id)}
-            >
-              Delete
-            </button>
+            {#if editingMemoryId === mem.id}
+              <button
+                class="btn-save"
+                on:click={() => saveEdit(mem.id)}
+              >
+                Save
+              </button>
+              <button
+                class="btn-cancel"
+                on:click={cancelEdit}
+              >
+                Cancel
+              </button>
+            {:else}
+              <button
+                class="btn-edit"
+                on:click={() => startEditMemory(mem)}
+              >
+                Edit
+              </button>
+              <button
+                class="btn-pin"
+                on:click={() => handleTogglePin(mem.id, mem.pinned)}
+              >
+                {mem.pinned ? "Unpin" : "Pin"}
+              </button>
+              <button
+                class="btn-delete"
+                on:click={() => handleDeleteMemory(mem.id)}
+              >
+                Delete
+              </button>
+            {/if}
           </div>
         </div>
       {/each}
@@ -430,6 +516,110 @@
     background: #fee2e2;
     border-color: #f87171;
     color: #dc2626;
+  }
+
+  .btn-edit {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-edit:hover {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    color: #1e40af;
+  }
+
+  .btn-save {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border: 1px solid #10b981;
+    background: #10b981;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-save:hover {
+    background: #059669;
+    border-color: #059669;
+  }
+
+  .btn-cancel {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-cancel:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+
+  .memory-item.editing {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .edit-type-select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
+    background: white;
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .memory-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .edit-field label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .edit-input,
+  .edit-textarea {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+
+  .edit-input:focus,
+  .edit-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .edit-textarea {
+    resize: vertical;
+    min-height: 60px;
   }
 
   @media (max-width: 640px) {
