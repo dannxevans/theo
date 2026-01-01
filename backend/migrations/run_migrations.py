@@ -37,9 +37,10 @@ def run_all_migrations():
     print()
 
     if not os.path.exists(db_path):
-        print(f"ERROR: Database not found at {db_path}")
-        print("The database will be created when you first run the backend.")
-        return False
+        print(f"Database not found at {db_path}")
+        print("Skipping migrations - database will be created on first run.")
+        print()
+        return True
 
     # Get all migration files in order
     migration_files = [
