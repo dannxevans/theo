@@ -25,13 +25,28 @@ def get_db_path():
         return str(data_dir / "theo.db")
 
 
-def migrate():
+def run_migration():
     """Add feature_provider_usage_logs table."""
     db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    print("[MIGRATION 012] Starting migration...")
+    print(f"[MIGRATION 012] Database: {db_path}")
+
+    # Check if table already exists
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='feature_provider_usage_logs'
+    """)
+
+    if cursor.fetchone():
+        print("[MIGRATION 012] ✓ feature_provider_usage_logs table already exists, skipping")
+        conn.close()
+        return True
+
     # Create feature_provider_usage_logs table
+    print("[MIGRATION 012] Creating feature_provider_usage_logs table...")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS feature_provider_usage_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +60,7 @@ def migrate():
     """)
 
     # Create index for faster queries
+    print("[MIGRATION 012] Creating indexes...")
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_feature_provider_usage_user_provider
         ON feature_provider_usage_logs(user_id, provider_type)
@@ -58,8 +74,16 @@ def migrate():
     conn.commit()
     conn.close()
 
-    print("Migration 012 completed: feature_provider_usage_logs table created")
+    print("[MIGRATION 012] ✓ Migration completed successfully")
+    return True
 
 
 if __name__ == "__main__":
-    migrate()
+    import sys
+    if len(sys.argv) > 1:
+        # Override get_db_path when called from migration runner
+        global get_db_path
+        db_arg = sys.argv[1]
+        get_db_path = lambda: db_arg
+
+    run_migration()
