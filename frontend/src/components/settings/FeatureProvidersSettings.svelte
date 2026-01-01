@@ -11,6 +11,16 @@
       apiKeyLabel: "OpenWeather API Key",
       signupUrl: "https://openweathermap.org/api",
       docsUrl: "https://openweathermap.org/current"
+    },
+    {
+      type: "here",
+      name: "HERE",
+      description: "Routing, navigation, and traffic information",
+      apiKeyLabel: "HERE API Key",
+      appIdLabel: "HERE APP ID",
+      requiresAppId: true,
+      signupUrl: "https://developer.here.com/",
+      docsUrl: "https://developer.here.com/documentation/routing-api/8.16.0/dev_guide/index.html"
     }
   ];
 
@@ -23,9 +33,12 @@
   PROVIDERS.forEach(provider => {
     providerStates[provider.type] = {
       apiKey: "",
+      appId: "",
       isEnabled: false,
       hasApiKey: false,
+      hasAppId: false,
       showApiKey: false,
+      showAppId: false,
       saving: false
     };
   });
@@ -41,6 +54,7 @@
         const config = await getFeatureProvider(provider.type);
         if (config) {
           providerStates[provider.type].hasApiKey = config.has_api_key;
+          providerStates[provider.type].hasAppId = config.has_app_id || false;
           providerStates[provider.type].isEnabled = config.is_enabled;
         }
       }
@@ -60,6 +74,11 @@
       return;
     }
 
+    if (provider.requiresAppId && !state.appId && !state.hasAppId) {
+      alert(`Please enter your ${provider.name} APP ID`);
+      return;
+    }
+
     state.saving = true;
     saveStatus = null;
 
@@ -74,6 +93,11 @@
         config.api_key = state.apiKey;
       }
 
+      // Only include APP ID if it was entered/changed
+      if (state.appId) {
+        config.app_id = state.appId;
+      }
+
       await configureFeatureProvider(providerType, config);
 
       // Update state
@@ -81,6 +105,12 @@
         state.hasApiKey = true;
         state.apiKey = ""; // Clear the input after saving
         state.showApiKey = false;
+      }
+
+      if (state.appId) {
+        state.hasAppId = true;
+        state.appId = ""; // Clear the input after saving
+        state.showAppId = false;
       }
 
       saveStatus = `${provider.name} configuration saved!`;
@@ -98,6 +128,10 @@
 
   function toggleApiKeyVisibility(providerType) {
     providerStates[providerType].showApiKey = !providerStates[providerType].showApiKey;
+  }
+
+  function toggleAppIdVisibility(providerType) {
+    providerStates[providerType].showAppId = !providerStates[providerType].showAppId;
   }
 </script>
 
@@ -128,6 +162,39 @@
         </div>
 
         <div class="provider-config">
+          {#if provider.requiresAppId}
+            <div class="form-group">
+              <label for="{provider.type}-app-id">{provider.appIdLabel}</label>
+              <div class="api-key-input-group">
+                {#if providerStates[provider.type].showAppId}
+                  <input
+                    id="{provider.type}-app-id"
+                    type="text"
+                    bind:value={providerStates[provider.type].appId}
+                    placeholder={providerStates[provider.type].hasAppId ? "••••••••••••••••" : "Enter your APP ID"}
+                    disabled={providerStates[provider.type].saving}
+                  />
+                {:else}
+                  <input
+                    id="{provider.type}-app-id"
+                    type="password"
+                    bind:value={providerStates[provider.type].appId}
+                    placeholder={providerStates[provider.type].hasAppId ? "••••••••••••••••" : "Enter your APP ID"}
+                    disabled={providerStates[provider.type].saving}
+                  />
+                {/if}
+                <button
+                  type="button"
+                  class="toggle-visibility"
+                  on:click={() => toggleAppIdVisibility(provider.type)}
+                  disabled={providerStates[provider.type].saving}
+                >
+                  {providerStates[provider.type].showAppId ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+          {/if}
+
           <div class="form-group">
             <label for="{provider.type}-api-key">{provider.apiKeyLabel}</label>
             <div class="api-key-input-group">
@@ -170,12 +237,12 @@
               <input
                 type="checkbox"
                 bind:checked={providerStates[provider.type].isEnabled}
-                disabled={providerStates[provider.type].saving || !providerStates[provider.type].hasApiKey}
+                disabled={providerStates[provider.type].saving || !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId)}
               />
               <span>Enable {provider.name} integration</span>
             </label>
-            {#if !providerStates[provider.type].hasApiKey}
-              <small class="form-help">Configure API key first to enable</small>
+            {#if !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId)}
+              <small class="form-help">Configure credentials first to enable</small>
             {/if}
           </div>
 

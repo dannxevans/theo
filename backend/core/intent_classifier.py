@@ -85,7 +85,7 @@ class IntentClassifier:
 
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
-            "read_calendar", "compose_email", "read_email", "weather"
+            "read_calendar", "compose_email", "read_email", "weather", "routing"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -276,6 +276,29 @@ class IntentClassifier:
                 # Check if there's a location indicator nearby
                 if any(loc in text_l for loc in location_indicators):
                     return "weather", 0.85
+
+        # Routing keywords
+        routing_keywords = [
+            "route from", "route to", "directions from", "directions to",
+            "how do i get from", "how do i get to", "how to get from",
+            "how to get to", "navigate from", "navigate to",
+            "distance from", "distance to", "drive from", "drive to",
+            "travel from", "travel to"
+        ]
+
+        for keyword in routing_keywords:
+            if keyword in text_l:
+                return "routing", 0.90
+
+        # Check for simple routing queries
+        routing_simple = ["route", "directions", "navigate", "navigation"]
+        route_indicators = ["from", "to", "between"]
+
+        for route_word in routing_simple:
+            if route_word in text_l:
+                # Check if there's a route indicator nearby
+                if any(ind in text_l for ind in route_indicators):
+                    return "routing", 0.85
 
         # Check user-defined intents (if memory available)
         if self.memory:

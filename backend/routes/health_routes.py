@@ -173,10 +173,87 @@ def get_health_overview():
             "booking_url": booking_url
         })
 
+    # Get feature providers
+    import sqlite3
+    db_path = Config.DATABASE_URL.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, provider_type, provider_name, is_enabled, created_at, updated_at
+        FROM feature_providers
+        WHERE user_id = ?
+    """, (str(user["id"]),))
+
+    feature_providers = []
+    prefs = memory.get_all(str(user["id"]))
+
+    for row in cursor.fetchall():
+        # Check for API key and APP ID
+        api_key_name = f"feature_provider_{row['provider_type']}_api_key"
+        app_id_name = f"feature_provider_{row['provider_type']}_app_id"
+
+        has_api_key = api_key_name in prefs and bool(prefs[api_key_name])
+        has_app_id = app_id_name in prefs and bool(prefs[app_id_name])
+
+        # Get usage statistics from logs
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
+                AVG(latency_ms) as avg_latency_ms,
+                MAX(CASE WHEN success = 1 THEN created_at ELSE NULL END) as last_success_at,
+                MAX(CASE WHEN success = 0 THEN created_at ELSE NULL END) as last_failure_at
+            FROM feature_provider_usage_logs
+            WHERE user_id = ? AND provider_type = ?
+        """, (str(user["id"]), row["provider_type"]))
+
+        usage_stats = cursor.fetchone()
+        total_requests = usage_stats["total_requests"] or 0
+        failed_requests = usage_stats["failed_requests"] or 0
+        success_rate = ((total_requests - failed_requests) / total_requests * 100) if total_requests > 0 else 0
+        avg_latency_ms = int(usage_stats["avg_latency_ms"]) if usage_stats["avg_latency_ms"] else 0
+
+        # Determine health status based on API key, enabled state, and success rate
+        health_status = "unknown"
+        if has_api_key and row["is_enabled"]:
+            if total_requests == 0:
+                health_status = "unknown"
+            elif success_rate >= 95:
+                health_status = "healthy"
+            elif success_rate >= 70:
+                health_status = "warning"
+            else:
+                health_status = "error"
+        elif row["is_enabled"]:
+            health_status = "warning"  # Enabled but no API key
+        else:
+            health_status = "disabled"
+
+        feature_providers.append({
+            "id": row["id"],
+            "provider_type": row["provider_type"],
+            "provider_name": row["provider_name"],
+            "is_enabled": bool(row["is_enabled"]),
+            "health_status": health_status,
+            "total_requests": total_requests,
+            "failed_requests": failed_requests,
+            "success_rate": round(success_rate, 2),
+            "avg_latency_ms": avg_latency_ms,
+            "last_success_at": usage_stats["last_success_at"],
+            "last_failure_at": usage_stats["last_failure_at"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]
+        })
+
+    conn.close()
+
     return jsonify({
         "ai_providers": ai_providers,
         "m365_integration": m365_integration,
-        "service_providers": service_providers
+        "service_providers": service_providers,
+        "feature_providers": feature_providers
     })
 
 
