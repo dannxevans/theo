@@ -97,8 +97,8 @@ class ProviderRegistry:
             with self.memory.engine.begin() as conn:
                 result = conn.execute(
                     select(self.memory.routing_preferences.c.provider_id, self.memory.routing_preferences.c.fallback_provider_id)
-                    .where(self.memory.routing_preferences.c.task_category == 'system')
-                    .where(self.memory.routing_preferences.c.user_id == 1)
+                    .where(self.memory.routing_preferences.c.intent == 'system')
+                    .where(self.memory.routing_preferences.c.user_id == '1')
                 ).fetchone()
 
                 if result:
@@ -115,8 +115,10 @@ class ProviderRegistry:
                         fallback = self.get(fallback_id)
                         if fallback and fallback.get('enabled', True):
                             return fallback
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the exception for debugging
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to get system provider from routing preferences: {e}")
 
         # Default: return first enabled provider
         providers = self.list()
