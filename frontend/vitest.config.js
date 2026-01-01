@@ -6,15 +6,11 @@ export default defineConfig({
   plugins: [svelte({ hot: !process.env.VITEST })],
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
     setupFiles: ['./tests/setup.js'],
     watch: false,
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true
-      }
-    },
+    singleThread: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json'],

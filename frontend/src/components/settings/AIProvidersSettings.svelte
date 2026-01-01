@@ -20,7 +20,8 @@
     api_key: "",
     enabled: true,
     cost_per_1k_input: "",
-    cost_per_1k_output: ""
+    cost_per_1k_output: "",
+    circuit_breaker_cooldown_minutes: 60
   };
 
   function getHealthBadge(providerId) {
@@ -160,15 +161,17 @@
       }
       await upsertProvider(providerData);
 
-      // Save cost metadata if provided
+      // Save cost metadata and circuit breaker configuration if provided
       const inputCost = parseFloat(providerForm.cost_per_1k_input) || 0;
       const outputCost = parseFloat(providerForm.cost_per_1k_output) || 0;
+      const cooldownMinutes = parseInt(providerForm.circuit_breaker_cooldown_minutes) || 60;
 
-      if (inputCost > 0 || outputCost > 0) {
+      if (inputCost > 0 || outputCost > 0 || cooldownMinutes !== 60) {
         // Convert USD to micro-dollars (multiply by 1,000,000)
-        const costData = {
+        const metadataData = {
           cost_per_1k_input: Math.round(inputCost * 1000000),
-          cost_per_1k_output: Math.round(outputCost * 1000000)
+          cost_per_1k_output: Math.round(outputCost * 1000000),
+          circuit_breaker_cooldown_minutes: cooldownMinutes
         };
 
         const token = localStorage.getItem("auth_token");
@@ -178,7 +181,7 @@
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify(costData)
+          body: JSON.stringify(metadataData)
         });
       }
 
@@ -213,10 +216,11 @@
       api_key: "", // never prefill secrets
       enabled: p.enabled,
       cost_per_1k_input: "",
-      cost_per_1k_output: ""
+      cost_per_1k_output: "",
+      circuit_breaker_cooldown_minutes: 60
     };
 
-    // Fetch existing cost metadata
+    // Fetch existing cost metadata and circuit breaker config
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(`${API_BASE}/api/providers/${p.id}/metadata`, {
@@ -230,9 +234,11 @@
         // Convert micro-dollars back to USD
         providerForm.cost_per_1k_input = (metadata.cost_per_1k_input_tokens / 1000000).toFixed(6);
         providerForm.cost_per_1k_output = (metadata.cost_per_1k_output_tokens / 1000000).toFixed(6);
+        // Load circuit breaker cooldown
+        providerForm.circuit_breaker_cooldown_minutes = metadata.circuit_breaker_cooldown_minutes || 60;
       }
     } catch (e) {
-      console.error("Failed to load cost metadata:", e);
+      console.error("Failed to load metadata:", e);
     }
 
     showAddProviderForm = true;
@@ -330,6 +336,11 @@
         <label for="provider-cost-output">Cost per 1K Output Tokens (USD)</label>
         <input id="provider-cost-output" type="number" step="0.000001" min="0" bind:value={providerForm.cost_per_1k_output} placeholder="0.00"/>
         <p class="hint">Cost in USD for every 1,000 output tokens. Leave as 0 for free providers.</p>
+      </div>
+      <div class="form-group">
+        <label for="provider-cooldown">Circuit Breaker Cooldown (minutes)</label>
+        <input id="provider-cooldown" type="number" step="1" min="1" max="1440" bind:value={providerForm.circuit_breaker_cooldown_minutes} placeholder="60"/>
+        <p class="hint">After 5 consecutive failures, wait this many minutes before automatically retrying the provider. Default: 60 minutes.</p>
       </div>
       <div class="form-group">
         <label class="checkbox-label">

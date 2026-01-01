@@ -112,8 +112,12 @@ def get_provider_metadata_endpoint(provider_id):
 @provider_bp.route("/<provider_id>/metadata", methods=["POST"])
 def update_provider_metadata_endpoint(provider_id):
     """
-    Update cost metadata for a provider.
-    Request body: { "cost_per_1k_input": N, "cost_per_1k_output": N }
+    Update cost metadata and circuit breaker settings for a provider.
+    Request body: {
+        "cost_per_1k_input": N,
+        "cost_per_1k_output": N,
+        "circuit_breaker_cooldown_minutes": N
+    }
     Returns: { "status": "ok" }
     """
     from app import memory
@@ -125,6 +129,13 @@ def update_provider_metadata_endpoint(provider_id):
         cost_per_1k_input=data.get("cost_per_1k_input", 0),
         cost_per_1k_output=data.get("cost_per_1k_output", 0),
     )
+
+    # Update circuit breaker cooldown if provided
+    if "circuit_breaker_cooldown_minutes" in data:
+        memory.update_circuit_breaker_cooldown(
+            provider_id,
+            data["circuit_breaker_cooldown_minutes"]
+        )
 
     return jsonify({"status": "ok"})
 

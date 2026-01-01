@@ -37,6 +37,66 @@ class OpenAITTSProvider(TTSProvider):
         self.model = model
         self.default_voice = "alloy"
 
+    def _chunk_text(self, text: str, max_length: int = 4000) -> List[str]:
+        """
+        Split text into chunks that respect sentence boundaries.
+
+        Args:
+            text: Text to split
+            max_length: Maximum characters per chunk (default 4000, leaving buffer for 4096 limit)
+
+        Returns:
+            List of text chunks
+        """
+        if len(text) <= max_length:
+            return [text]
+
+        chunks = []
+        # Split on sentence boundaries (period, question mark, exclamation)
+        sentences = []
+        current_sentence = ""
+
+        for char in text:
+            current_sentence += char
+            if char in '.!?\n' and len(current_sentence.strip()) > 0:
+                sentences.append(current_sentence)
+                current_sentence = ""
+
+        # Add any remaining text
+        if current_sentence.strip():
+            sentences.append(current_sentence)
+
+        # Group sentences into chunks
+        current_chunk = ""
+        for sentence in sentences:
+            # If single sentence exceeds max_length, split it
+            if len(sentence) > max_length:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = ""
+                # Split long sentence by words
+                words = sentence.split()
+                word_chunk = ""
+                for word in words:
+                    if len(word_chunk) + len(word) + 1 <= max_length:
+                        word_chunk += (" " if word_chunk else "") + word
+                    else:
+                        if word_chunk:
+                            chunks.append(word_chunk)
+                        word_chunk = word
+                if word_chunk:
+                    chunks.append(word_chunk)
+            elif len(current_chunk) + len(sentence) <= max_length:
+                current_chunk += sentence
+            else:
+                chunks.append(current_chunk)
+                current_chunk = sentence
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
     def synthesize(
         self,
         text: str,
@@ -46,6 +106,7 @@ class OpenAITTSProvider(TTSProvider):
     ) -> bytes:
         """
         Convert text to speech using OpenAI TTS.
+        Automatically chunks text longer than 4096 characters.
 
         Args:
             text: Text to convert to speech
@@ -79,21 +140,48 @@ class OpenAITTSProvider(TTSProvider):
             output_format = "mp3"
 
         try:
-            logging.info(f"[TTS] Synthesizing {len(text)} chars with voice '{selected_voice}', speed {speed}")
+            # Check if text needs chunking
+            if len(text) > 4000:
+                logging.info(f"[TTS] Text length {len(text)} exceeds limit, chunking into smaller parts")
+                chunks = self._chunk_text(text, max_length=4000)
+                logging.info(f"[TTS] Split into {len(chunks)} chunks")
 
-            response = self.client.audio.speech.create(
-                model=self.model,
-                voice=selected_voice,
-                input=text,
-                speed=speed,
-                response_format=output_format
-            )
+                # Synthesize each chunk
+                audio_chunks = []
+                for i, chunk in enumerate(chunks):
+                    logging.info(f"[TTS] Synthesizing chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
 
-            # Convert response to bytes
-            audio_bytes = response.read()
+                    response = self.client.audio.speech.create(
+                        model=self.model,
+                        voice=selected_voice,
+                        input=chunk,
+                        speed=speed,
+                        response_format=output_format
+                    )
 
-            logging.info(f"[TTS] Generated {len(audio_bytes)} bytes of audio")
-            return audio_bytes
+                    audio_chunks.append(response.read())
+
+                # Concatenate audio chunks
+                audio_bytes = b''.join(audio_chunks)
+                logging.info(f"[TTS] Generated {len(audio_bytes)} bytes of audio from {len(chunks)} chunks")
+                return audio_bytes
+            else:
+                # Single request for short text
+                logging.info(f"[TTS] Synthesizing {len(text)} chars with voice '{selected_voice}', speed {speed}")
+
+                response = self.client.audio.speech.create(
+                    model=self.model,
+                    voice=selected_voice,
+                    input=text,
+                    speed=speed,
+                    response_format=output_format
+                )
+
+                # Convert response to bytes
+                audio_bytes = response.read()
+
+                logging.info(f"[TTS] Generated {len(audio_bytes)} bytes of audio")
+                return audio_bytes
 
         except Exception as e:
             logging.error(f"[TTS] Synthesis failed: {e}")

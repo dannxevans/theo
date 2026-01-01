@@ -18,7 +18,7 @@ def test_get_routing_preferences(client, memory, sample_intent, sample_provider)
     data = response.json
     assert isinstance(data, dict)
     assert sample_intent["id"] in data
-    assert data[sample_intent["id"]] == sample_provider["id"]
+    assert data[sample_intent["id"]]["provider_id"] == sample_provider["id"]
 
 
 def test_get_routing_preferences_empty(client):
@@ -44,7 +44,7 @@ def test_set_routing_preference(client, memory, sample_intent, sample_provider):
     # Verify set
     prefs = memory.get_routing_preferences("local")
     assert sample_intent["id"] in prefs
-    assert prefs[sample_intent["id"]] == sample_provider["id"]
+    assert prefs[sample_intent["id"]]["provider_id"] == sample_provider["id"]
 
 
 def test_set_routing_preference_update(client, memory, sample_intent, sample_provider):
@@ -138,5 +138,164 @@ def test_routing_preferences_multiple_intents(client, memory):
     # Verify both preferences exist
     assert "coding" in data
     assert "creative" in data
-    assert data["coding"] == "provider1"
-    assert data["creative"] == "provider2"
+    assert data["coding"]["provider_id"] == "provider1"
+    assert data["creative"]["provider_id"] == "provider2"
+
+
+# ====================
+# Fallback Provider Tests
+# ====================
+
+def test_set_routing_preference_with_fallback(client, memory, sample_intent):
+    """Test set routing preference with fallback provider."""
+    # Create providers
+    memory.upsert_provider({
+        "id": "primary",
+        "name": "Primary Provider",
+        "type": "openai",
+        "enabled": True
+    })
+    memory.upsert_provider({
+        "id": "fallback",
+        "name": "Fallback Provider",
+        "type": "anthropic",
+        "enabled": True
+    })
+
+    response = client.post("/api/routing", json={
+        "intent": sample_intent["id"],
+        "provider_id": "primary",
+        "fallback_provider_id": "fallback"
+    })
+
+    assert response.status_code == 200
+    assert response.json["status"] == "ok"
+
+    # Verify both primary and fallback are set
+    prefs = memory.get_routing_preferences("local")
+    assert sample_intent["id"] in prefs
+    assert prefs[sample_intent["id"]]["provider_id"] == "primary"
+    assert prefs[sample_intent["id"]]["fallback_provider_id"] == "fallback"
+
+
+def test_set_routing_preference_fallback_optional(client, memory, sample_intent):
+    """Test set routing preference without fallback (optional)."""
+    memory.upsert_provider({
+        "id": "primary",
+        "name": "Primary Provider",
+        "type": "openai",
+        "enabled": True
+    })
+
+    response = client.post("/api/routing", json={
+        "intent": sample_intent["id"],
+        "provider_id": "primary"
+    })
+
+    assert response.status_code == 200
+
+    # Verify only primary is set, no fallback
+    fallback = memory.get_fallback_provider("local", sample_intent["id"])
+    assert fallback is None
+
+
+def test_update_routing_preference_with_fallback(client, memory, sample_intent):
+    """Test update routing preference to add fallback."""
+    # Create providers
+    memory.upsert_provider({
+        "id": "primary",
+        "name": "Primary Provider",
+        "type": "openai",
+        "enabled": True
+    })
+    memory.upsert_provider({
+        "id": "fallback",
+        "name": "Fallback Provider",
+        "type": "anthropic",
+        "enabled": True
+    })
+
+    # Set without fallback
+    client.post("/api/routing", json={
+        "intent": sample_intent["id"],
+        "provider_id": "primary"
+    })
+
+    # Update to add fallback
+    response = client.post("/api/routing", json={
+        "intent": sample_intent["id"],
+        "provider_id": "primary",
+        "fallback_provider_id": "fallback"
+    })
+
+    assert response.status_code == 200
+
+    # Verify fallback was added
+    fallback = memory.get_fallback_provider("local", sample_intent["id"])
+    assert fallback == "fallback"
+
+
+def test_get_routing_preferences_includes_fallback(client, memory):
+    """Test GET routing preferences includes fallback information."""
+    # Create providers
+    memory.upsert_provider({
+        "id": "primary",
+        "name": "Primary Provider",
+        "type": "openai",
+        "enabled": True
+    })
+    memory.upsert_provider({
+        "id": "fallback",
+        "name": "Fallback Provider",
+        "type": "anthropic",
+        "enabled": True
+    })
+
+    # Set routing with fallback
+    client.post("/api/routing", json={
+        "intent": "general",
+        "provider_id": "primary",
+        "fallback_provider_id": "fallback"
+    })
+
+    # Get preferences
+    response = client.get("/api/routing")
+
+    assert response.status_code == 200
+    data = response.json
+
+    assert "general" in data
+    assert data["general"]["provider_id"] == "primary"
+    assert data["general"]["fallback_provider_id"] == "fallback"
+
+
+def test_delete_routing_preference_removes_fallback(client, memory, sample_intent):
+    """Test delete routing preference also removes fallback."""
+    # Create providers
+    memory.upsert_provider({
+        "id": "primary",
+        "name": "Primary Provider",
+        "type": "openai",
+        "enabled": True
+    })
+    memory.upsert_provider({
+        "id": "fallback",
+        "name": "Fallback Provider",
+        "type": "anthropic",
+        "enabled": True
+    })
+
+    # Set with fallback
+    memory.set_routing_preference("local", sample_intent["id"], "primary", fallback_provider_id="fallback")
+
+    # Delete
+    response = client.delete(f"/api/routing/{sample_intent['id']}")
+
+    assert response.status_code == 200
+
+    # Verify both primary and fallback are removed
+    provider = memory.get_routing_provider("local", sample_intent["id"])
+    fallback = memory.get_fallback_provider("local", sample_intent["id"])
+
+    assert provider is None
+    assert fallback is None

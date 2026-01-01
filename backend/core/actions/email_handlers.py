@@ -502,6 +502,14 @@ class EmailHandlers(BaseActionHandler):
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
+                # Try configured fallback provider for system intent
+                fallback_provider_id = self.memory.get_fallback_provider(user_id, "system") if self.memory else None
+                if fallback_provider_id:
+                    provider_cfg = registry.get(fallback_provider_id)
+                    if provider_cfg and provider_cfg.get("api_key"):
+                        logging.info(f"[EMAIL_HANDLERS] Using configured fallback provider: {fallback_provider_id}")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
                 # Fallback to OpenAI provider
                 provider_cfg = registry.get_by_type("openai")
                 logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
@@ -657,6 +665,14 @@ Generate a reply email body:"""
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
+                # Try configured fallback provider for system intent
+                fallback_provider_id = self.memory.get_fallback_provider(user_id, "system") if self.memory else None
+                if fallback_provider_id:
+                    provider_cfg = registry.get(fallback_provider_id)
+                    if provider_cfg and provider_cfg.get("api_key"):
+                        logging.info(f"[EMAIL_HANDLERS] Using configured fallback provider: {fallback_provider_id}")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
                 # Fallback to OpenAI provider
                 provider_cfg = registry.get_by_type("openai")
                 logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
@@ -793,6 +809,14 @@ Generate the email with subject and body:"""
                 # Use configured system provider
                 provider_cfg = registry.get(system_provider_id)
                 logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
+
+            if not provider_cfg or not provider_cfg.get("api_key"):
+                # Try configured fallback provider for system intent
+                fallback_provider_id = self.memory.get_fallback_provider(user_id, "system") if self.memory else None
+                if fallback_provider_id:
+                    provider_cfg = registry.get(fallback_provider_id)
+                    if provider_cfg and provider_cfg.get("api_key"):
+                        logging.info(f"[EMAIL_HANDLERS] Using configured fallback provider: {fallback_provider_id}")
 
             if not provider_cfg or not provider_cfg.get("api_key"):
                 # Fallback to OpenAI provider

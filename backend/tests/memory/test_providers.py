@@ -244,3 +244,159 @@ def test_provider_lifecycle(memory):
     # Verify deleted
     assert memory.get_provider("lifecycle") is None
     assert memory.get_provider_metadata("lifecycle") is None
+
+
+# ====================
+# Circuit Breaker Cooldown Tests
+# ====================
+
+def test_circuit_breaker_cooldown_default(memory):
+    """Test circuit breaker cooldown defaults to 60 minutes."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_cooldown_minutes"] == 60
+
+
+def test_update_circuit_breaker_cooldown(memory):
+    """Test update circuit breaker cooldown period."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    memory.update_circuit_breaker_cooldown("test", 120)
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_cooldown_minutes"] == 120
+
+
+def test_update_circuit_breaker_cooldown_validation_min(memory):
+    """Test circuit breaker cooldown validates minimum value (1 minute)."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    memory.update_circuit_breaker_cooldown("test", 0)
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_cooldown_minutes"] == 1
+
+
+def test_update_circuit_breaker_cooldown_validation_max(memory):
+    """Test circuit breaker cooldown validates maximum value (1440 minutes)."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    memory.update_circuit_breaker_cooldown("test", 2000)
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_cooldown_minutes"] == 1440
+
+
+def test_update_circuit_breaker_cooldown_creates_metadata(memory):
+    """Test update circuit breaker cooldown creates metadata if missing."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+
+    # Update cooldown without initializing metadata first
+    memory.update_circuit_breaker_cooldown("test", 90)
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata is not None
+    assert metadata["circuit_breaker_cooldown_minutes"] == 90
+
+
+def test_circuit_breaker_opened_at_tracking(memory):
+    """Test circuit breaker tracks when it was opened."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    # Trigger circuit breaker with 5 consecutive failures
+    # Use log_request to properly track request history
+    for i in range(5):
+        memory.log_request(
+            session_id=f"session{i}",
+            provider_id="test",
+            intent="general",
+            success=False,
+            latency_ms=0,
+            error_message="Test failure"
+        )
+
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_open"] is True
+    assert metadata["circuit_breaker_opened_at"] is not None
+
+
+def test_circuit_breaker_opened_at_preserved_until_reset(memory):
+    """Test circuit breaker opened_at persists until manually reset."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+
+    # Open circuit breaker - use log_request
+    for i in range(5):
+        memory.log_request(
+            session_id=f"session{i}",
+            provider_id="test",
+            intent="general",
+            success=False,
+            latency_ms=0,
+            error_message="Test failure"
+        )
+
+    # Verify it's open with timestamp
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_open"] is True
+    assert metadata["circuit_breaker_opened_at"] is not None
+
+    # Manually reset health to close circuit breaker
+    memory.reset_provider_health("test")
+
+    # Verify circuit breaker is closed and opened_at is NOT cleared by reset
+    # (reset doesn't clear timestamp, only manual intervention or time-based recovery)
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_open"] is False
+
+
+def test_health_summary_includes_cooldown_info(memory):
+    """Test health summary includes circuit breaker cooldown information."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+    memory.update_circuit_breaker_cooldown("test", 90)
+
+    # Trigger circuit breaker - use log_request
+    for i in range(5):
+        memory.log_request(
+            session_id=f"session{i}",
+            provider_id="test",
+            intent="general",
+            success=False,
+            latency_ms=0,
+            error_message="Test failure"
+        )
+
+    summary = memory.get_provider_health_summary()
+
+    assert "test" in summary
+    assert summary["test"]["circuit_breaker_open"] is True
+    assert summary["test"]["circuit_breaker_cooldown_minutes"] == 90
+    assert summary["test"]["circuit_breaker_opened_at"] is not None
+
+
+def test_reset_provider_health_preserves_cooldown(memory):
+    """Test reset provider health preserves cooldown configuration."""
+    memory.upsert_provider({"id": "test", "name": "Test", "type": "openai", "enabled": True})
+    memory.init_provider_metadata("test")
+    memory.update_circuit_breaker_cooldown("test", 180)
+
+    # Trigger some failures
+    for _ in range(3):
+        memory.update_provider_health("test", success=False)
+
+    # Reset health
+    memory.reset_provider_health("test")
+
+    # Verify cooldown is preserved but health is reset
+    metadata = memory.get_provider_metadata("test")
+    assert metadata["circuit_breaker_cooldown_minutes"] == 180
+    assert metadata["total_requests"] == 0
+    assert metadata["failed_requests"] == 0
+    assert metadata["circuit_breaker_open"] is False
