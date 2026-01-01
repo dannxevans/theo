@@ -8,7 +8,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features 
 
 - **Multi-Model Routing** - Intelligent routing based on user-defined intents
 - **Voice Features** - Text-to-Speech and Speech-to-Text powered by OpenAI
