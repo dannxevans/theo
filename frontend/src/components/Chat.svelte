@@ -58,6 +58,14 @@
       return null;
     }
 
+    // Weather provider
+    if (provider === "weather") {
+      if (model === "openweather") {
+        return "OpenWeather · Weather";
+      }
+      return `${model} · Weather`;
+    }
+
     // Determine provider type based on model string
     if (model && (model.includes("gpt") || model.includes("o1") || model.includes("o3"))) {
       providerType = "OpenAI";
@@ -831,11 +839,16 @@
                     {@const formattedModel = formatModelDisplay(m.provider, m.model, m.task_type)}
                     {@const isActionRouter = m.provider === 'action_router'}
                     {@const isError = m.provider === 'error'}
+                    {@const isWeather = m.provider === 'weather'}
                     {@const formattedAction = m.task_type
                       ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
                       : "Action"}
                     <div class="bubble-footer">
-                      {#if formattedModel}
+                      {#if isWeather}
+                        <span class="provider-badge provider-badge-weather">
+                          via OpenWeather · Weather
+                        </span>
+                      {:else if formattedModel}
                         <span class="provider-badge provider-badge-ai">
                           via {formattedModel}
                         </span>
@@ -1227,6 +1240,12 @@
   .provider-badge-error {
     background: var(--error-100);
     color: var(--error-700);
+  }
+
+  /* Weather responses - washed out purple */
+  .provider-badge-weather {
+    background: #f3e8ff;
+    color: #7c3aed;
   }
 
   .bubble-footer {

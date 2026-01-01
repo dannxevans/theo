@@ -13,6 +13,7 @@
   import AccountSettings from "./AccountSettings.svelte";
   import ThemeSettings from "./ThemeSettings.svelte";
   import VoiceSettings from "./VoiceSettings.svelte";
+  import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -375,6 +376,9 @@
           <button class="dropdown-item" class:active={activeTab === "service-providers"} on:click={() => switchCategory("accounts", "service-providers")}>
             Service Providers
           </button>
+          <button class="dropdown-item" class:active={activeTab === "feature-providers"} on:click={() => switchCategory("accounts", "feature-providers")}>
+            Feature Providers
+          </button>
         </div>
       {/if}
     </div>
@@ -410,6 +414,7 @@
       {#if activeTab === "memory"}Memory{/if}
       {#if activeTab === "voice"}Voice{/if}
       {#if activeTab === "theme"}Theme{/if}
+      {#if activeTab === "feature-providers"}Feature Providers{/if}
       {#if activeTab === "personal"}Personal Mode{/if}
       {#if activeTab === "work"}Work Mode{/if}
       {#if activeTab === "theo-account"}THEO Account{/if}
@@ -449,6 +454,10 @@
 
     {#if activeTab === "theme"}
       <ThemeSettings />
+    {/if}
+
+    {#if activeTab === "feature-providers"}
+      <FeatureProvidersSettings />
     {/if}
 
     {#if activeTab === "ai-providers"}

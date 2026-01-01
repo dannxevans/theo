@@ -394,6 +394,105 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
     return None
 
 
+def _generate_friendly_weather_response(raw_weather: str, user_text: str, memory: Optional[MemoryStore], user_id: str) -> Optional[str]:
+    """
+    Use system LLM to generate a friendly, conversational weather response.
+
+    Args:
+        raw_weather: Raw weather data formatted as text
+        user_text: Original user query
+        memory: MemoryStore instance
+        user_id: User ID
+
+    Returns:
+        Friendly weather response or None if LLM unavailable
+    """
+    try:
+        # Get system provider for lightweight tasks (configurable)
+        registry = ProviderRegistry(memory)
+
+        # First check for "system" routing preference
+        system_provider_id = memory.get_routing_provider(user_id, "system") if memory else None
+        provider_cfg = None
+
+        if system_provider_id:
+            # Use configured system provider
+            provider_cfg = registry.get(system_provider_id)
+            logging.info(f"[WEATHER] Using configured system provider: {system_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Try configured fallback provider for system intent
+            fallback_provider_id = memory.get_fallback_provider(user_id, "system") if memory else None
+            if fallback_provider_id:
+                provider_cfg = registry.get(fallback_provider_id)
+                if provider_cfg and provider_cfg.get("api_key"):
+                    logging.info(f"[WEATHER] Using configured fallback provider: {fallback_provider_id}")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # Fallback to OpenAI provider
+            provider_cfg = registry.get_by_type("openai")
+            logging.info("[WEATHER] Using fallback OpenAI provider for weather formatting")
+
+        if not provider_cfg or not provider_cfg.get("api_key"):
+            # No LLM available at all
+            logging.warning("[WEATHER] No LLM provider available, using raw weather data")
+            return None
+
+        # Instantiate appropriate provider based on type
+        provider_type = provider_cfg.get("type")
+        api_key = provider_cfg.get("api_key")
+        model = provider_cfg.get("model")
+
+        if provider_type == "openai":
+            provider = OpenAIProvider(api_key=api_key, model=model)
+        elif provider_type == "anthropic":
+            provider = AnthropicProvider(api_key=api_key, model=model)
+        elif provider_type == "google":
+            provider = GoogleProvider(api_key=api_key, model=model)
+        elif provider_type == "xai":
+            provider = XAIProvider(api_key=api_key, model=model)
+        elif provider_type == "mistral":
+            provider = MistralProvider(api_key=api_key, model=model)
+        else:
+            logging.warning(f"[WEATHER] Unknown provider type: {provider_type}")
+            return None
+
+        # Generate friendly response using LLM
+        system_prompt = """You are a friendly weather assistant. Your job is to present weather information in a natural, conversational way.
+
+Guidelines:
+- Be concise and friendly
+- Use natural language instead of bullet points
+- Include relevant details based on the conditions (e.g., mention wind if it's strong, humidity if it's high)
+- Don't repeat the location unnecessarily
+- Keep it to 1-2 sentences unless the user asks for more detail"""
+
+        user_prompt = f"""User asked: "{user_text}"
+
+Weather data:
+{raw_weather}
+
+Present this weather information in a friendly, natural way:"""
+
+        response = provider.chat(
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+
+        response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+
+        if response_text:
+            logging.info(f"[WEATHER] Generated friendly response ({len(response_text)} chars)")
+            return response_text
+        else:
+            logging.warning("[WEATHER] LLM returned empty response")
+            return None
+
+    except Exception as e:
+        logging.error(f"[WEATHER] Failed to generate friendly response: {e}")
+        return None
+
+
 def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None, user_id: str = "local"):
     fallback_reason = None
     selected_provider = None
@@ -647,6 +746,107 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Incoming text: {text}")
     _debug(memory, f"Classified intent: {intent}")
     _debug(memory, f"Forced provider: {forced}")
+
+    # =============================
+    # Weather Intent Handling
+    # =============================
+    if intent == "weather":
+        _debug(memory, "Handling weather request")
+
+        # Get user_id from context
+        user_id = context.get("user_id") if context.get("user_id") else "local"
+
+        # Get weather API key from user preferences
+        prefs = memory.get_all(user_id) if memory else {}
+        api_key = prefs.get("feature_provider_openweather_api_key")
+
+        if not api_key:
+            return {
+                "text": "Weather service is not configured. Please add your OpenWeather API key in Settings > Feature Providers.",
+                "provider": "error",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": "missing_api_key",
+            }
+
+        # Extract location from the message
+        # Use simple extraction - look for location after common phrases
+        import re
+        text_l = text.lower()
+
+        # Try to extract location using patterns
+        location = None
+        location_patterns = [
+            r'weather (?:in|for|at) ([^?]+)',
+            r'temperature (?:in|for|at) ([^?]+)',
+            r'forecast (?:in|for|at) ([^?]+)',
+        ]
+
+        for pattern in location_patterns:
+            match = re.search(pattern, text_l)
+            if match:
+                location = match.group(1).strip()
+                break
+
+        # If no location found, ask for it
+        if not location:
+            return {
+                "text": "I can get the weather for you! Which location would you like to know about?",
+                "provider": "weather",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": "missing_location",
+            }
+
+        # Fetch weather data
+        from core.weather_service import WeatherService
+
+        try:
+            weather_service = WeatherService(api_key)
+            weather_data = weather_service.get_weather(location)
+
+            if weather_data:
+                # Get raw weather data formatted
+                raw_weather = weather_service.format_weather_response(weather_data)
+
+                # Use system LLM to make the response more conversational
+                friendly_response = _generate_friendly_weather_response(
+                    raw_weather,
+                    user_text=text,
+                    memory=memory,
+                    user_id=user_id
+                )
+
+                if friendly_response:
+                    response_text = friendly_response
+                else:
+                    # Fallback to raw format if LLM fails
+                    response_text = raw_weather
+
+                return {
+                    "text": response_text,
+                    "provider": "weather",
+                    "model": "openweather",
+                    "task_type": "weather",
+                    "fallback_reason": None,
+                }
+            else:
+                return {
+                    "text": f"I couldn't fetch the weather for '{location}'. Please check the location name and try again.",
+                    "provider": "weather",
+                    "model": None,
+                    "task_type": "weather",
+                    "fallback_reason": "weather_fetch_failed",
+                }
+        except Exception as e:
+            logging.error(f"[ROUTER] Weather service error: {e}")
+            return {
+                "text": f"I encountered an error fetching the weather: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": f"weather_error: {str(e)}",
+            }
 
     # =============================
     # Action Intent Routing

@@ -85,7 +85,7 @@ class IntentClassifier:
 
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
-            "read_calendar", "compose_email", "read_email"
+            "read_calendar", "compose_email", "read_email", "weather"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -254,6 +254,28 @@ class IntentClassifier:
         email_action_pattern = r'\b(show|read|open|display)\b.{0,50}\bemail\b'
         if re.search(email_action_pattern, text_l):
             return "read_email", 0.80
+
+        # Weather keywords
+        weather_keywords = [
+            "what's the weather", "whats the weather", "weather in",
+            "weather for", "how's the weather", "hows the weather",
+            "temperature in", "temperature for", "forecast for",
+            "is it raining", "will it rain", "sunny in"
+        ]
+
+        for keyword in weather_keywords:
+            if keyword in text_l:
+                return "weather", 0.90
+
+        # Check for simple weather queries
+        weather_simple = ["weather", "temperature", "forecast"]
+        location_indicators = ["in", "at", "for"]
+
+        for weather_word in weather_simple:
+            if weather_word in text_l:
+                # Check if there's a location indicator nearby
+                if any(loc in text_l for loc in location_indicators):
+                    return "weather", 0.85
 
         # Check user-defined intents (if memory available)
         if self.memory:
