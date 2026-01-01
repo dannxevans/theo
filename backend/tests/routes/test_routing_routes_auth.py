@@ -38,7 +38,7 @@ def test_get_routing_preferences_with_auth(client, auth_headers, memory, test_us
 
     # Should be a dict with intent -> provider_id mappings
     assert isinstance(data, dict)
-    assert data.get('test_intent') == 'openai'
+    assert data.get('test_intent')['provider_id'] == 'openai'
 
 
 def test_set_routing_preference_with_auth(client, auth_headers, memory, test_user):
@@ -69,7 +69,7 @@ def test_set_routing_preference_with_auth(client, auth_headers, memory, test_use
 
     # Verify it was set
     prefs = memory.get_routing_preferences(str(test_user["id"]))
-    assert prefs.get('test_intent') == 'anthropic'
+    assert prefs.get('test_intent')['provider_id'] == 'anthropic'
 
 
 def test_delete_routing_preference_with_auth(client, auth_headers, memory, test_user):
@@ -136,12 +136,12 @@ def test_routing_preference_upsert(memory, test_user):
     # Set initial preference
     memory.set_routing_preference(str(test_user["id"]), "test_intent", "openai")
     prefs = memory.get_routing_preferences(str(test_user["id"]))
-    assert prefs['test_intent'] == 'openai'
+    assert prefs['test_intent']['provider_id'] == 'openai'
 
     # Update preference
     memory.set_routing_preference(str(test_user["id"]), "test_intent", "anthropic")
     prefs = memory.get_routing_preferences(str(test_user["id"]))
-    assert prefs['test_intent'] == 'anthropic'
+    assert prefs['test_intent']['provider_id'] == 'anthropic'
 
 
 def test_get_routing_preferences_empty(client, auth_headers):
