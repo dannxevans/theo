@@ -85,7 +85,7 @@ class IntentClassifier:
 
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
-            "read_calendar", "compose_email", "read_email", "weather", "routing"
+            "read_calendar", "compose_email", "read_email", "weather", "routing", "planning"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -228,13 +228,18 @@ class IntentClassifier:
         read_calendar_keywords = [
             "what's on my calendar", "what's in my calendar", "whats on my calendar",
             "whats in my calendar", "check my calendar", "my availability",
-            "when am i free", "what's on", "schedule for", "what do i have",
-            "any meetings", "any appointments"
+            "when am i free", "schedule for", "what do i have",
+            "any meetings", "any appointments", "my calendar for", "calendar for",
+            "show my calendar", "show me my calendar"
         ]
 
         for keyword in read_calendar_keywords:
             if keyword in text_l:
                 return "read_calendar", 0.85
+
+        # Also check for "what's on" followed by "calendar" or time reference
+        if "what" in text_l and "calendar" in text_l:
+            return "read_calendar", 0.85
 
         # Read email/inbox
         read_email_keywords = [
@@ -299,6 +304,27 @@ class IntentClassifier:
                 # Check if there's a route indicator nearby
                 if any(ind in text_l for ind in route_indicators):
                     return "routing", 0.85
+
+        # Planning keywords
+        planning_keywords = [
+            "going to", "planning to", "want to go", "need to go",
+            "meeting at", "appointment at", "shopping at",
+            "visiting", "heading to", "tomorrow at", "later at",
+            "this afternoon at", "tonight at", "going shopping",
+            "have an appointment", "need to be at"
+        ]
+
+        for keyword in planning_keywords:
+            if keyword in text_l:
+                # Check if there's a time or location indicator
+                time_indicators = ["tomorrow", "today", "tonight", "afternoon", "morning", "at", "pm", "am"]
+                location_indicators = ["at", "in", "to"]
+
+                has_time = any(ind in text_l for ind in time_indicators)
+                has_location = any(ind in text_l for ind in location_indicators)
+
+                if has_time or has_location:
+                    return "planning", 0.90
 
         # Check user-defined intents (if memory available)
         if self.memory:

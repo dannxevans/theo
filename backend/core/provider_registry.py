@@ -85,3 +85,41 @@ class ProviderRegistry:
         """
         self.memory.delete_provider(provider_id)
         self.reload()
+
+    def get_system_provider(self):
+        """
+        Get the system provider (used for lightweight tasks like summarization).
+        Uses the 'system' routing preference if set, otherwise falls back to first enabled provider.
+        """
+        # Try to get system provider from routing preferences
+        try:
+            from sqlalchemy import select
+            with self.memory.engine.begin() as conn:
+                result = conn.execute(
+                    select(self.memory.routing_preferences.c.provider_id, self.memory.routing_preferences.c.fallback_provider_id)
+                    .where(self.memory.routing_preferences.c.task_category == 'system')
+                    .where(self.memory.routing_preferences.c.user_id == 1)
+                ).fetchone()
+
+                if result:
+                    primary_id = result[0]
+                    fallback_id = result[1]
+
+                    # Try primary provider first
+                    primary = self.get(primary_id)
+                    if primary and primary.get('enabled', True):
+                        return primary
+
+                    # Fall back to fallback provider
+                    if fallback_id:
+                        fallback = self.get(fallback_id)
+                        if fallback and fallback.get('enabled', True):
+                            return fallback
+        except Exception:
+            pass
+
+        # Default: return first enabled provider
+        providers = self.list()
+        if providers:
+            return providers[0]
+        return None

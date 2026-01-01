@@ -299,6 +299,7 @@ def create_schema(meta: MetaData):
         Column("model", String, nullable=True),
         Column("intent", String, nullable=True),
         Column("metadata", Text, nullable=True),  # JSON metadata for confirmations, etc.
+        Column("planning_metadata", Text, nullable=True),  # JSON: weather/traffic/calendar context
     )
 
     # =============================
@@ -369,6 +370,7 @@ def create_schema(meta: MetaData):
         Column("max_retries", Integer, default=3),
         Column("is_reversible", Boolean, default=False),
         Column("rollback_action_id", Integer, nullable=True),
+        Column("enrichment_data", Text, nullable=True),  # JSON: weather/traffic/calendar enrichment
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
