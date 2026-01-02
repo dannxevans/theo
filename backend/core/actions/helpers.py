@@ -266,6 +266,14 @@ def parse_event_details(text: str) -> Optional[Dict]:
         # Assume PM for times like "1:00" without AM/PM
         hour += 12
 
+    # Validate hour and minute are in valid range
+    if not (0 <= hour <= 23):
+        logging.warning(f"[HELPERS] Invalid hour value {hour}, cannot parse event")
+        return None
+    if not (0 <= minute <= 59):
+        logging.warning(f"[HELPERS] Invalid minute value {minute}, cannot parse event")
+        return None
+
     # Parse date (today, tomorrow, specific day)
     date_base = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
@@ -346,7 +354,7 @@ def extract_event_with_llm(user_text: str, user_id: int, memory_store) -> Option
 
         if system_provider_id:
             # Use configured system provider
-            provider_cfg = registry.get_by_id(system_provider_id)
+            provider_cfg = registry.get(system_provider_id)
             logging.info(f"[HELPERS] Using configured system provider: {system_provider_id}")
 
         if not provider_cfg or not provider_cfg.get("api_key"):
