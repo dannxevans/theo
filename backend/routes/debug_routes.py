@@ -20,6 +20,25 @@ from auth.password import require_auth
 debug_bp = Blueprint('debug', __name__, url_prefix='/api/debug')
 
 
+def get_db_path(memory):
+    """
+    Extract database file path from MemoryStore's SQLAlchemy engine URL.
+
+    Args:
+        memory: MemoryStore instance
+
+    Returns:
+        str: Path to SQLite database file
+    """
+    db_url = str(memory.engine.url)
+    # Extract path from sqlite:///path/to/db.db
+    if db_url.startswith('sqlite:///'):
+        return db_url.replace('sqlite:///', '')
+    else:
+        # Fallback for relative paths
+        return db_url.split('sqlite:///')[-1]
+
+
 def is_admin(memory, user):
     """
     Check if user has admin privileges.
@@ -80,7 +99,8 @@ def stream_logs():
             last_id = 0
 
             # Get initial last ID from database
-            conn = sqlite3.connect(memory.db_path)
+            db_path = get_db_path(memory)
+            conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT MAX(id) as max_id FROM debug_logs")
@@ -91,7 +111,7 @@ def stream_logs():
 
             # Stream new logs
             while True:
-                conn = sqlite3.connect(memory.db_path)
+                conn = sqlite3.connect(db_path)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
@@ -183,7 +203,8 @@ def get_logs():
     search = request.args.get("search", "")
 
     try:
-        conn = sqlite3.connect(memory.db_path)
+        db_path = get_db_path(memory)
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -273,7 +294,8 @@ def clear_logs():
     level = request.args.get("level", "")
 
     try:
-        conn = sqlite3.connect(memory.db_path)
+        db_path = get_db_path(memory)
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         # Build delete query
@@ -339,7 +361,8 @@ def log_frontend():
     user_id = user.get('id') if user else None
 
     try:
-        conn = sqlite3.connect(memory.db_path)
+        db_path = get_db_path(memory)
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -383,7 +406,8 @@ def get_debug_status():
         enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
 
         # Get log count
-        conn = sqlite3.connect(memory.db_path)
+        db_path = get_db_path(memory)
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM debug_logs")
         row = cursor.fetchone()

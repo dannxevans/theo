@@ -190,7 +190,16 @@ class DatabaseLogHandler(logging.Handler):
             return
 
         try:
-            conn = sqlite3.connect(self.memory_store.db_path)
+            # Get database path from SQLAlchemy engine URL
+            db_url = str(self.memory_store.engine.url)
+            # Extract path from sqlite:///path/to/db.db
+            if db_url.startswith('sqlite:///'):
+                db_path = db_url.replace('sqlite:///', '')
+            else:
+                # Fallback for relative paths like sqlite:///./data/theo.db
+                db_path = db_url.split('sqlite:///')[-1]
+
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
             # Batch insert
