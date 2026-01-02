@@ -2,11 +2,32 @@
 
 This directory contains database migration scripts for THEO.
 
+## Migration System Overview
+
+**IMPORTANT**: THEO has two migration runners:
+
+1. **`backend/db_backup.py:run_migrations()`** - **MAIN MIGRATION RUNNER**
+   - Runs automatically on every application startup
+   - Handles all migrations 001-019 in sequence
+   - Used by AWS deployments and Docker containers
+   - Called by `init_database_backup()` in app initialization
+
+2. **`backend/migrations/run_migrations.py`** - Manual runner for development
+   - Use for manual migration testing
+   - Use for running migrations on specific database files
+   - Use for emergency migration fixes
+
 ## Running Migrations
 
-### Quick Start - Run All Migrations
+### Automatic (Production/AWS)
 
-The easiest way to run all pending migrations:
+Migrations run automatically when the application starts via `backend/db_backup.py`.
+
+No manual intervention needed - migrations 001-019 are applied automatically.
+
+### Manual (Development/Testing)
+
+Run all pending migrations manually:
 
 ```bash
 python3 backend/migrations/run_migrations.py
