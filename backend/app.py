@@ -66,6 +66,16 @@ context_manager = ContextManager(memory)
 provider_registry = ProviderRegistry(memory)
 set_context_manager(context_manager)
 
+# Add DatabaseLogHandler for debug console
+# This must be outside if __name__ == "__main__" to work with Gunicorn
+from core.logging_handler import DatabaseLogHandler
+db_handler = DatabaseLogHandler(memory)
+db_handler.setLevel(logging.DEBUG)
+app.logger.addHandler(db_handler)
+
+# Also capture logs from root logger (for non-Flask logs)
+logging.getLogger().addHandler(db_handler)
+
 # Inject provider registry into router
 set_provider_registry(provider_registry)
 
@@ -122,6 +132,7 @@ from routes.voice_routes import voice_bp
 from routes.feature_provider_routes import feature_provider_bp
 from routes.planning_routes import planning_bp
 from routes.routine_routes import routine_bp
+from routes.debug_routes import debug_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(auth_bp)
@@ -141,6 +152,7 @@ app.register_blueprint(voice_bp, url_prefix="/api/voice")
 app.register_blueprint(feature_provider_bp)
 app.register_blueprint(planning_bp)
 app.register_blueprint(routine_bp)
+app.register_blueprint(debug_bp)
 
 # Set g.user_id for all requests based on auth token
 @app.before_request
