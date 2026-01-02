@@ -19,14 +19,34 @@
 
   // Action types available
   // These come from the available action handlers in the backend
-  // (CalendarHandlers, EmailHandlers, etc.)
+  // (CalendarHandlers, EmailHandlers, WeatherService, TrafficService, etc.)
   const ACTION_TYPES = [
+    // Calendar actions
     {
       type: "calendar_read",
       label: "Read Calendar",
       description: "Check calendar events",
       defaultParams: { timeframe: "today" },
     },
+    {
+      type: "book_appointment",
+      label: "Book Appointment",
+      description: "Schedule a calendar event",
+      defaultParams: {},
+    },
+    {
+      type: "update_appointment",
+      label: "Update Appointment",
+      description: "Modify an existing calendar event",
+      defaultParams: {},
+    },
+    {
+      type: "cancel_appointment",
+      label: "Cancel Appointment",
+      description: "Delete a calendar event",
+      defaultParams: {},
+    },
+    // Email actions
     {
       type: "email_check",
       label: "Check Emails",
@@ -38,6 +58,52 @@
       label: "Summarize Emails",
       description: "Summarize unread emails",
       defaultParams: { filter: "unread", exclude_important: false },
+    },
+    {
+      type: "read_email",
+      label: "Read Email",
+      description: "Read specific email(s)",
+      defaultParams: {},
+    },
+    {
+      type: "compose_email",
+      label: "Compose Email",
+      description: "Draft a new email",
+      defaultParams: {},
+    },
+    {
+      type: "email_reply",
+      label: "Reply to Email",
+      description: "Reply to an email",
+      defaultParams: {},
+    },
+    {
+      type: "send_email",
+      label: "Send Email",
+      description: "Send an email message",
+      defaultParams: {},
+    },
+    // Weather actions
+    {
+      type: "weather",
+      label: "Weather",
+      description: "Get weather forecast",
+      defaultParams: {},
+    },
+    // Routing actions
+    {
+      type: "route",
+      label: "Route/Traffic",
+      description: "Get route and traffic information",
+      defaultParams: {},
+    },
+    // Custom action
+    {
+      type: "custom_action",
+      label: "Custom Action",
+      description: "Custom LLM prompt",
+      defaultParams: {},
+      isCustom: true,
     },
   ];
 
@@ -254,7 +320,14 @@
       type,
       description: actionDef.description,
       params: actionDef.defaultParams,
+      customPrompt: actionDef.isCustom ? "" : undefined,
     };
+    formActions = [...formActions];
+  }
+
+  function updateCustomPrompt(index, prompt) {
+    formActions[index].customPrompt = prompt;
+    formActions[index].description = prompt || "Custom LLM prompt";
     formActions = [...formActions];
   }
 
@@ -310,7 +383,7 @@
           <small class="action-help">Actions are executed from the backend action handlers (calendar, email, etc.)</small>
           <div class="actions-list">
             {#each formActions as action, index}
-              <div class="action-item">
+              <div class="action-item" class:custom={action.type === "custom_action"}>
                 <span class="action-number">{index + 1}.</span>
                 <div class="action-fields">
                   <select
@@ -321,11 +394,21 @@
                       <option value={actionType.type}>{actionType.label}</option>
                     {/each}
                   </select>
-                  <input
-                    type="text"
-                    bind:value={action.description}
-                    placeholder="Description"
-                  />
+                  {#if action.type === "custom_action"}
+                    <input
+                      type="text"
+                      bind:value={action.customPrompt}
+                      on:input={(e) => updateCustomPrompt(index, e.target.value)}
+                      placeholder="Enter custom prompt (e.g., 'Tell me a joke')"
+                      class="custom-prompt-input"
+                    />
+                  {:else}
+                    <input
+                      type="text"
+                      bind:value={action.description}
+                      placeholder="Description"
+                    />
+                  {/if}
                 </div>
                 <button
                   class="btn-icon btn-remove"
@@ -672,6 +755,11 @@
     border-radius: var(--radius-sm);
   }
 
+  .action-item.custom {
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(var(--theo-blue-rgb, 59, 130, 246), 0.05) 100%);
+    border-color: var(--theo-blue);
+  }
+
   .action-number {
     font-weight: 600;
     color: var(--text-secondary);
@@ -687,6 +775,16 @@
   .action-fields select,
   .action-fields input {
     flex: 1;
+  }
+
+  .custom-prompt-input {
+    font-style: italic;
+    border-color: var(--theo-blue) !important;
+  }
+
+  .custom-prompt-input::placeholder {
+    font-style: italic;
+    opacity: 0.6;
   }
 
   .btn-icon {
