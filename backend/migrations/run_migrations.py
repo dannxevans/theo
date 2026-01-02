@@ -50,7 +50,8 @@ def run_all_migrations():
         "012_add_feature_provider_usage_logs.py",  # Add usage tracking for feature providers
         "013_add_planning_metadata.py",  # Add enrichment_data column to actions table for context-aware planning
         "014_add_proactive_settings.py",  # Add proactive_settings table for user notification preferences
-        "015_add_proactive_tracking_tables.py"  # Add proactive notification tracking tables
+        "015_add_proactive_tracking_tables.py",  # Add proactive notification tracking tables
+        "016_add_routine_tracking.py"  # Add routine_name and routine_actions columns to turns table
     ]
 
     # Filter to only existing files

@@ -300,6 +300,9 @@ def create_schema(meta: MetaData):
         Column("intent", String, nullable=True),
         Column("metadata", Text, nullable=True),  # JSON metadata for confirmations, etc.
         Column("planning_metadata", Text, nullable=True),  # JSON: weather/traffic/calendar context
+        # Routine tracking
+        Column("routine_name", String, nullable=True),  # Name of routine executed (e.g., "good_morning")
+        Column("routine_actions", Text, nullable=True),  # JSON array of actions executed
     )
 
     # =============================

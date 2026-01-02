@@ -240,6 +240,22 @@ export async function generateSessionTitle(sessionId) {
   return response.json();
 }
 
+export async function regenerateMessage(sessionId, turnId) {
+  const response = await fetch(
+    `${API_BASE}/api/sessions/${sessionId}/regenerate/${turnId}`,
+    {
+      method: "POST"
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to regenerate message");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Intent Management API
 // =============================

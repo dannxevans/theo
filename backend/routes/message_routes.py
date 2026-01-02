@@ -197,7 +197,12 @@ def stream_chat_sse(session_id):
             router_context["session_mode"] = current_mode
             router_context["session_user_id"] = user_id
 
-            # Route request (non-streaming, we chunk manually)
+            # TEMPORARILY DISABLED: Routines feature
+            # Uncomment to re-enable after debugging
+            routine_name = None
+            routine_actions_list = None
+
+            # Normal LLM routing
             result = route_request(router_context)
 
             full_text = result.get("text", "")
@@ -209,7 +214,7 @@ def stream_chat_sse(session_id):
 
             # Save the turn to database BEFORE sending end event
             # This ensures metadata is persisted before frontend reloads messages
-            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id)
+            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
 
             # Send metadata at end of stream
             end_payload = {

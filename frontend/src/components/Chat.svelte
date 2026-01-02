@@ -10,6 +10,7 @@
   exportSession,
   forkSession,
   generateSessionTitle,
+  regenerateMessage,
   approveConfirmation,
   rejectConfirmation,
   dismissProactiveNotification
@@ -20,6 +21,7 @@
   import "prismjs/themes/prism-tomorrow.css";
   import { tick, afterUpdate, onMount, onDestroy } from "svelte";
   import VoiceControls from "./VoiceControls.svelte";
+  import ChatControls from "./ChatControls.svelte";
 
   export let sessionId;
   export let currentMode = "personal";
@@ -575,6 +577,89 @@
     }
   }
 
+  async function handleRegenerate(event) {
+    const { turnId } = event.detail;
+
+    try {
+      loading = true;
+
+      // Call regenerate endpoint to delete turns and get user message
+      const result = await regenerateMessage(sessionId, turnId);
+
+      // Reload messages to reflect deletion
+      await loadSessionMessages(sessionId);
+
+      // Re-submit the user message
+      const userText = result.user_message;
+      error = null;
+      streaming = true;
+      streamedText = "";
+      streamBuffer = "";
+
+      await streamMessage({
+        sessionId,
+        text: userText,
+        forcedProvider: forcedModel,
+        workSubtab: currentMode === "work" ? activeWorkSubtab : null,
+        onToken(token) {
+          streamedText += token;
+          scrollToBottom();
+        },
+        async onEnd(meta) {
+          if (meta?.provider) {
+            usedProviders = new Set([...usedProviders, meta.provider]);
+          }
+
+          if (meta?.debug_instruction) {
+            lastDebugInstruction = {
+              ...meta.debug_instruction,
+              expanded: false
+            };
+          }
+
+          streamedText = "";
+          streaming = false;
+          loading = false;
+
+          await loadSessionMessages(sessionId);
+          await tick();
+          scrollToBottom();
+          enhanceCodeBlocks();
+        },
+        onError(err) {
+          error = err;
+          streaming = false;
+          loading = false;
+        }
+      });
+    } catch (e) {
+      alert(`Failed to regenerate: ${e.message}`);
+      loading = false;
+    }
+  }
+
+  async function handleBranch(event) {
+    const { turnId } = event.detail;
+
+    try {
+      // Find the index of the turn to branch at
+      const turnIndex = messages.findIndex(m => m.id === turnId);
+
+      if (turnIndex === -1) {
+        alert("Could not find message to branch from");
+        return;
+      }
+
+      // Fork the session at this turn
+      const result = await forkSession(sessionId, turnIndex);
+
+      // Reload page to show the new branched session
+      window.location.reload();
+    } catch (e) {
+      alert(`Failed to branch: ${e.message}`);
+    }
+  }
+
   async function submit() {
     if (!input || loading) return;
 
@@ -970,43 +1055,59 @@
                     {@const formattedAction = m.task_type
                       ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
                       : "Action"}
-                    <div class="bubble-footer">
-                      {#if isWeather}
-                        <span class="provider-badge provider-badge-weather">
-                          via OpenWeather · Weather
-                        </span>
-                      {:else if isRouting}
-                        <span class="provider-badge provider-badge-routing">
-                          via HERE · Routing
-                        </span>
-                      {:else if formattedModel}
-                        <span class="provider-badge provider-badge-ai">
-                          via {formattedModel}
-                        </span>
-                      {:else if isActionRouter}
-                        <span class="provider-badge provider-badge-action">
-                          via Action Router · {formattedAction}
-                        </span>
-                      {:else if isError}
-                        <span class="provider-badge provider-badge-error">
-                          Error · {formattedAction}
-                        </span>
-                      {:else}
-                        <span class="provider-badge">
-                          via {m.provider}
-                          {#if m.model}
-                            · {m.model}
-                          {/if}
-                          {#if m.task_type}
-                            ({m.task_type})
-                          {/if}
-                        </span>
-                      {/if}
-                      {#if m.fallback_reason}
-                        <span class="fallback-reason">
-                          {m.fallback_reason}
-                        </span>
-                      {/if}
+                    <div class="bubble-footer-container">
+                      <div class="bubble-footer">
+                        {#if isWeather}
+                          <span class="provider-badge provider-badge-weather">
+                            via OpenWeather · Weather
+                          </span>
+                        {:else if isRouting}
+                          <span class="provider-badge provider-badge-routing">
+                            via HERE · Routing
+                          </span>
+                        {:else if formattedModel}
+                          <span class="provider-badge provider-badge-ai">
+                            via {formattedModel}
+                          </span>
+                        {:else if isActionRouter}
+                          <span class="provider-badge provider-badge-action">
+                            via Action Router · {formattedAction}
+                          </span>
+                        {:else if isError}
+                          <span class="provider-badge provider-badge-error">
+                            Error · {formattedAction}
+                          </span>
+                        {:else}
+                          <span class="provider-badge">
+                            via {m.provider}
+                            {#if m.model}
+                              · {m.model}
+                            {/if}
+                            {#if m.task_type}
+                              ({m.task_type})
+                            {/if}
+                          </span>
+                        {/if}
+                        {#if m.fallback_reason}
+                          <span class="fallback-reason">
+                            {m.fallback_reason}
+                          </span>
+                        {/if}
+                      </div>
+
+                      <!-- Chat Controls -->
+                      <ChatControls
+                        message={{
+                          id: m.id,
+                          role: m.role,
+                          content: m.text
+                        }}
+                        {sessionId}
+                        mode={currentMode}
+                        {voiceControls}
+                        on:regenerate={handleRegenerate}
+                        on:branch={handleBranch}
+                      />
                     </div>
                   {/if}
                 {:else}
@@ -1410,8 +1511,15 @@
     color: #7c3aed;
   }
 
-  .bubble-footer {
+  .bubble-footer-container {
     margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .bubble-footer {
     display: flex;
     gap: 0.5rem;
     align-items: center;

@@ -273,6 +273,58 @@ def fork_session(session_id):
     })
 
 
+@session_bp.route("/sessions/<session_id>/regenerate/<int:turn_id>", methods=["POST"])
+def regenerate_message(session_id, turn_id):
+    """
+    Regenerate an assistant response by deleting it and all subsequent turns,
+    then returning the previous user message for re-streaming.
+
+    Request body: None
+    Returns: { "user_message": "...", "status": "ok" }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get all turns for this session
+    turns = memory.get_recent_turns(session_id, limit=10000)
+
+    # Find the turn to regenerate
+    turn_to_regenerate = next((t for t in turns if t.get("id") == turn_id), None)
+
+    if not turn_to_regenerate:
+        return jsonify({"error": "Turn not found"}), 404
+
+    # Ensure it's an assistant message
+    if turn_to_regenerate["role"] != "assistant":
+        return jsonify({"error": "Can only regenerate assistant messages"}), 400
+
+    # Find the index of this turn
+    turn_index = next(i for i, t in enumerate(turns) if t.get("id") == turn_id)
+
+    # Get the previous user message
+    previous_user_message = None
+    for i in range(turn_index - 1, -1, -1):
+        if turns[i]["role"] == "user":
+            previous_user_message = turns[i]["content"]
+            break
+
+    if not previous_user_message:
+        return jsonify({"error": "No previous user message found"}), 400
+
+    # Delete this turn and all subsequent turns
+    turns_to_delete = turns[turn_index:]
+    for turn in turns_to_delete:
+        memory.delete_turn(turn.get("id"))
+
+    return jsonify({
+        "status": "ok",
+        "user_message": previous_user_message,
+        "deleted_turns": len(turns_to_delete)
+    })
+
+
 @session_bp.route("/sessions/<session_id>/generate-title", methods=["POST"])
 def generate_session_title(session_id):
     """
