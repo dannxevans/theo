@@ -1,4 +1,5 @@
 # import eventlet
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 # eventlet.monkey_patch()
 import logging
 from datetime import datetime, timedelta
@@ -160,7 +161,7 @@ def set_user_id():
 
 def debug_log(message):
     try:
-        prefs = memory.get_all("local")
+        prefs = memory.get_all(DEFAULT_USER_ID)
         enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
         if enabled:
             logging.info(f"[DEBUG] {message}")

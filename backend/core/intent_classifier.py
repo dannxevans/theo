@@ -8,6 +8,7 @@ This module provides a tiered approach to intent classification:
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from typing import Optional, Dict, List, Tuple
 import re
 
@@ -305,7 +306,7 @@ class IntentClassifier:
                 if any(ind in text_l for ind in route_indicators):
                     return "routing", 0.85
 
-        # Planning keywords
+        # Planning keywords - only trigger if user is requesting help, not just stating plans
         planning_keywords = [
             "going to", "planning to", "want to go", "need to go",
             "meeting at", "appointment at", "shopping at",
@@ -314,13 +315,30 @@ class IntentClassifier:
             "have an appointment", "need to be at"
         ]
 
-        for keyword in planning_keywords:
-            if keyword in text_l:
-                # Check if there's a time or location indicator
-                time_indicators = ["tomorrow", "today", "tonight", "afternoon", "morning", "at", "pm", "am"]
-                location_indicators = ["at", "in", "to"]
+        # Exclusion patterns - phrases that indicate informational statements, not planning requests
+        import re
+        exclusion_patterns = [
+            r'\b(good night|goodnight|bye|goodbye|see you|talk to you|speak to you)\b',
+            r'\b(continue|finish|complete|work on|test|debug|fix)\b.*\b(tomorrow|today|tonight)\b',
+        ]
 
-                has_time = any(ind in text_l for ind in time_indicators)
+        # Check if message is an exclusion (informational statement)
+        is_excluded = any(re.search(pattern, text_l) for pattern in exclusion_patterns)
+
+        for keyword in planning_keywords:
+            if keyword in text_l and not is_excluded:
+                # Check if there's a time or location indicator
+                # Use specific patterns for time indicators to avoid false positives (e.g., "am" in "I am")
+                has_time = False
+                # Check for time-specific patterns with word boundaries
+                if re.search(r'\b(tomorrow|today|tonight|afternoon|morning)\b', text_l):
+                    has_time = True
+                # Check for am/pm with digit before them (e.g., "3am", "2 pm", "10am")
+                elif re.search(r'\d+\s*(am|pm)\b', text_l):
+                    has_time = True
+
+                # More specific location patterns to avoid false positives
+                location_indicators = [" at ", " in ", " to the ", " to a "]
                 has_location = any(ind in text_l for ind in location_indicators)
 
                 if has_time or has_location:
@@ -329,7 +347,7 @@ class IntentClassifier:
         # Check user-defined intents (if memory available)
         if self.memory:
             # Use actual user_id, default to "local" only if user_id is None
-            lookup_user_id = str(user_id) if user_id is not None else "local"
+            lookup_user_id = normalize_user_id(user_id)
             intents = self.memory.list_intents(lookup_user_id)
             enabled_intents = [i for i in intents if i.get("enabled", True)]
 

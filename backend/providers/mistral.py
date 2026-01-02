@@ -8,7 +8,7 @@ def _is_debug_enabled():
     try:
         from core.memory import MemoryStore
         memory = MemoryStore()
-        prefs = memory.get_all("local")
+        prefs = memory.get_all(DEFAULT_USER_ID)
         return str(prefs.get("debug_enabled", "false")).lower() == "true"
     except Exception:
         return False

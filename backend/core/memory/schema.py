@@ -103,7 +103,7 @@ def create_schema(meta: MetaData):
     debug_settings = Table(
         "debug_settings",
         meta,
-        Column("user_id", String, nullable=False, primary_key=True),
+        Column("user_id", Integer, nullable=False, primary_key=True),  # ForeignKey("users.id") - enable in Phase 6
         Column("enabled", Boolean, default=False),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
@@ -114,7 +114,7 @@ def create_schema(meta: MetaData):
     preferences = Table(
         "preferences",
         meta,
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("key", String, nullable=False),
         Column("value", Text, nullable=False),
         Column("updated_at", DateTime, default=datetime.utcnow),
@@ -127,7 +127,7 @@ def create_schema(meta: MetaData):
     system_prompt_config = Table(
         "system_prompt_config",
         meta,
-        Column("user_id", String, nullable=False, primary_key=True),
+        Column("user_id", Integer, nullable=False, primary_key=True),  # ForeignKey("users.id") - enable in Phase 6
         Column("persona_name", String, default="THEO"),
         Column("tone", String, default="professional, conversational, direct"),
         Column("style_rules", Text, default="No em dashes\nBe concise first, then detailed\nProvide full working solutions when asked for code\nMaintain a consistent persona regardless of model"),
@@ -142,7 +142,7 @@ def create_schema(meta: MetaData):
         "memories",
         meta,
         Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("type", String, nullable=False),  # fact, preference, goal, context
         Column("key", String, nullable=False),
         Column("value", Text, nullable=False),
@@ -160,7 +160,7 @@ def create_schema(meta: MetaData):
         "intents",
         meta,
         Column("id", String, primary_key=True),  # e.g., "coding", "creative"
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("name", String, nullable=False),  # Display name
         Column("description", Text, nullable=True),  # What this intent is for
         Column("keywords", Text, nullable=False),  # Comma-separated keywords
@@ -177,7 +177,7 @@ def create_schema(meta: MetaData):
     routing_preferences = Table(
         "routing_preferences",
         meta,
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("intent", String, nullable=False),
         Column("provider_id", String, nullable=False),
         Column("fallback_provider_id", String, nullable=True),
@@ -425,7 +425,7 @@ def create_schema(meta: MetaData):
         "feature_providers",
         meta,
         Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("provider_type", String(50), nullable=False),
         Column("provider_name", String(100), nullable=False),
         Column("is_enabled", Boolean, default=True),
@@ -440,7 +440,7 @@ def create_schema(meta: MetaData):
         "feature_provider_usage_logs",
         meta,
         Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("user_id", String, nullable=False),
+        Column("user_id", Integer, nullable=False),  # ForeignKey("users.id") - enable in Phase 6
         Column("provider_type", String(50), nullable=False),
         Column("success", Boolean, default=True),
         Column("latency_ms", Integer, nullable=True),

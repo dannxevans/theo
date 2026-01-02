@@ -6,6 +6,7 @@ Fetches unread emails and classifies them as important or not.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from sqlalchemy import text
@@ -46,7 +47,7 @@ def check_important_emails(memory_store):
 
     except Exception as e:
         logger.error(f"[EMAIL_SERVICE] Error during email check: {e}")
-        _log_error(memory_store, "local", "email_fetch", str(e))
+        _log_error(memory_store, DEFAULT_USER_ID, "email_fetch", str(e))
 
 
 def send_email_digest(memory_store):
@@ -82,7 +83,7 @@ def send_email_digest(memory_store):
 
     except Exception as e:
         logger.error(f"[EMAIL_SERVICE] Error during digest generation: {e}")
-        _log_error(memory_store, "local", "email_digest", str(e))
+        _log_error(memory_store, DEFAULT_USER_ID, "email_digest", str(e))
 
 
 def _get_users_for_email_check(memory_store) -> List[int]:
@@ -484,7 +485,7 @@ Generate the notification:"""
             "text": prompt,
             "session_id": "proactive_summarization",
             "memory": memory_store,
-            "user_id": str(user_id) if user_id is not None else "local",
+            "user_id": str(user_id) if user_id is not None else DEFAULT_USER_ID,
             "forced_provider": None
         }
 

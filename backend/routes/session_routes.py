@@ -6,6 +6,7 @@ export, forking, and title generation.
 """
 
 from flask import Blueprint, jsonify, request, Response
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 import json
 import logging
 import uuid
@@ -380,7 +381,7 @@ Title:"""
             "text": title_prompt,
             "session_id": session_id,
             "memory": memory,
-            "user_id": str(user_id) if user_id else "local",  # Added for routing preferences lookup
+            "user_id": normalize_user_id(user_id),  # Added for routing preferences lookup
             "forced_provider": None,  # Let router pick best provider
             "force_intent": "system"  # Use system intent for lightweight internal operations
         }

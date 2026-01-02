@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import select, delete, insert, update
 
 from .base import BaseMemoryOperations
+from core.user_utils import normalize_user_id
 
 
 class UserOperations(BaseMemoryOperations):
@@ -72,6 +73,9 @@ class UserOperations(BaseMemoryOperations):
         Returns:
             User dictionary or None
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             row = conn.execute(
                 select(self.users)
@@ -87,6 +91,9 @@ class UserOperations(BaseMemoryOperations):
             user_id: User ID
             password_hash: New hashed password
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 update(self.users)
@@ -104,6 +111,9 @@ class UserOperations(BaseMemoryOperations):
         Args:
             user_id: User ID to disable
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 update(self.users)
@@ -209,6 +219,9 @@ class UserOperations(BaseMemoryOperations):
             user_id: User identifier
             enabled: Whether debug mode is enabled
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.debug_settings)

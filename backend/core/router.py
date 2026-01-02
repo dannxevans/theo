@@ -14,12 +14,14 @@ from core.intent_classifier import classify_intent_enhanced
 import logging
 
 
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
+
 def _debug_log(memory: Optional[MemoryStore], message: str):
     """Log debug messages only if debug mode is enabled in user preferences."""
     if not memory:
         return
     try:
-        prefs = memory.get_all("local")
+        prefs = memory.get_all(DEFAULT_USER_ID)
         enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
         if enabled:
             logging.info(f"[DEBUG] {message}")
@@ -53,7 +55,7 @@ def _debug(memory: Optional[MemoryStore], msg: str, **context):
     try:
         debug_enabled = False
         if memory:
-            prefs = memory.get_all("local")
+            prefs = memory.get_all(DEFAULT_USER_ID)
             value = prefs.get("debug_enabled")
             if isinstance(value, str):
                 debug_enabled = value.lower() == "true"
@@ -231,8 +233,8 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
         return "general"
 
     # Get user intents, ordered by priority
-    # Use actual user_id, default to "local" only if user_id is None
-    lookup_user_id = str(user_id) if user_id is not None else "local"
+    # Normalize user_id (handles "local" string, None, and integers)
+    lookup_user_id = normalize_user_id(user_id)
     intents = memory.list_intents(lookup_user_id)
 
     # Filter to enabled intents only
@@ -267,13 +269,17 @@ def classify_intent(text: str, memory: Optional[MemoryStore] = None, user_id: Op
     return "general"
 
 
-def provider_supports_intent(provider_cfg, intent: str, memory=None, user_id="local") -> bool:
+def provider_supports_intent(provider_cfg: dict, intent: str, memory: Optional[MemoryStore] = None, user_id: Optional[int] = None) -> bool:
     """
     Check if a provider supports a given intent.
 
     For hardcoded intents (coding, general, etc.), check PROVIDER_CAPABILITIES.
     For custom user-defined intents, assume all providers can handle them via LLM.
     """
+    # Normalize user_id
+    if user_id is not None:
+        user_id = normalize_user_id(user_id)
+
     ptype = provider_cfg.get("type")
     allowed = PROVIDER_CAPABILITIES.get(ptype)
     if not allowed:
@@ -351,7 +357,7 @@ def extract_explicit_memory(text: str):
     return None, None, None
 
 
-def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[str]:
+def resolve_from_memory(text: str, memory: Optional[MemoryStore], user_id: Optional[int] = None) -> Optional[str]:
     """
     Step 2: Attempt to directly answer from structured memory.
     Returns an answer string if resolved, otherwise None.
@@ -362,7 +368,7 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
     text_l = text.lower().strip()
 
     # Try structured memory first
-    relevant_memories = memory.get_relevant_memories("local", text, max_results=3)
+    relevant_memories = memory.get_relevant_memories(normalize_user_id(user_id), text, max_results=3)
 
     for mem in relevant_memories:
         key_l = mem['key'].lower()
@@ -380,7 +386,7 @@ def resolve_from_memory(text: str, memory: Optional[MemoryStore]) -> Optional[st
             return f"Your {mem['key']} is {mem['value']}."
 
     # Legacy fallback to preferences table
-    facts = memory.get_all("local") or {}
+    facts = memory.get_all(normalize_user_id(user_id)) or {}
     for key, value in facts.items():
         key_l = key.lower()
 
@@ -628,10 +634,13 @@ Present this routing information in a friendly, natural way:"""
         return None
 
 
-def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None, user_id: str = "local"):
+def select_provider(intent: str, memory: Optional[MemoryStore], forced_provider: Optional[str] = None, user_id: Optional[int] = None):
     fallback_reason = None
     selected_provider = None
     routing_explanation = []
+
+    # Normalize user_id
+    user_id = normalize_user_id(user_id)
 
     # Step 3: Check health status and circuit breaker
     health_summary = memory.get_provider_health_summary() if memory else {}
@@ -855,7 +864,7 @@ def route_request(context: dict, stream: bool = False):
     # =============================
     # Memory-first resolution
     # =============================
-    answer = resolve_from_memory(text, memory)
+    answer = resolve_from_memory(text, memory, user_id=context.get("user_id"))
     if answer:
         _debug(memory, "Resolved directly from memory", answer=answer)
         return {
@@ -896,7 +905,7 @@ def route_request(context: dict, stream: bool = False):
         _debug(memory, "Handling weather request")
 
         # Get user_id from context
-        user_id = context.get("user_id") if context.get("user_id") else "local"
+        user_id = normalize_user_id(context.get("user_id"))
 
         # Get weather API key from user preferences
         prefs = memory.get_all(user_id) if memory else {}
@@ -945,8 +954,8 @@ def route_request(context: dict, stream: bool = False):
             location_lower = location.lower()
             logging.info(f"[WEATHER] Checking location alias: '{location}' (user_id: {user_id})")
 
-            # Memory facts are stored under "local" user_id, not numeric user_id
-            memory_user_id = "local"
+            # Memory facts now use integer user_id
+            memory_user_id = normalize_user_id(user_id)
 
             if location_lower in ["home", "my home"]:
                 # Query memory facts for Home Location
@@ -1069,7 +1078,7 @@ def route_request(context: dict, stream: bool = False):
         _debug(memory, "Handling routing request")
 
         # Get user_id from context
-        user_id = context.get("user_id") if context.get("user_id") else "local"
+        user_id = normalize_user_id(context.get("user_id"))
 
         # Get HERE API key from user preferences
         prefs = memory.get_all(user_id) if memory else {}
@@ -1107,7 +1116,7 @@ def route_request(context: dict, stream: bool = False):
                 destination = match.group(1).strip()
                 # Try to get home location as default origin
                 if memory:
-                    memories = memory.get_relevant_memories("local", "home location", max_results=5)
+                    memories = memory.get_relevant_memories(normalize_user_id(user_id), "home location", max_results=5)
                     home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
                     if home_mem:
                         origin = "home"
@@ -1125,8 +1134,8 @@ def route_request(context: dict, stream: bool = False):
 
         # Resolve location aliases (home, work, etc.) from memory facts
         if memory:
-            # Memory facts are stored under "local" user_id, not numeric user_id
-            memory_user_id = "local"
+            # Memory facts now use integer user_id
+            memory_user_id = normalize_user_id(user_id)
 
             # Resolve origin
             origin_lower = origin.lower()
@@ -1265,7 +1274,7 @@ def route_request(context: dict, stream: bool = False):
         _debug(memory, "Handling planning request")
 
         # Get user_id from context
-        user_id = context.get("user_id") if context.get("user_id") else "local"
+        user_id = normalize_user_id(context.get("user_id"))
 
         # Use PlanningHandlers to process the request
         from core.actions.planning_handlers import PlanningHandlers
@@ -1296,7 +1305,7 @@ def route_request(context: dict, stream: bool = False):
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
     # Get action intents from database (configurable per user)
-    user_id = context.get("user_id", "local")
+    user_id = normalize_user_id(context.get("user_id"))
     action_intents = memory.get_action_intents(user_id) if memory else []
     logging.info(f"[ROUTER] user_id={user_id}, intent={intent}, action_intents={action_intents}, in_list={intent in action_intents}")
 
@@ -1356,7 +1365,7 @@ def route_request(context: dict, stream: bool = False):
         memory_type, key, value = extract_explicit_memory(text)
         if key and value:
             # Use structured memory API
-            memory.store_memory("local", memory_type, key, value)
+            memory.store_memory(DEFAULT_USER_ID, memory_type, key, value)
             _debug(memory, "Explicit memory write", type=memory_type, key=key, value=value)
 
             # Return immediate confirmation
@@ -1387,7 +1396,7 @@ def route_request(context: dict, stream: bool = False):
     }
     if memory:
         memory.remember(
-            "local",
+            DEFAULT_USER_ID,
             "last_routing_decision",
             json.dumps(routing_decision),
         )
@@ -1429,6 +1438,7 @@ def route_request(context: dict, stream: bool = False):
         user_text=text,
         system_prompt_override=system_prompt_override,
         subtab_context_prefix=subtab_context_prefix,
+        user_id=context.get("user_id"),
     )
     system_prompt = context_obj["system"]
     messages = context_obj["messages"]
@@ -1575,7 +1585,7 @@ def route_request(context: dict, stream: bool = False):
             # Persist full response
             final_text = "".join(full_text)
             if memory:
-                memory.append("local", text, final_text)
+                memory.append(DEFAULT_USER_ID, text, final_text)
 
             # ⬇️ THIS IS THE IMPORTANT PART ⬇️
             yield {
@@ -1596,8 +1606,8 @@ def route_request(context: dict, stream: bool = False):
     # Check if message debug is enabled
     debug_instruction = None
     if memory:
-        # Use user_id if available, otherwise use "local" for unauthenticated users
-        check_user_id = user_id if user_id else "local"
+        # Normalize user_id for unauthenticated users
+        check_user_id = normalize_user_id(user_id)
         prefs = memory.get_all(check_user_id)
         message_debug_enabled = str(prefs.get("message_debug_enabled", "false")).lower() == "true"
 

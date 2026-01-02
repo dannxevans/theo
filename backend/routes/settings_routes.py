@@ -5,8 +5,15 @@ Provides application settings endpoints for debug mode and system prompt configu
 """
 
 from flask import Blueprint, jsonify, request
+from core.user_utils import DEFAULT_USER_ID
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/api/settings')
+
+
+
+def get_user_id_from_request():
+    """Extract user_id from auth token or use default."""
+    return DEFAULT_USER_ID
 
 
 @settings_bp.route("/debug", methods=["GET"])
@@ -21,7 +28,7 @@ def get_debug_setting():
     memory = MemoryStore(Config.DATABASE_URL)
 
     # Read from preferences, not routing
-    prefs = memory.get_all("local")
+    prefs = memory.get_all(get_user_id_from_request())
     value = prefs.get("debug_enabled")
 
     if value is None:
@@ -48,7 +55,7 @@ def set_debug_setting():
 
     # Persist as preference
     memory.remember(
-        user_id="local",
+        user_id=get_user_id_from_request(),
         key="debug_enabled",
         value=str(enabled).lower()
     )
@@ -68,8 +75,8 @@ def get_message_debug_setting():
 
     memory = MemoryStore(Config.DATABASE_URL)
 
-    # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    # Get authenticated user or use get_user_id_from_request() for unauthenticated
+    user_id = get_user_id_from_request()
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -102,8 +109,8 @@ def set_message_debug_setting():
 
     memory = MemoryStore(Config.DATABASE_URL)
 
-    # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    # Get authenticated user or use get_user_id_from_request() for unauthenticated
+    user_id = get_user_id_from_request()
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -140,7 +147,7 @@ def get_system_prompt_settings():
     from config import Config
 
     memory = MemoryStore(Config.DATABASE_URL)
-    config = memory.get_system_prompt_config("local")
+    config = memory.get_system_prompt_config(get_user_id_from_request())
     
     return jsonify(config)
 
@@ -165,7 +172,7 @@ def update_system_prompt_settings():
     if not updates:
         return jsonify({"error": "No valid fields to update"}), 400
 
-    memory.update_system_prompt_config("local", **updates)
+    memory.update_system_prompt_config(get_user_id_from_request(), **updates)
     return jsonify({"status": "ok"})
 
 
@@ -180,8 +187,8 @@ def get_user_preference(key):
 
     memory = MemoryStore(Config.DATABASE_URL)
 
-    # For now, using "local" as user_id (will be replaced with actual auth later)
-    value = memory.get_user_preference("local", key)
+    # For now, using get_user_id_from_request() as user_id (will be replaced with actual auth later)
+    value = memory.get_user_preference(get_user_id_from_request(), key)
 
     return jsonify({"value": value})
 
@@ -203,8 +210,8 @@ def set_user_preference(key):
     if value is None:
         return jsonify({"error": "Value is required"}), 400
 
-    # For now, using "local" as user_id
-    memory.set_user_preference("local", key, str(value))
+    # For now, using get_user_id_from_request() as user_id
+    memory.set_user_preference(get_user_id_from_request(), key, str(value))
 
     return jsonify({"status": "ok"})
 
@@ -220,7 +227,7 @@ def get_proactive_settings():
     from sqlalchemy import text
 
     memory = MemoryStore(Config.DATABASE_URL)
-    user_id = "local"  # For now, using "local" as user_id
+    user_id = get_user_id_from_request()  # For now, using get_user_id_from_request() as user_id
 
     try:
         with memory.engine.connect() as conn:
@@ -285,7 +292,7 @@ def update_proactive_settings():
     from sqlalchemy import text
 
     memory = MemoryStore(Config.DATABASE_URL)
-    user_id = "local"  # For now, using "local" as user_id
+    user_id = get_user_id_from_request()  # For now, using get_user_id_from_request() as user_id
     data = request.json
 
     try:

@@ -27,32 +27,27 @@ def test_confirmation_manager_initialization():
     """Test that ConfirmationManager can be initialized."""
     print("\n=== Test 1: ConfirmationManager Initialization ===")
 
-    try:
-        # Create temporary database
-        db_path = "/tmp/test_confirmation_init.db"
-        if os.path.exists(db_path):
-            os.remove(db_path)
-
-        memory = MemoryStore(f"sqlite:///{db_path}")
-        action_registry = ActionProviderRegistry(memory)
-        action_router = ActionRouter(action_registry, memory)
-        confirmation_manager = ConfirmationManager(memory, action_router)
-
-        print("✓ ConfirmationManager initialized successfully")
-        print(f"  - Manager: {confirmation_manager}")
-        print(f"  - Memory: {confirmation_manager.memory}")
-        print(f"  - Router: {confirmation_manager.action_router}")
-
-        # Cleanup
+    # Create temporary database
+    db_path = "/tmp/test_confirmation_init.db"
+    if os.path.exists(db_path):
         os.remove(db_path)
 
-        return True
+    memory = MemoryStore(f"sqlite:///{db_path}")
+    action_registry = ActionProviderRegistry(memory)
+    action_router = ActionRouter(action_registry, memory)
+    confirmation_manager = ConfirmationManager(memory, action_router)
 
-    except Exception as e:
-        print(f"✗ Failed to initialize ConfirmationManager: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    print("✓ ConfirmationManager initialized successfully")
+    print(f"  - Manager: {confirmation_manager}")
+    print(f"  - Memory: {confirmation_manager.memory}")
+    print(f"  - Router: {confirmation_manager.action_router}")
+
+    # Cleanup
+    os.remove(db_path)
+
+    assert confirmation_manager is not None
+    assert confirmation_manager.memory is not None
+    assert confirmation_manager.action_router is not None
 
 
 def test_create_confirmation():

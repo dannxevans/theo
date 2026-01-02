@@ -8,6 +8,7 @@ import logging
 import json
 from datetime import datetime
 from sqlalchemy import Table, Column, Integer, String, Text, MetaData, select, insert, update, delete
+from core.user_utils import normalize_user_id
 
 
 class RoutineOperations:
@@ -47,6 +48,9 @@ class RoutineOperations:
         Returns:
             List of routine dicts
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             stmt = select(self.user_routines).where(
                 self.user_routines.c.user_id == user_id
@@ -87,6 +91,9 @@ class RoutineOperations:
         Returns:
             Created routine ID
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             now = datetime.utcnow().isoformat()
 

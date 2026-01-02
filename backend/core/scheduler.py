@@ -6,6 +6,7 @@ Uses APScheduler to run periodic checks based on user-configurable settings.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -161,7 +162,7 @@ class ProactiveScheduler:
                         FROM proactive_settings
                         WHERE user_id = :user_id
                     """),
-                    {"user_id": "local"}
+                    {"user_id": DEFAULT_USER_ID}
                 )
 
                 row = result.fetchone()
