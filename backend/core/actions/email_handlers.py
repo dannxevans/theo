@@ -237,36 +237,81 @@ class EmailHandlers(BaseActionHandler):
 
         provider_id, provider = provider_result
 
-        # Extract email identifier (subject search)
-        # Look for quoted text or "email about X" or "email from X"
-        subject_match = re.search(r"['\"]([^'\"]+)['\"]", user_text)
-
-        if not subject_match:
-            return self._format_error_response(
-                "I couldn't identify which email to reply to. Please specify the email subject in quotes (e.g., \"reply to 'this is a test'\").",
-                "compose_email"
-            )
-
-        search_subject = subject_match.group(1)
-        logging.info(f"[EMAIL_HANDLERS] Searching for email with subject: {search_subject}")
+        # Extract email identifier
+        # Priority 1: Check for recent proactive email notification in conversation
+        # Priority 2: Look for quoted subject text
+        matching_email = None
 
         try:
-            # Read recent emails to find the one to reply to
-            emails = provider.read_email(folder="inbox", top=50)
+            # Check for recent proactive email notification
+            recent_turns = self.memory.get_recent_turns(session_id, limit=10)
+            for turn in reversed(recent_turns):  # Most recent first
+                if turn.get("role") == "assistant":
+                    metadata = turn.get("metadata", {})
+                    if metadata.get("proactive") and metadata.get("type") == "important_email":
+                        # Found a proactive email notification - extract email ID
+                        source_ids = metadata.get("source_ids", [])
+                        if source_ids:
+                            email_id = source_ids[0]
+                            logging.info(f"[EMAIL_HANDLERS] Found recent proactive email notification with ID: {email_id}")
 
-            # Find matching email by subject
-            matching_email = None
-            for email in emails:
-                if search_subject.lower() in email.get("subject", "").lower():
-                    matching_email = email
-                    break
+                            # Fetch the email details
+                            emails = provider.read_email(folder="inbox", top=50)
+                            for email in emails:
+                                if email.get("id") == email_id:
+                                    matching_email = email
+                                    break
 
-            if not matching_email:
+                            if matching_email:
+                                logging.info(f"[EMAIL_HANDLERS] Using email from proactive notification: {matching_email.get('subject')}")
+                                break
+        except Exception as e:
+            logging.warning(f"[EMAIL_HANDLERS] Failed to check proactive notifications: {e}")
+
+        # If no proactive email found, look for quoted subject text
+        if not matching_email:
+            subject_match = re.search(r"['\"]([^'\"]+)['\"]", user_text)
+
+            if not subject_match:
                 return self._format_error_response(
-                    f"I couldn't find an email with subject containing '{search_subject}'. Please check the subject and try again.",
+                    "I couldn't identify which email to reply to. Either:\n1. Reply immediately after receiving a proactive email notification, or\n2. Specify the email subject in quotes (e.g., \"reply to 'this is a test'\").",
                     "compose_email"
                 )
 
+            search_subject = subject_match.group(1)
+            logging.info(f"[EMAIL_HANDLERS] Searching for email with subject: {search_subject}")
+
+            try:
+                # Read recent emails to find the one to reply to
+                emails = provider.read_email(folder="inbox", top=50)
+
+                # Find matching email by subject
+                for email in emails:
+                    if search_subject.lower() in email.get("subject", "").lower():
+                        matching_email = email
+                        break
+
+                if not matching_email:
+                    return self._format_error_response(
+                        f"I couldn't find an email with subject containing '{search_subject}'. Please check the subject and try again.",
+                        "compose_email"
+                    )
+            except Exception as e:
+                self._log_error("handle_email_reply", e)
+                return self._format_error_response(
+                    f"I encountered an error searching for the email: {str(e)}",
+                    "compose_email",
+                    str(e)
+                )
+
+        # At this point, matching_email should be set (either from proactive or subject search)
+        if not matching_email:
+            return self._format_error_response(
+                "I couldn't identify which email to reply to.",
+                "compose_email"
+            )
+
+        try:
             # Extract what to include in reply (e.g., "with details about my calendar")
             reply_context = user_text.lower()
             include_calendar = "calendar" in reply_context or "schedule" in reply_context
@@ -280,8 +325,9 @@ class EmailHandlers(BaseActionHandler):
             )
 
             if not reply_body:
+                logging.error(f"[EMAIL_HANDLERS] _generate_reply_body returned None for email reply")
                 return self._format_error_response(
-                    "I couldn't generate a reply. Please try rephrasing your request.",
+                    "I couldn't generate a reply. This might be due to missing LLM provider configuration. Please check that you have a provider configured for the 'system' intent.",
                     "compose_email"
                 )
 
@@ -485,51 +531,9 @@ class EmailHandlers(BaseActionHandler):
         Returns:
             Generated reply body (HTML)
         """
-        from providers.openai import OpenAIProvider
-        from core.provider_registry import ProviderRegistry
+        from core.router import route_request
 
         try:
-            # Get system provider for lightweight tasks (configurable)
-            registry = ProviderRegistry(self.memory)
-
-            # First check for "system" routing preference
-            system_provider_id = self.memory.get_routing_provider(user_id, "system") if self.memory else None
-            provider_cfg = None
-
-            if system_provider_id:
-                # Use configured system provider
-                provider_cfg = registry.get(system_provider_id)
-                logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                # Try configured fallback provider for system intent
-                fallback_provider_id = self.memory.get_fallback_provider(user_id, "system") if self.memory else None
-                if fallback_provider_id:
-                    provider_cfg = registry.get(fallback_provider_id)
-                    if provider_cfg and provider_cfg.get("api_key"):
-                        logging.info(f"[EMAIL_HANDLERS] Using configured fallback provider: {fallback_provider_id}")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                # Fallback to OpenAI provider
-                provider_cfg = registry.get_by_type("openai")
-                logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                logging.warning("[EMAIL_HANDLERS] No LLM provider available for email generation")
-                return None
-
-            # Instantiate appropriate provider based on type
-            provider_type = provider_cfg.get("type", "openai")
-            if provider_type == "openai":
-                provider = OpenAIProvider(
-                    api_key=provider_cfg["api_key"],
-                    base_url=provider_cfg.get("base_url"),
-                    model=provider_cfg.get("model") or "gpt-4o-mini"
-                )
-            else:
-                # For now, only OpenAI is supported for lightweight tasks
-                logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for email generation")
-                return None
 
             # Get user's name from memory facts
             user_name = None
@@ -614,12 +618,22 @@ Guidelines:
 
 Generate a reply email body:"""
 
-            response = provider.chat(
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}]
-            )
+            # Use route_request to leverage user's routing preferences
+            router_context = {
+                "text": user_prompt,
+                "session_id": "email_reply_generation",
+                "memory": self.memory,
+                "user_id": str(user_id),
+                "force_intent": "system",  # Use system intent for internal generation
+                "system_message": system_prompt
+            }
 
-            reply_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+            result = route_request(router_context)
+            reply_text = result.get("text", "").strip()
+
+            if not reply_text:
+                logging.warning("[EMAIL_HANDLERS] LLM returned empty reply")
+                return None
 
             # Convert to simple HTML
             reply_html = reply_text.replace("\n", "<br>\n")
