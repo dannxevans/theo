@@ -197,8 +197,57 @@ def stream_chat_sse(session_id):
             router_context["session_mode"] = current_mode
             router_context["session_user_id"] = user_id
 
-            # Route request (non-streaming, we chunk manually)
-            result = route_request(router_context)
+            # Check for routine triggers
+            routine_name = None
+            routine_actions_list = None
+
+            try:
+                from core.routines import detect_routine, execute_routine, consolidate_results
+                from app import action_router
+
+                # Get user routines if authenticated
+                user_routines = None
+                if user_id:
+                    user_routines = memory.get_user_routines(user_id)
+
+                detected_routine_name, routine_def = detect_routine(filtered_text, user_routines)
+
+                if detected_routine_name and routine_def:
+                    logging.info(f"[ROUTINES] Detected routine: {detected_routine_name}")
+
+                    # Build routine execution context
+                    routine_context = {
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "mode": current_mode,
+                        "action_router": action_router,
+                        "memory": memory
+                    }
+
+                    # Execute routine actions
+                    execution_results = execute_routine(routine_def, routine_context)
+
+                    # Consolidate results using lightweight LLM
+                    result = consolidate_results(
+                        routine_def,
+                        execution_results,
+                        route_request,
+                        memory,
+                        user_id
+                    )
+
+                    # Store routine metadata for database
+                    routine_name = detected_routine_name
+                    routine_actions_list = execution_results.get("actions", [])
+
+                else:
+                    # Normal LLM routing
+                    result = route_request(router_context)
+
+            except Exception as e:
+                logging.error(f"[ROUTINES] Routine execution failed: {e}", exc_info=True)
+                # Fall back to normal LLM routing
+                result = route_request(router_context)
 
             full_text = result.get("text", "")
             chunk_size = 32
@@ -209,7 +258,7 @@ def stream_chat_sse(session_id):
 
             # Save the turn to database BEFORE sending end event
             # This ensures metadata is persisted before frontend reloads messages
-            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id)
+            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
 
             # Send metadata at end of stream
             end_payload = {
