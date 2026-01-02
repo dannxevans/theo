@@ -866,15 +866,22 @@ def route_request(context: dict, stream: bool = False):
             "fallback_reason": None,
         }
 
+    # Check if intent is being forced (used for internal summarization to prevent loops)
+    force_intent = context.get("force_intent")
+
     # Use enhanced intent classification with mode and subtab awareness
-    intent = classify_intent_enhanced(
-        text=text,
-        memory=memory,
-        user_id=context.get("user_id"),
-        mode=context.get("mode"),
-        subtab=context.get("subtab"),
-        provider_registry=provider_registry
-    )
+    if force_intent:
+        intent = force_intent
+        _debug(memory, f"Intent forced to: {force_intent}")
+    else:
+        intent = classify_intent_enhanced(
+            text=text,
+            memory=memory,
+            user_id=context.get("user_id"),
+            mode=context.get("mode"),
+            subtab=context.get("subtab"),
+            provider_registry=provider_registry
+        )
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)

@@ -11,13 +11,14 @@
   forkSession,
   generateSessionTitle,
   approveConfirmation,
-  rejectConfirmation
+  rejectConfirmation,
+  dismissProactiveNotification
 } from "../lib/api.js";
   import { marked } from "marked";
   import Prism from "prismjs";
   import "prismjs/components/prism-python";
   import "prismjs/themes/prism-tomorrow.css";
-  import { tick, afterUpdate } from "svelte";
+  import { tick, afterUpdate, onMount, onDestroy } from "svelte";
   import VoiceControls from "./VoiceControls.svelte";
 
   export let sessionId;
@@ -184,6 +185,13 @@
   let speechSpeed = 1.0;
   let isSpeaking = false; // Track if TTS is currently playing
 
+  // Polling for new proactive notifications
+  let pollingInterval = null;
+  const POLL_INTERVAL_MS = 30000; // Poll every 30 seconds
+
+  // Track user interaction for autoplay permission
+  let hasUserInteracted = false;
+
   // Load voice settings from localStorage
   function loadVoiceSettings() {
     selectedVoice = localStorage.getItem("theo.voice") || "alloy";
@@ -208,12 +216,18 @@
       const shouldSkipTTS = latestMessage?.task_type === "coding";
 
       if (latestMessage && latestMessage.role === "assistant" && latestMessage.text && !shouldSkipTTS) {
-        // Reload voice settings in case they were changed
-        loadVoiceSettings();
-        // Auto-read the latest assistant message
-        setTimeout(() => {
-          voiceControls?.speak(latestMessage.text);
-        }, 100);
+        // Only attempt autoplay if user has interacted with the page
+        // This prevents browser autoplay policy errors
+        if (hasUserInteracted) {
+          // Reload voice settings in case they were changed
+          loadVoiceSettings();
+          // Auto-read the latest assistant message
+          setTimeout(() => {
+            voiceControls?.speak(latestMessage.text);
+          }, 100);
+        } else {
+          console.log("[TTS] Skipping autoplay - waiting for user interaction (browser autoplay policy)");
+        }
       }
       // Update count after processing
       lastMessageCount = messages.length;
@@ -229,7 +243,50 @@
   // Mode switch notification
   let modeSwitchNotification = null;
 
-  import { onMount } from "svelte";
+  // Start polling for new messages
+  function startPolling() {
+    stopPolling(); // Clear any existing interval
+
+    pollingInterval = setInterval(async () => {
+      if (!sessionId || loading) return;
+
+      try {
+        const turns = await getSessionMessages(sessionId);
+        const currentMessageCount = turns.length;
+
+        // If new messages appeared, refresh
+        if (currentMessageCount > messages.length) {
+          console.log(`[POLLING] New messages detected (${currentMessageCount} vs ${messages.length}), refreshing...`);
+
+          messages = turns.map(t => ({
+            id: t.id,
+            role: t.role,
+            text: t.content,
+            provider: t.provider,
+            model: t.model,
+            task_type: t.task_type,
+            created_at: t.created_at,
+            metadata: t.metadata || null
+          }));
+
+          // Scroll to bottom on new message
+          await tick();
+          scrollToBottom();
+        }
+      } catch (e) {
+        // Silently fail - don't spam console with poll errors
+      }
+    }, POLL_INTERVAL_MS);
+  }
+
+  // Stop polling
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
   onMount(async () => {
     try {
       const result = await getProviders();
@@ -270,6 +327,27 @@
         modeSwitchNotification = null;
       }, 3000);
     });
+
+    // Track user interaction for autoplay permission
+    const markUserInteraction = () => {
+      if (!hasUserInteracted) {
+        hasUserInteracted = true;
+        console.log("[TTS] User interaction detected - autoplay enabled");
+      }
+    };
+
+    // Listen for any user interaction
+    document.addEventListener("click", markUserInteraction, { once: false });
+    document.addEventListener("keydown", markUserInteraction, { once: false });
+    document.addEventListener("touchstart", markUserInteraction, { once: false });
+
+    // Start polling for new proactive notifications
+    startPolling();
+  });
+
+  onDestroy(() => {
+    // Clean up polling on component destroy
+    stopPolling();
   });
 
   // Reload messages whenever session changes
@@ -427,6 +505,7 @@
       const turns = await getSessionMessages(id);
 
       messages = turns.map(t => ({
+        id: t.id,
         role: t.role,
         text: t.content,
         provider: t.provider,
@@ -646,6 +725,26 @@
     }
     return `${minutes}m`;
   }
+
+  async function handleDismissNotification(turnId) {
+    try {
+      await dismissProactiveNotification(turnId);
+
+      // Update the message metadata to show dismissed status
+      messages = messages.map(m => {
+        if (m.id === turnId) {
+          return {
+            ...m,
+            metadata: { ...m.metadata, dismissed: true, dismissed_at: new Date().toISOString() }
+          };
+        }
+        return m;
+      });
+    } catch (e) {
+      console.error("Dismiss error:", e);
+      alert("Failed to dismiss notification: " + e.message);
+    }
+  }
 </script>
 
 <div class="chat">
@@ -761,7 +860,7 @@
             </div>
           {/if}
 
-          {#each messages as m}
+          {#each messages.filter(m => !(m.metadata?.proactive && m.metadata?.dismissed)) as m}
             <div class="message {m.role}">
               <div class="bubble">
                 <div class="message-header">
@@ -847,6 +946,18 @@
                           </button>
                         </div>
                       {/if}
+                    </div>
+                  {/if}
+
+                  {#if m.metadata && m.metadata.proactive && !m.metadata.dismissed}
+                    <div class="proactive-notification">
+                      <button
+                        class="btn-dismiss"
+                        on:click={() => handleDismissNotification(m.id)}
+                        title="Dismiss this notification"
+                      >
+                        × Dismiss
+                      </button>
                     </div>
                   {/if}
 
@@ -1167,6 +1278,28 @@
   .btn-reject:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .proactive-notification {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .btn-dismiss {
+    padding: 0.4rem 0.8rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-dismiss:hover {
+    background: #c82333;
   }
 
   .confirmation-status {

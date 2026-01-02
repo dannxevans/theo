@@ -1053,6 +1053,22 @@ export async function rejectConfirmation(confirmationId, reason = null) {
   return response.json();
 }
 
+export async function dismissProactiveNotification(turnId) {
+  const response = await fetch(`${API_BASE}/api/proactive/dismiss/${turnId}`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || "Failed to dismiss notification");
+  }
+
+  return response.json();
+}
+
 // =============================
 // Session Mode API
 // =============================
@@ -1286,6 +1302,38 @@ export async function deleteFeatureProvider(providerType) {
   if (!response.ok) {
     const err = await response.text();
     throw new Error(err || "Failed to delete feature provider");
+  }
+
+  return response.json();
+}
+
+// Proactive Notification Settings
+export async function getProactiveSettings() {
+  const response = await fetch(`${API_BASE}/api/settings/proactive`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to fetch proactive settings");
+  }
+
+  return response.json();
+}
+
+export async function updateProactiveSettings(settings) {
+  const response = await fetch(`${API_BASE}/api/settings/proactive`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(settings)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update proactive settings");
   }
 
   return response.json();
