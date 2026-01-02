@@ -202,6 +202,14 @@ class DatabaseLogHandler(logging.Handler):
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
+            # Check if debug_logs table exists before trying to insert
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+            if not cursor.fetchone():
+                # Table doesn't exist yet - skip logging
+                # This prevents crashes during initial startup before migrations run
+                conn.close()
+                return
+
             # Batch insert
             cursor.executemany("""
                 INSERT INTO debug_logs (timestamp, level, source, component, message, raw_data, user_id, session_id)

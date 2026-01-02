@@ -208,6 +208,17 @@ def get_logs():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
+        # Check if debug_logs table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+        if not cursor.fetchone():
+            # Table doesn't exist yet - return empty results
+            conn.close()
+            return jsonify({
+                "logs": [],
+                "total": 0,
+                "has_more": False
+            })
+
         # Build query with filters
         query = "SELECT * FROM debug_logs WHERE 1=1"
         params = []
@@ -297,6 +308,13 @@ def clear_logs():
         db_path = get_db_path(memory)
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
+
+        # Check if debug_logs table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+        if not cursor.fetchone():
+            # Table doesn't exist yet - nothing to delete
+            conn.close()
+            return jsonify({"deleted": 0})
 
         # Build delete query
         query = "DELETE FROM debug_logs WHERE 1=1"
@@ -405,14 +423,25 @@ def get_debug_status():
         prefs = memory.get_all(DEFAULT_USER_ID)
         enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
 
-        # Get log count
-        db_path = get_db_path(memory)
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) as count FROM debug_logs")
-        row = cursor.fetchone()
-        log_count = row[0] if row else 0
-        conn.close()
+        # Get log count (gracefully handle missing table)
+        log_count = 0
+        try:
+            db_path = get_db_path(memory)
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Check if debug_logs table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+            if cursor.fetchone():
+                cursor.execute("SELECT COUNT(*) as count FROM debug_logs")
+                row = cursor.fetchone()
+                log_count = row[0] if row else 0
+
+            conn.close()
+        except Exception as db_error:
+            # If debug_logs table doesn't exist or other DB error, return 0
+            # This prevents the entire endpoint from failing
+            pass
 
         return jsonify({
             "enabled": enabled,
