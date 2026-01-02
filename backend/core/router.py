@@ -940,6 +940,69 @@ def route_request(context: dict, stream: bool = False):
                 "fallback_reason": "missing_location",
             }
 
+        # Resolve location aliases (home, work, etc.) from memory
+        if memory:
+            location_lower = location.lower()
+            logging.info(f"[WEATHER] Checking location alias: '{location}' (user_id: {user_id})")
+
+            # Memory facts are stored under "local" user_id, not numeric user_id
+            memory_user_id = "local"
+
+            if location_lower in ["home", "my home"]:
+                # Query memory facts for Home Location
+                memories = memory.get_relevant_memories(memory_user_id, "home location", max_results=5)
+                home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
+                if home_mem:
+                    home_location = home_mem.get('value')
+                    logging.info(f"[WEATHER] Resolved 'home' → '{home_location}'")
+                    location = home_location
+                else:
+                    logging.warning(f"[WEATHER] Home Location not found in memory facts")
+            elif location_lower in ["work", "my work", "office", "my office"]:
+                # Query memory facts for Work Location
+                memories = memory.get_relevant_memories(memory_user_id, "work location", max_results=5)
+                work_mem = next((m for m in memories if m.get('key') == 'Work Location'), None)
+                if work_mem:
+                    work_location = work_mem.get('value')
+                    logging.info(f"[WEATHER] Resolved 'work' → '{work_location}'")
+                    location = work_location
+                else:
+                    logging.warning(f"[WEATHER] Work Location not found in memory facts")
+            else:
+                logging.info(f"[WEATHER] Location '{location}' is not an alias, using as-is")
+
+        # Fallback check after resolution
+        if not location:
+            return {
+                "text": "I can get the weather for you! Which location would you like to know about?",
+                "provider": "weather",
+                "model": None,
+                "task_type": "weather",
+                "fallback_reason": "missing_location",
+            }
+
+        # Extract city from full address for OpenWeather API
+        # OpenWeather expects ONLY city names like "Salford" or "Wirral" (NO postcodes)
+        # Example: "Soapworks, Colgate Ln, Salford M5 3LZ" → "Salford"
+        # Example: "8 Harefields Way, Wirral. CH494SB" → "Wirral"
+        if location and ',' in location:
+            parts = [p.strip() for p in location.split(',')]
+            # UK postcode pattern: XX## #XX or X# #XX
+            postcode_pattern = r'[A-Z]{1,2}\d{1,2}\s?\d?[A-Z]{2}'
+
+            # Find the city (last part that's not a postcode and doesn't contain a postcode)
+            for part in reversed(parts):
+                # Skip empty parts
+                if not part:
+                    continue
+                # Remove any postcode from this part
+                part_clean = re.sub(postcode_pattern, '', part).strip().rstrip('.')
+                # If there's meaningful text left after removing postcode, this is likely the city
+                if part_clean and len(part_clean) > 2:
+                    location = part_clean
+                    logging.info(f"[WEATHER] Extracted city '{location}' from full address")
+                    break
+
         # Fetch weather data
         from core.weather_service import WeatherService
         import time
@@ -1029,22 +1092,109 @@ def route_request(context: dict, stream: bool = False):
         origin = None
         destination = None
 
-        # Pattern: "route from X to Y" or "directions from X to Y"
-        from_to_pattern = r'(?:route|directions|navigate|drive|travel) from ([^t]+) to (.+)'
+        # Pattern 1: Explicit "from X to Y"
+        from_to_pattern = r'from\s+(.+?)\s+to\s+(.+?)(?:\?|$|\.)'
         match = re.search(from_to_pattern, text_l)
         if match:
             origin = match.group(1).strip()
             destination = match.group(2).strip()
+            logging.info(f"[ROUTING] Extracted from/to: '{origin}' → '{destination}'")
+        else:
+            # Pattern 2: Only "to Y" (assume current location as origin)
+            to_only_pattern = r'(?:route|traffic|directions|navigate|drive|commute)\s+(?:to|for)\s+(.+?)(?:\?|$|\.)'
+            match = re.search(to_only_pattern, text_l)
+            if match:
+                destination = match.group(1).strip()
+                # Try to get home location as default origin
+                if memory:
+                    memories = memory.get_relevant_memories("local", "home location", max_results=5)
+                    home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
+                    if home_mem:
+                        origin = "home"
+                        logging.info(f"[ROUTING] Extracted to-only pattern, using home as origin: '{origin}' → '{destination}'")
 
         # If no match, ask for clarification
         if not origin or not destination:
             return {
-                "text": "I can provide routing information! Please specify the origin and destination coordinates (e.g., 'route from 52.5308,13.3847 to 52.5264,13.3686').",
+                "text": "I can provide routing information! Please specify the origin and destination (e.g., 'route from home to work').",
                 "provider": "routing",
                 "model": None,
                 "task_type": "routing",
                 "fallback_reason": "missing_locations",
             }
+
+        # Resolve location aliases (home, work, etc.) from memory facts
+        if memory:
+            # Memory facts are stored under "local" user_id, not numeric user_id
+            memory_user_id = "local"
+
+            # Resolve origin
+            origin_lower = origin.lower()
+            if origin_lower in ["home", "my home"]:
+                memories = memory.get_relevant_memories(memory_user_id, "home location", max_results=5)
+                home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
+                if home_mem:
+                    home_location = home_mem.get('value')
+                    logging.info(f"[ROUTING] Resolved origin 'home' → '{home_location}'")
+                    origin = home_location
+            elif origin_lower in ["work", "my work", "office", "my office"]:
+                memories = memory.get_relevant_memories(memory_user_id, "work location", max_results=5)
+                work_mem = next((m for m in memories if m.get('key') == 'Work Location'), None)
+                if work_mem:
+                    work_location = work_mem.get('value')
+                    logging.info(f"[ROUTING] Resolved origin 'work' → '{work_location}'")
+                    origin = work_location
+
+            # Resolve destination
+            dest_lower = destination.lower()
+            if dest_lower in ["home", "my home"]:
+                memories = memory.get_relevant_memories(memory_user_id, "home location", max_results=5)
+                home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
+                if home_mem:
+                    home_location = home_mem.get('value')
+                    logging.info(f"[ROUTING] Resolved destination 'home' → '{home_location}'")
+                    destination = home_location
+            elif dest_lower in ["work", "my work", "office", "my office"]:
+                memories = memory.get_relevant_memories(memory_user_id, "work location", max_results=5)
+                work_mem = next((m for m in memories if m.get('key') == 'Work Location'), None)
+                if work_mem:
+                    work_location = work_mem.get('value')
+                    logging.info(f"[ROUTING] Resolved destination 'work' → '{work_location}'")
+                    destination = work_location
+
+        # Fallback check after resolution
+        if not origin or not destination:
+            return {
+                "text": "I can provide routing information! Please specify the origin and destination.",
+                "provider": "routing",
+                "model": None,
+                "task_type": "routing",
+                "fallback_reason": "missing_locations",
+            }
+
+        # Extract city from full addresses for better geocoding accuracy
+        # While HERE API can handle full addresses, simplified addresses work better
+        # Example: "Soapworks, Colgate Ln, Salford M5 3LZ" → "Salford M5 3LZ"
+        def extract_city_for_routing(location):
+            if location and ',' in location:
+                parts = [p.strip() for p in location.split(',')]
+                # UK postcode pattern: XX## #XX or X# #XX
+                postcode_pattern = r'[A-Z]{1,2}\d{1,2}\s?\d?[A-Z]{2}'
+
+                # Find city with postcode (last 2 parts usually)
+                # Example: "Salford M5 3LZ" from "Soapworks, Colgate Ln, Salford M5 3LZ"
+                if len(parts) >= 2:
+                    # Check if last part contains postcode
+                    last_part = parts[-1]
+                    if re.search(postcode_pattern, last_part):
+                        # Return city + postcode (last 2 parts)
+                        city_with_postcode = ", ".join(parts[-2:]) if len(parts) >= 2 else last_part
+                        logging.info(f"[ROUTING] Extracted '{city_with_postcode}' from full address")
+                        return city_with_postcode
+            return location
+
+        origin = extract_city_for_routing(origin)
+        destination = extract_city_for_routing(destination)
 
         # Fetch route data
         from core.traffic_service import TrafficService

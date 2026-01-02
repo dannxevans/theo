@@ -20,6 +20,7 @@ from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
 from .actions import ActionOperations
 from .voice import VoiceOperations
+from .routines import RoutineOperations
 
 
 class MemoryStore:
@@ -97,6 +98,7 @@ class MemoryStore:
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
+        self._routine_ops = RoutineOperations(self.engine)
         self._voice_ops = VoiceOperations(self.engine, tables)
 
     # =============================
@@ -243,9 +245,9 @@ class MemoryStore:
         """Generate an automatic summary of the conversation using an LLM."""
         return self._session_ops.generate_auto_summary(session_id, provider_call)
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
         """Save a conversation turn (message)."""
-        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata, mode, user_id)
+        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata, mode, user_id, routine_name, routine_actions)
 
     def get_recent_turns(self, session_id, limit=6):
         """Get recent conversation turns for a session."""
@@ -258,6 +260,10 @@ class MemoryStore:
     def update_turn_metadata(self, session_id, role, metadata):
         """Update metadata for the most recent turn matching session_id and role."""
         return self._session_ops.update_turn_metadata(session_id, role, metadata)
+
+    def delete_turn(self, turn_id):
+        """Delete a specific turn by ID."""
+        return self._session_ops.delete_turn(turn_id)
 
     # =============================
     # Provider Operations (delegated)
@@ -661,3 +667,32 @@ class MemoryStore:
                 }
             )
             conn.execute(stmt)
+
+    # ==============================
+    # Routine Operations (delegated)
+    # ==============================
+
+    def get_user_routines(self, user_id):
+        """Get all routines for a user."""
+        return self._routine_ops.get_user_routines(user_id)
+
+    def get_user_routine(self, routine_id, user_id):
+        """Get a specific routine."""
+        return self._routine_ops.get_user_routine(routine_id, user_id)
+
+    def create_user_routine(self, user_id, name, triggers, actions, consolidation_prompt=""):
+        """Create a new user routine."""
+        return self._routine_ops.create_user_routine(
+            user_id, name, triggers, actions, consolidation_prompt
+        )
+
+    def update_user_routine(self, routine_id, user_id, name=None, triggers=None,
+                           actions=None, consolidation_prompt=None, enabled=None):
+        """Update a user routine."""
+        return self._routine_ops.update_user_routine(
+            routine_id, user_id, name, triggers, actions, consolidation_prompt, enabled
+        )
+
+    def delete_user_routine(self, routine_id, user_id):
+        """Delete a user routine."""
+        return self._routine_ops.delete_user_routine(routine_id, user_id)

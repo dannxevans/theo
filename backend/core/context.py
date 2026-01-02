@@ -184,15 +184,17 @@ class ContextManager:
     # =============================
     # Context update
     # =============================
-    def update(self, session_id, user_text, assistant_text, provider_registry=None, mode="personal", user_id=None):
+    def update(self, session_id, user_text, assistant_text, provider_registry=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
         """
         Persist the latest turn and update the rolling session summary.
 
         Args:
             mode: Session mode ("work" or "personal")
             user_id: User ID for session filtering
+            routine_name: Optional routine name if this is a routine execution
+            routine_actions: Optional list of action types executed in routine
         """
-        logging.info(f"[CONTEXT] update() called for session {session_id}, mode={mode}")
+        logging.info(f"[CONTEXT] update() called for session {session_id}, mode={mode}, routine={routine_name}")
 
         # Extract metadata from assistant response if it's a dict
         provider_id = None
@@ -215,8 +217,8 @@ class ContextManager:
         # Store recent turns with mode and user_id
         logging.info(f"[CONTEXT] Storing user turn")
         self._store_turn(session_id, "user", user_text, mode=mode, user_id=user_id)
-        logging.info(f"[CONTEXT] Storing assistant turn with metadata: {metadata is not None}")
-        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent, metadata=metadata, mode=mode, user_id=user_id)
+        logging.info(f"[CONTEXT] Storing assistant turn with metadata: {metadata is not None}, routine={routine_name}")
+        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent, metadata=metadata, mode=mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions)
         logging.info(f"[CONTEXT] Turns stored successfully")
 
         # Derive and persist session title if supported by memory store
@@ -283,7 +285,7 @@ class ContextManager:
             limit=self.MAX_RECENT_TURNS * 2
         )
 
-    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None):
+    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
         self.memory.save_turn(
             session_id=session_id,
             role=role,
@@ -294,7 +296,9 @@ class ContextManager:
             intent=intent,
             metadata=metadata,
             mode=mode,
-            user_id=user_id
+            user_id=user_id,
+            routine_name=routine_name,
+            routine_actions=routine_actions
         )
 
     def _generate_summary(self, session_id):

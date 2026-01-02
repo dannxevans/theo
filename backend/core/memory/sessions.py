@@ -372,7 +372,7 @@ class SessionOperations(BaseMemoryOperations):
     # Conversation Turns
     # =============================
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
         """
         Save a conversation turn (message).
 
@@ -387,6 +387,8 @@ class SessionOperations(BaseMemoryOperations):
             metadata: Optional metadata dictionary
             mode: Session mode ("work" or "personal")
             user_id: User ID for session filtering
+            routine_name: Optional routine name if this is a routine execution
+            routine_actions: Optional list of actions executed in routine
         """
         logging.info(f"[MEMORY] save_turn() called: session={session_id}, role={role}, mode={mode}, has_metadata={metadata is not None}")
         self._ensure_session(session_id, mode=mode, user_id=user_id)
@@ -416,6 +418,15 @@ class SessionOperations(BaseMemoryOperations):
                 logging.error(f"[MEMORY] Metadata content: {metadata}")
                 metadata_json = None
 
+        # Serialize routine_actions to JSON if it's a list
+        routine_actions_json = None
+        if routine_actions:
+            try:
+                routine_actions_json = json.dumps(routine_actions) if isinstance(routine_actions, list) else routine_actions
+            except (TypeError, ValueError) as e:
+                logging.error(f"[MEMORY] Failed to serialize routine_actions to JSON: {e}")
+                routine_actions_json = None
+
         now = created_at or datetime.utcnow()
         with self._get_connection() as conn:
             logging.info(f"[MEMORY] Inserting turn into database...")
@@ -429,6 +440,8 @@ class SessionOperations(BaseMemoryOperations):
                     model=model,
                     intent=intent,
                     metadata=metadata_json,
+                    routine_name=routine_name,
+                    routine_actions=routine_actions_json,
                 )
             )
             turn_id = result.lastrowid
@@ -564,3 +577,17 @@ class SessionOperations(BaseMemoryOperations):
                     .where(self.turns.c.id == turn.id)
                     .values(metadata=metadata_json)
                 )
+
+    def delete_turn(self, turn_id):
+        """
+        Delete a specific turn by ID.
+
+        Args:
+            turn_id: Turn identifier to delete
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                delete(self.turns)
+                .where(self.turns.c.id == turn_id)
+            )
+            logging.info(f"[MEMORY] Deleted turn {turn_id}")
