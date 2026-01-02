@@ -136,6 +136,8 @@ class ActionRouter:
             # Email actions
             "read_email": self.email_handlers.handle_read_email,
             "compose_email": self.email_handlers.handle_compose_email,
+            "email_reply": self.email_handlers.handle_email_reply,
+            "send_email": self.email_handlers.handle_email_send,
 
             # Confirmation actions
             "approve_confirmation": self.confirmation_handlers.handle_approve_confirmation,
