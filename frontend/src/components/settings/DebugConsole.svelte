@@ -37,12 +37,15 @@
 
   async function checkDebugStatus() {
     try {
-      const response = await fetch('/api/debug/status');
+      // Use full API URL to handle different environments
+      const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:1066';
+      const response = await fetch(`${API_BASE}/api/debug/status`);
       const data = await response.json();
       debugEnabled = data.enabled;
       totalLogs = data.log_count;
     } catch (e) {
       error = `Failed to check debug status: ${e.message}`;
+      console.error('Debug status check error:', e);
     }
   }
 
