@@ -237,36 +237,81 @@ class EmailHandlers(BaseActionHandler):
 
         provider_id, provider = provider_result
 
-        # Extract email identifier (subject search)
-        # Look for quoted text or "email about X" or "email from X"
-        subject_match = re.search(r"['\"]([^'\"]+)['\"]", user_text)
-
-        if not subject_match:
-            return self._format_error_response(
-                "I couldn't identify which email to reply to. Please specify the email subject in quotes (e.g., \"reply to 'this is a test'\").",
-                "compose_email"
-            )
-
-        search_subject = subject_match.group(1)
-        logging.info(f"[EMAIL_HANDLERS] Searching for email with subject: {search_subject}")
+        # Extract email identifier
+        # Priority 1: Check for recent proactive email notification in conversation
+        # Priority 2: Look for quoted subject text
+        matching_email = None
 
         try:
-            # Read recent emails to find the one to reply to
-            emails = provider.read_email(folder="inbox", top=50)
+            # Check for recent proactive email notification
+            recent_turns = self.memory.get_recent_turns(session_id, limit=10)
+            for turn in reversed(recent_turns):  # Most recent first
+                if turn.get("role") == "assistant":
+                    metadata = turn.get("metadata", {})
+                    if metadata.get("proactive") and metadata.get("type") == "important_email":
+                        # Found a proactive email notification - extract email ID
+                        source_ids = metadata.get("source_ids", [])
+                        if source_ids:
+                            email_id = source_ids[0]
+                            logging.info(f"[EMAIL_HANDLERS] Found recent proactive email notification with ID: {email_id}")
 
-            # Find matching email by subject
-            matching_email = None
-            for email in emails:
-                if search_subject.lower() in email.get("subject", "").lower():
-                    matching_email = email
-                    break
+                            # Fetch the email details
+                            emails = provider.read_email(folder="inbox", top=50)
+                            for email in emails:
+                                if email.get("id") == email_id:
+                                    matching_email = email
+                                    break
 
-            if not matching_email:
+                            if matching_email:
+                                logging.info(f"[EMAIL_HANDLERS] Using email from proactive notification: {matching_email.get('subject')}")
+                                break
+        except Exception as e:
+            logging.warning(f"[EMAIL_HANDLERS] Failed to check proactive notifications: {e}")
+
+        # If no proactive email found, look for quoted subject text
+        if not matching_email:
+            subject_match = re.search(r"['\"]([^'\"]+)['\"]", user_text)
+
+            if not subject_match:
                 return self._format_error_response(
-                    f"I couldn't find an email with subject containing '{search_subject}'. Please check the subject and try again.",
+                    "I couldn't identify which email to reply to. Either:\n1. Reply immediately after receiving a proactive email notification, or\n2. Specify the email subject in quotes (e.g., \"reply to 'this is a test'\").",
                     "compose_email"
                 )
 
+            search_subject = subject_match.group(1)
+            logging.info(f"[EMAIL_HANDLERS] Searching for email with subject: {search_subject}")
+
+            try:
+                # Read recent emails to find the one to reply to
+                emails = provider.read_email(folder="inbox", top=50)
+
+                # Find matching email by subject
+                for email in emails:
+                    if search_subject.lower() in email.get("subject", "").lower():
+                        matching_email = email
+                        break
+
+                if not matching_email:
+                    return self._format_error_response(
+                        f"I couldn't find an email with subject containing '{search_subject}'. Please check the subject and try again.",
+                        "compose_email"
+                    )
+            except Exception as e:
+                self._log_error("handle_email_reply", e)
+                return self._format_error_response(
+                    f"I encountered an error searching for the email: {str(e)}",
+                    "compose_email",
+                    str(e)
+                )
+
+        # At this point, matching_email should be set (either from proactive or subject search)
+        if not matching_email:
+            return self._format_error_response(
+                "I couldn't identify which email to reply to.",
+                "compose_email"
+            )
+
+        try:
             # Extract what to include in reply (e.g., "with details about my calendar")
             reply_context = user_text.lower()
             include_calendar = "calendar" in reply_context or "schedule" in reply_context
