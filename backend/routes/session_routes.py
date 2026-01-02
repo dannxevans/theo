@@ -91,6 +91,7 @@ def get_session_messages(session_id):
     # Normalise shape for frontend
     return jsonify([
         {
+            "id": t.get("id"),
             "role": t["role"],
             "content": t["content"],
             "created_at": t["created_at"].isoformat() if t.get("created_at") else None,
@@ -299,6 +300,15 @@ def generate_session_title(session_id):
 
     # Use a provider to generate the title
     try:
+        # Get authenticated user_id
+        user_id = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            auth_session = memory.get_auth_session(token)
+            if auth_session and auth_session["expires_at"] >= datetime.utcnow():
+                user_id = auth_session["user_id"]
+
         # Build minimal context for title generation
         title_prompt = f"""Based on this conversation, generate a concise, descriptive title.
 
@@ -318,8 +328,9 @@ Title:"""
             "text": title_prompt,
             "session_id": session_id,
             "memory": memory,
+            "user_id": str(user_id) if user_id else "local",  # Added for routing preferences lookup
             "forced_provider": None,  # Let router pick best provider
-            "force_intent": "general"  # Force general intent to avoid action routing
+            "force_intent": "system"  # Use system intent for lightweight internal operations
         }
 
         result = route_request(router_context)

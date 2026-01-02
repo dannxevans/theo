@@ -331,6 +331,9 @@ class PlanningService:
 
     def _fetch_weather(self, location: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Fetch weather data for location."""
+        import time
+        start_time = time.time()
+
         try:
             prefs = self.memory.get_all(str(user_id))
             api_key = prefs.get("feature_provider_openweather_api_key")
@@ -345,10 +348,19 @@ class PlanningService:
                 self.logger.info(f"[PLANNING] Parsed location '{location}' -> '{parsed_location}'")
 
             weather_service = WeatherService(api_key)
-            return weather_service.get_weather(parsed_location)
+            result = weather_service.get_weather(parsed_location)
+
+            # Log successful usage
+            latency_ms = int((time.time() - start_time) * 1000)
+            self._log_feature_provider_usage(user_id, "openweather", success=True, latency_ms=latency_ms)
+
+            return result
 
         except Exception as e:
             self.logger.error(f"[PLANNING] Failed to fetch weather: {e}")
+            # Log failed usage
+            latency_ms = int((time.time() - start_time) * 1000)
+            self._log_feature_provider_usage(user_id, "openweather", success=False, latency_ms=latency_ms, error_message=str(e))
             return None
 
     def _get_user_location(self, user_id: str, location_type: str) -> Optional[str]:
@@ -387,6 +399,9 @@ class PlanningService:
 
     def _fetch_traffic(self, activity_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
         """Fetch traffic data for activity."""
+        import time
+        start_time = time.time()
+
         try:
             prefs = self.memory.get_all(str(user_id))
             api_key = prefs.get("feature_provider_here_api_key")
@@ -422,14 +437,23 @@ class PlanningService:
             if activity_data.get("time"):
                 departure_time = datetime.fromisoformat(activity_data["time"])
 
-            return traffic_service.get_traffic_estimate(
+            result = traffic_service.get_traffic_estimate(
                 origin=origin,
                 destination=destination,
                 departure_time=departure_time
             )
 
+            # Log successful usage
+            latency_ms = int((time.time() - start_time) * 1000)
+            self._log_feature_provider_usage(user_id, "here", success=True, latency_ms=latency_ms)
+
+            return result
+
         except Exception as e:
             self.logger.error(f"[PLANNING] Failed to fetch traffic: {e}")
+            # Log failed usage
+            latency_ms = int((time.time() - start_time) * 1000)
+            self._log_feature_provider_usage(user_id, "here", success=False, latency_ms=latency_ms, error_message=str(e))
             return None
 
     def _fetch_traffic_to_event(self, destination: str, start_time: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -444,6 +468,9 @@ class PlanningService:
         Returns:
             Traffic estimate dict or None
         """
+        import time
+        start_time_ms = time.time()
+
         try:
             prefs = self.memory.get_all(str(user_id))
             api_key = prefs.get("feature_provider_here_api_key")
@@ -482,14 +509,23 @@ class PlanningService:
                 cleaned_time = re.sub(r'\.(\d{6})\d+', r'.\1', start_time).replace("Z", "+00:00")
                 departure_time = datetime.fromisoformat(cleaned_time)
 
-            return traffic_service.get_traffic_estimate(
+            result = traffic_service.get_traffic_estimate(
                 origin=origin,
                 destination=destination,
                 departure_time=departure_time
             )
 
+            # Log successful usage
+            latency_ms = int((time.time() - start_time_ms) * 1000)
+            self._log_feature_provider_usage(user_id, "here", success=True, latency_ms=latency_ms)
+
+            return result
+
         except Exception as e:
             self.logger.error(f"[PLANNING] Failed to fetch traffic to event: {e}")
+            # Log failed usage
+            latency_ms = int((time.time() - start_time_ms) * 1000)
+            self._log_feature_provider_usage(user_id, "here", success=False, latency_ms=latency_ms, error_message=str(e))
             return None
 
     def _check_calendar_conflicts(self, time_str: str, user_id: str) -> List[Dict[str, Any]]:
@@ -557,3 +593,34 @@ class PlanningService:
             return "⛈️"
         else:
             return "🌤️"
+
+    def _log_feature_provider_usage(self, user_id: str, provider_type: str, success: bool, latency_ms: int = None, error_message: str = None):
+        """
+        Log feature provider usage to database for health tracking.
+
+        Args:
+            user_id: User ID
+            provider_type: Provider type (e.g., 'openweather', 'here')
+            success: Whether the request succeeded
+            latency_ms: Request latency in milliseconds
+            error_message: Error message if request failed
+        """
+        try:
+            from sqlalchemy import text
+            with self.memory.engine.connect() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO feature_provider_usage_logs (user_id, provider_type, success, latency_ms, error_message)
+                        VALUES (:user_id, :provider_type, :success, :latency_ms, :error_message)
+                    """),
+                    {
+                        "user_id": str(user_id),
+                        "provider_type": provider_type,
+                        "success": 1 if success else 0,
+                        "latency_ms": latency_ms,
+                        "error_message": error_message
+                    }
+                )
+                conn.commit()
+        except Exception as e:
+            self.logger.error(f"[PLANNING] Failed to log feature provider usage: {e}")

@@ -14,3 +14,4 @@ pytest
 pytest-cov
 pytest-mock
 pytest-flask
+apscheduler==3.10.4

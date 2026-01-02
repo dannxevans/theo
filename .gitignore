@@ -32,6 +32,7 @@ coverage/
 .env.*.local
 
 # THEO runtime data
+dev-docs/
 backend/data/
 *.sqlite
 *.sqlite3
@@ -64,6 +65,7 @@ Thumbs.db
 docs/
 theo.wiki/
 wiki/
+dev-docs/
 
 # Python package build artifacts
 *.egg-info/

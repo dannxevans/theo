@@ -419,7 +419,7 @@ class SessionOperations(BaseMemoryOperations):
         now = created_at or datetime.utcnow()
         with self._get_connection() as conn:
             logging.info(f"[MEMORY] Inserting turn into database...")
-            conn.execute(
+            result = conn.execute(
                 insert(self.turns).values(
                     session_id=session_id,
                     role=role,
@@ -431,12 +431,14 @@ class SessionOperations(BaseMemoryOperations):
                     metadata=metadata_json,
                 )
             )
-            logging.info(f"[MEMORY] Turn inserted successfully")
+            turn_id = result.lastrowid
+            logging.info(f"[MEMORY] Turn inserted successfully with ID {turn_id}")
             conn.execute(
                 update(self.sessions)
                 .where(self.sessions.c.id == session_id)
                 .values(updated_at=now)
             )
+            return turn_id
 
     def get_recent_turns(self, session_id, limit=6):
         """
@@ -452,6 +454,7 @@ class SessionOperations(BaseMemoryOperations):
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(
+                    self.turns.c.id,
                     self.turns.c.role,
                     self.turns.c.content,
                     self.turns.c.created_at,
@@ -468,6 +471,7 @@ class SessionOperations(BaseMemoryOperations):
             # Reverse so oldest → newest
             return [
                 {
+                    "id": r.id,
                     "role": r.role,
                     "content": r.content,
                     "created_at": r.created_at,
