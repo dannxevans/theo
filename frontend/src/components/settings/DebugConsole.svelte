@@ -421,29 +421,31 @@
 
   .btn-secondary {
     padding: 0.4rem 0.8rem;
-    background: var(--color-gray-100);
-    border: 1px solid var(--color-gray-300);
+    background: var(--gray-100, #f3f4f6);
+    border: 1px solid var(--gray-300, #d1d5db);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
+    color: var(--text-primary, #111827);
   }
 
   .btn-secondary:hover {
-    background: var(--color-gray-200);
+    background: var(--gray-200, #e5e7eb);
   }
 
   .btn-danger {
     padding: 0.4rem 0.8rem;
-    background: var(--color-error);
+    background: var(--error-500, #ef4444);
     color: white;
-    border: 1px solid var(--color-error);
+    border: 1px solid var(--error-500, #ef4444);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
   }
 
   .btn-danger:hover {
-    background: #c53030;
+    background: var(--error-600, #dc2626);
+    border-color: var(--error-600, #dc2626);
   }
 
   .connection-status {
@@ -469,13 +471,13 @@
   }
 
   .status-disconnected {
-    background: var(--color-gray-200);
-    color: var(--color-gray-600);
+    background: var(--gray-200, #e5e7eb);
+    color: var(--gray-600, #4b5563);
   }
 
   .log-count {
     font-size: 0.9rem;
-    color: var(--color-gray-600);
+    color: var(--gray-600, #4b5563);
   }
 
   .error-message {
@@ -487,7 +489,7 @@
   }
 
   .filters {
-    background: var(--color-gray-50);
+    background: var(--gray-50, #f9fafb);
     padding: 1rem;
     border-radius: 6px;
     margin-bottom: 1rem;
@@ -593,21 +595,21 @@
   .console-footer {
     margin-top: 0.5rem;
     font-size: 0.85rem;
-    color: var(--color-gray-600);
+    color: var(--gray-600, #4b5563);
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
 
   .paused-indicator {
-    color: var(--color-warning);
+    color: var(--warning-500, #f59e0b);
     font-weight: 600;
   }
 
   .debug-disabled-message {
     text-align: center;
     padding: 3rem;
-    color: var(--color-gray-600);
+    color: var(--gray-600, #4b5563);
   }
 
   .debug-disabled-message .note {
