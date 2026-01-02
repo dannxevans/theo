@@ -12,6 +12,7 @@ import logging
 from sqlalchemy import select, delete, insert, update
 
 from .base import BaseMemoryOperations
+from core.user_utils import normalize_user_id
 
 
 class IntentOperations(BaseMemoryOperations):
@@ -31,6 +32,9 @@ class IntentOperations(BaseMemoryOperations):
             provider_id: Provider ID to route to
             fallback_provider_id: Optional fallback provider ID
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.routing_preferences)
@@ -57,6 +61,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             Dictionary mapping intent to {provider_id, fallback_provider_id}
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(self.routing_preferences)
@@ -78,6 +85,9 @@ class IntentOperations(BaseMemoryOperations):
             user_id: User identifier
             intent: Intent ID
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.routing_preferences)
@@ -96,6 +106,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             Provider ID or None if not set
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             row = conn.execute(
                 select(self.routing_preferences.c.provider_id)
@@ -115,6 +128,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             Fallback provider ID or None if not set
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             row = conn.execute(
                 select(self.routing_preferences.c.fallback_provider_id)
@@ -148,6 +164,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             List of intent dictionaries
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(self.intents)
@@ -180,6 +199,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             Intent dictionary or None
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             row = conn.execute(
                 select(self.intents)
@@ -214,6 +236,9 @@ class IntentOperations(BaseMemoryOperations):
             enabled: Whether intent is enabled
             is_action: Whether this is an action intent (calendar, email, etc.)
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 insert(self.intents).values(
@@ -242,6 +267,7 @@ class IntentOperations(BaseMemoryOperations):
         Raises:
             ValueError: If intent does not exist
         """
+        user_id = normalize_user_id(user_id)
         updates["updated_at"] = datetime.utcnow()
         with self._get_connection() as conn:
             result = conn.execute(
@@ -264,6 +290,9 @@ class IntentOperations(BaseMemoryOperations):
         Raises:
             ValueError: If intent does not exist
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             # Delete routing preferences first
             conn.execute(
@@ -429,6 +458,9 @@ class IntentOperations(BaseMemoryOperations):
         Returns:
             List of action intent IDs
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(self.intents.c.id)

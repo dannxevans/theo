@@ -6,10 +6,11 @@ using a lightweight LLM.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from typing import Dict, Any
 
 
-def consolidate_results(routine_def, execution_results, router_func, memory, user_id="local"):
+def consolidate_results(routine_def, execution_results, router_func, memory, user_id=DEFAULT_USER_ID):
     """
     Consolidate routine execution results into a single response.
 

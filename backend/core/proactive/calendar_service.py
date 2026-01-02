@@ -6,6 +6,7 @@ Fetches upcoming events and generates notifications using system LLM.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from sqlalchemy import text
@@ -47,7 +48,7 @@ def check_calendar_events(memory_store):
 
     except Exception as e:
         logger.error(f"[CALENDAR_SERVICE] Error during calendar check: {e}")
-        _log_error(memory_store, "local", "calendar_fetch", str(e))
+        _log_error(memory_store, DEFAULT_USER_ID, "calendar_fetch", str(e))
 
 
 def _get_users_for_calendar_check(memory_store) -> List[int]:
@@ -519,7 +520,7 @@ Generate the reminder:"""
             "text": prompt,
             "session_id": "proactive_summarization",
             "memory": memory_store,
-            "user_id": str(user_id) if user_id is not None else "local",
+            "user_id": str(user_id) if user_id is not None else DEFAULT_USER_ID,
             "forced_provider": None
         }
 

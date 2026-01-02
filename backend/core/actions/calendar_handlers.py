@@ -10,6 +10,7 @@ Provides handlers for calendar-related actions:
 """
 
 from typing import Dict, Any, List
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime, timedelta
 import logging
 import re
@@ -308,7 +309,7 @@ Keep it concise (2-3 sentences max) and conversational."""
                 "text": prompt,
                 "session_id": "calendar_enrichment",
                 "memory": self.memory,
-                "user_id": str(user_id) if user_id else "local",
+                "user_id": str(user_id) if user_id else DEFAULT_USER_ID,
                 "forced_provider": None,
                 "force_intent": "system",  # Use system intent for internal summarization (prevents infinite loop)
                 "system_message": system_message

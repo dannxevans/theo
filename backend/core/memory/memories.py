@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import select, delete, insert, update, func, case
 
 from .base import BaseMemoryOperations
+from core.user_utils import normalize_user_id
 
 
 class MemoryOperations(BaseMemoryOperations):
@@ -22,10 +23,11 @@ class MemoryOperations(BaseMemoryOperations):
         Store a user preference (legacy API).
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
             key: Preference key
             value: Preference value
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.preferences)
@@ -46,9 +48,10 @@ class MemoryOperations(BaseMemoryOperations):
         Remove a user preference (legacy API).
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
             key: Preference key
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.preferences)
@@ -61,11 +64,12 @@ class MemoryOperations(BaseMemoryOperations):
         Get all user preferences (legacy API).
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
 
         Returns:
             Dictionary of key-value pairs
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             rows = conn.execute(
                 select(self.preferences)
@@ -78,12 +82,13 @@ class MemoryOperations(BaseMemoryOperations):
         Store a structured memory with type classification.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
             memory_type: Type of memory (fact, preference, goal, context)
             key: Memory key/identifier
             value: Memory content
             pinned: Whether memory should be pinned (not subject to decay)
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             # Check if memory with this key already exists
             existing = conn.execute(
@@ -129,13 +134,14 @@ class MemoryOperations(BaseMemoryOperations):
         Retrieve memories, optionally filtered by type.
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
             memory_type: Optional type filter (fact, preference, goal, context)
             limit: Optional maximum number of results
 
         Returns:
             List of memory dictionaries sorted by relevance score (descending)
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             query = select(self.memories).where(self.memories.c.user_id == user_id)
 
@@ -161,13 +167,14 @@ class MemoryOperations(BaseMemoryOperations):
         - Time decay reduces score
 
         Args:
-            user_id: User identifier
+            user_id: User identifier (int, str, or None - will be normalized)
             query_text: Query text to match against
             max_results: Maximum number of memories to return
 
         Returns:
             List of memory dictionaries with computed_relevance scores
         """
+        user_id = normalize_user_id(user_id)
         with self._get_connection() as conn:
             all_memories = conn.execute(
                 select(self.memories)
@@ -246,6 +253,9 @@ class MemoryOperations(BaseMemoryOperations):
             user_id: User identifier
             memory_id: Memory ID to delete
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 delete(self.memories)
@@ -264,6 +274,9 @@ class MemoryOperations(BaseMemoryOperations):
             key: Optional new key
             value: Optional new value
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             # Build update values dict with only provided fields
             updates = {}
@@ -293,6 +306,9 @@ class MemoryOperations(BaseMemoryOperations):
             memory_id: Memory ID to pin/unpin
             pinned: True to pin, False to unpin
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             conn.execute(
                 update(self.memories)
@@ -311,6 +327,9 @@ class MemoryOperations(BaseMemoryOperations):
             user_id: User identifier
             decay_amount: Amount to decrease relevance scores
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             # Use case expression for SQLite compatibility (no greatest function)
             new_score = case(
@@ -335,6 +354,9 @@ class MemoryOperations(BaseMemoryOperations):
         Returns:
             Dictionary with persona_name, tone, style_rules, custom_instructions
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             row = conn.execute(
                 select(self.system_prompt_config)
@@ -365,6 +387,9 @@ class MemoryOperations(BaseMemoryOperations):
             user_id: User identifier
             **updates: Fields to update (persona_name, tone, style_rules, custom_instructions)
         """
+
+        user_id = normalize_user_id(user_id)
+
         with self._get_connection() as conn:
             # Check if config exists
             existing = conn.execute(
