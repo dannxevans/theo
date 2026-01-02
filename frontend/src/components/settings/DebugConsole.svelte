@@ -38,8 +38,8 @@
 
   async function checkDebugStatus() {
     try {
-      // Use full API URL to handle different environments
-      const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:1066';
+      // Use relative URL like rest of the app
+      const API_BASE = "";
       const response = await fetch(`${API_BASE}/api/debug/status`);
       const data = await response.json();
       debugEnabled = data.enabled;
