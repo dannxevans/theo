@@ -14,6 +14,7 @@
   import ThemeSettings from "./ThemeSettings.svelte";
   import VoiceSettings from "./VoiceSettings.svelte";
   import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
+  import RoutinesSettings from "./RoutinesSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -326,6 +327,9 @@
           <button class="dropdown-item" class:active={activeTab === "theme"} on:click={() => switchCategory("general", "theme")}>
             Theme
           </button>
+          <button class="dropdown-item" class:active={activeTab === "routines"} on:click={() => switchCategory("general", "routines")}>
+            Routines
+          </button>
         </div>
       {/if}
     </div>
@@ -414,6 +418,7 @@
       {#if activeTab === "memory"}Memory{/if}
       {#if activeTab === "voice"}Voice{/if}
       {#if activeTab === "theme"}Theme{/if}
+      {#if activeTab === "routines"}Routines{/if}
       {#if activeTab === "feature-providers"}Feature Providers{/if}
       {#if activeTab === "personal"}Personal Mode{/if}
       {#if activeTab === "work"}Work Mode{/if}
@@ -454,6 +459,10 @@
 
     {#if activeTab === "theme"}
       <ThemeSettings />
+    {/if}
+
+    {#if activeTab === "routines"}
+      <RoutinesSettings />
     {/if}
 
     {#if activeTab === "feature-providers"}
