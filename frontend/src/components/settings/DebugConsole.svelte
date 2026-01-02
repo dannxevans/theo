@@ -410,13 +410,13 @@
   }
 
   .btn-toggle.active {
-    background: var(--color-error);
-    border: 1px solid var(--color-error);
+    background: var(--error-500, #ef4444);
+    border: 1px solid var(--error-500, #ef4444);
   }
 
   .btn-toggle.active:hover {
-    background: #c53030;
-    border-color: #c53030;
+    background: var(--error-600, #dc2626);
+    border-color: var(--error-600, #dc2626);
   }
 
   .btn-secondary {
