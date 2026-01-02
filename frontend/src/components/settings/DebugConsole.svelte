@@ -392,23 +392,31 @@
 
   .btn-toggle {
     padding: 0.5rem 1rem;
-    background: var(--bg-tertiary, #fff);
-    border: 1px solid var(--border-primary, #ccc);
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
     transition: all 0.2s ease;
+    color: white;
   }
 
-  .btn-toggle:hover {
-    background: var(--bg-hover, #f0f0f0);
-    border-color: var(--theo-blue, #4a90e2);
+  .btn-toggle:not(.active) {
+    background: var(--theo-blue, #4a90e2);
+    border: 1px solid var(--theo-blue, #4a90e2);
+  }
+
+  .btn-toggle:not(.active):hover {
+    background: #357abd;
+    border-color: #357abd;
   }
 
   .btn-toggle.active {
-    background: var(--color-success);
-    color: white;
-    border-color: var(--color-success);
+    background: var(--color-error);
+    border: 1px solid var(--color-error);
+  }
+
+  .btn-toggle.active:hover {
+    background: #c53030;
+    border-color: #c53030;
   }
 
   .btn-secondary {
