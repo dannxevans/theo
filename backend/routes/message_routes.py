@@ -205,7 +205,12 @@ def stream_chat_sse(session_id):
                 from core.routines import detect_routine, execute_routine, consolidate_results
                 from app import action_router
 
-                detected_routine_name, routine_def = detect_routine(filtered_text)
+                # Get user routines if authenticated
+                user_routines = None
+                if user_id:
+                    user_routines = memory.get_user_routines(user_id)
+
+                detected_routine_name, routine_def = detect_routine(filtered_text, user_routines)
 
                 if detected_routine_name and routine_def:
                     logging.info(f"[ROUTINES] Detected routine: {detected_routine_name}")

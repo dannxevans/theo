@@ -1,46 +1,44 @@
 """
 Routine definitions for THEO.
 
-Defines system routines that bundle multiple actions together.
+Provides default routine templates.
+All routines are now user-editable.
 """
 
-# System-defined routines
-ROUTINES = {
-    "good_morning": {
-        "name": "Good Morning",
-        "description": "Morning briefing with calendar, important emails, and email summary",
-        "triggers": [
-            "good morning",
-            "good morning theo",
-            "morning briefing",
-            "morning update",
-        ],
-        "actions": [
-            {
-                "type": "calendar_read",
-                "description": "Read today's calendar events",
-                "params": {
-                    "timeframe": "today"
-                }
-            },
-            {
-                "type": "email_check",
-                "description": "Check for important emails",
-                "params": {
-                    "filter": "important",
-                    "unread_only": True
-                }
-            },
-            {
-                "type": "email_summary",
-                "description": "Summarize unread non-important emails",
-                "params": {
-                    "filter": "unread",
-                    "exclude_important": True
-                }
+# Default routine template for "Good Morning"
+# This is just a template - actual routines are stored in the database
+DEFAULT_GOOD_MORNING_ROUTINE = {
+    "name": "Good Morning",
+    "description": "Morning briefing with calendar, important emails, and email summary",
+    "triggers": [
+        "good morning",
+    ],
+    "actions": [
+        {
+            "type": "calendar_read",
+            "description": "Read today's calendar events",
+            "params": {
+                "timeframe": "today"
             }
-        ],
-        "consolidation_prompt": """You are summarizing a morning briefing for the user.
+        },
+        {
+            "type": "email_check",
+            "description": "Check for important emails",
+            "params": {
+                "filter": "important",
+                "unread_only": True
+            }
+        },
+        {
+            "type": "email_summary",
+            "description": "Summarize unread non-important emails",
+            "params": {
+                "filter": "unread",
+                "exclude_important": True
+            }
+        }
+    ],
+    "consolidation_prompt": """You are summarizing a morning briefing for the user.
 
 Given the following information:
 - Today's calendar events
@@ -56,38 +54,4 @@ Create a friendly, concise morning briefing that:
 
 Be natural and conversational. Don't use overly formal language.
 """
-    }
 }
-
-
-def get_routine_by_name(routine_name):
-    """
-    Get a routine definition by name.
-
-    Args:
-        routine_name: Name of the routine (e.g., "good_morning")
-
-    Returns:
-        Routine definition dict or None if not found
-    """
-    return ROUTINES.get(routine_name)
-
-
-def get_all_routines():
-    """
-    Get all defined routines.
-
-    Returns:
-        Dictionary of all routines
-    """
-    return ROUTINES.copy()
-
-
-def get_routine_names():
-    """
-    Get list of all routine names.
-
-    Returns:
-        List of routine names
-    """
-    return list(ROUTINES.keys())

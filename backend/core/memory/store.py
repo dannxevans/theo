@@ -20,6 +20,7 @@ from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
 from .actions import ActionOperations
 from .voice import VoiceOperations
+from .routines import RoutineOperations
 
 
 class MemoryStore:
@@ -97,6 +98,7 @@ class MemoryStore:
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
+        self._routine_ops = RoutineOperations(self.engine)
         self._voice_ops = VoiceOperations(self.engine, tables)
 
     # =============================
@@ -665,3 +667,32 @@ class MemoryStore:
                 }
             )
             conn.execute(stmt)
+
+    # ==============================
+    # Routine Operations (delegated)
+    # ==============================
+
+    def get_user_routines(self, user_id):
+        """Get all routines for a user."""
+        return self._routine_ops.get_user_routines(user_id)
+
+    def get_user_routine(self, routine_id, user_id):
+        """Get a specific routine."""
+        return self._routine_ops.get_user_routine(routine_id, user_id)
+
+    def create_user_routine(self, user_id, name, triggers, actions, consolidation_prompt=""):
+        """Create a new user routine."""
+        return self._routine_ops.create_user_routine(
+            user_id, name, triggers, actions, consolidation_prompt
+        )
+
+    def update_user_routine(self, routine_id, user_id, name=None, triggers=None,
+                           actions=None, consolidation_prompt=None, enabled=None):
+        """Update a user routine."""
+        return self._routine_ops.update_user_routine(
+            routine_id, user_id, name, triggers, actions, consolidation_prompt, enabled
+        )
+
+    def delete_user_routine(self, routine_id, user_id):
+        """Delete a user routine."""
+        return self._routine_ops.delete_user_routine(routine_id, user_id)
