@@ -272,7 +272,7 @@
             ⬇ Export
           </button>
           <button class="btn-danger" on:click={handleClearLogs}>
-            🗑 Clear
+            Clear
           </button>
           <span class="log-count">{totalLogs} logs</span>
         </div>
