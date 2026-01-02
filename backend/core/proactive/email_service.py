@@ -515,6 +515,62 @@ Generate the notification:"""
     return "\n".join(parts), None, None
 
 
+def _generate_digest_content(memory_store, user_id: int, email_count: int) -> tuple:
+    """
+    Generate digest notification text using LLM.
+
+    Args:
+        memory_store: MemoryStore instance
+        user_id: User ID
+        email_count: Number of non-important emails
+
+    Returns:
+        tuple: (digest_text, provider_id, model) or (digest_text, None, None) for template
+    """
+    # Try LLM generation first
+    try:
+        from core.router import route_request
+
+        prompt = f"""You are a helpful assistant that creates friendly email digest notifications.
+
+You need to notify the user that they have {email_count} unread email{'s' if email_count != 1 else ''} in their inbox that weren't urgent enough for immediate notification.
+
+Generate a brief, casual message (1-2 sentences) that:
+1. Addresses the user as "Hey Danny" (casual, friendly tone)
+2. Mentions they have {email_count} unread email{'s' if email_count != 1 else ''}
+3. Suggests they might want to check them when they have time
+4. Keeps it light and non-urgent
+
+Example: "Hey Danny, you've got {email_count} unread email{'s' if email_count != 1 else ''} waiting in your inbox. They're nothing urgent, but worth a look when you get a chance."
+
+Generate the notification:"""
+
+        # Route to LLM using "system" intent
+        context = {
+            "text": prompt,
+            "session_id": "proactive_digest",
+            "memory": memory_store,
+            "user_id": str(user_id) if user_id is not None else DEFAULT_USER_ID,
+            "forced_provider": None
+        }
+
+        result = route_request(context)
+        llm_summary = result.get("text", "").strip()
+        provider_id = result.get("provider")
+        model = result.get("model")
+
+        if llm_summary and len(llm_summary) > 10:  # Valid summary
+            logger.info(f"[EMAIL_SERVICE] Generated LLM digest (provider: {provider_id}, model: {model})")
+            return llm_summary, provider_id, model
+
+    except Exception as e:
+        logger.warning(f"[EMAIL_SERVICE] Failed to generate LLM digest, falling back to template: {e}")
+
+    # Fallback to template-based digest
+    digest_text = f"Email Digest ({email_count} unread email{'s' if email_count != 1 else ''})\n\nYou have {email_count} unread email{'s' if email_count != 1 else ''} in your inbox."
+    return digest_text, None, None
+
+
 def _generate_digest_for_user(memory_store, user_id: int) -> bool:
     """
     Generate and send email digest for non-important emails.
@@ -563,8 +619,8 @@ def _generate_digest_for_user(memory_store, user_id: int) -> bool:
             logger.debug(f"[EMAIL_SERVICE] Rate limit prevents digest for user {user_id}: {reason}")
             return False
 
-        # Generate digest content
-        digest_text = f"Email Digest ({email_count} unread email{'s' if email_count != 1 else ''})\n\nYou have {email_count} unread email{'s' if email_count != 1 else ''} in your inbox."
+        # Generate digest content via LLM
+        digest_text, provider_id, model = _generate_digest_content(memory_store, user_id, email_count)
 
         # Post proactive message to turns table (visible in chat)
         from core.proactive.message_poster import post_proactive_message
@@ -572,7 +628,9 @@ def _generate_digest_for_user(memory_store, user_id: int) -> bool:
             memory_store=memory_store,
             user_id=user_id,
             message_type='email_digest',
-            content=digest_text
+            content=digest_text,
+            provider_id=provider_id,
+            model=model
         )
 
         if not message_posted:
