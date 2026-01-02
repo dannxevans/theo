@@ -364,6 +364,10 @@
     margin-bottom: 1rem;
     flex-wrap: wrap;
     gap: 1rem;
+    background: var(--bg-secondary, #f8f9fa);
+    padding: 1rem;
+    border: 1px solid var(--border-primary, #e0e0e0);
+    border-radius: 6px;
   }
 
   .control-group {
@@ -374,11 +378,17 @@
 
   .btn-toggle {
     padding: 0.5rem 1rem;
-    background: var(--color-gray-100);
-    border: 1px solid var(--color-gray-300);
+    background: var(--bg-tertiary, #fff);
+    border: 1px solid var(--border-primary, #ccc);
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .btn-toggle:hover {
+    background: var(--bg-hover, #f0f0f0);
+    border-color: var(--theo-blue, #4a90e2);
   }
 
   .btn-toggle.active {
