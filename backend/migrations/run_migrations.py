@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
 """
-Master migration runner script.
+Manual migration runner script.
 
-Runs all pending migrations in order.
+NOTE: This is for MANUAL migrations only. The automatic migration runner used
+during application startup is in backend/db_backup.py:run_migrations().
+
+The db_backup.py runner is the canonical migration runner that:
+- Runs automatically on every application startup
+- Handles all migrations 001-019 in sequence
+- Is used by AWS deployments and Docker containers
+
+This script (run_migrations.py) is useful for:
+- Manual migration testing during development
+- Running migrations on a specific database file
+- Emergency migration fixes
 
 Usage:
   python3 backend/migrations/run_migrations.py
