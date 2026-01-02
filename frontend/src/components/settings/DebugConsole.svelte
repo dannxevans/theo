@@ -9,6 +9,7 @@
   let isLoading = false;
   let error = null;
   let consoleContainer;
+  let isUserScrolling = false;
 
   // Filter state
   let selectedLevels = { DEBUG: true, INFO: true, WARNING: true, ERROR: true };
@@ -117,9 +118,21 @@
     }
   }
 
+  function isScrolledToBottom() {
+    if (!consoleContainer) return true;
+    const threshold = 50; // pixels from bottom to be considered "at bottom"
+    const scrollBottom = consoleContainer.scrollHeight - consoleContainer.scrollTop - consoleContainer.clientHeight;
+    return scrollBottom < threshold;
+  }
+
+  function handleScroll() {
+    // Check if user is scrolled to bottom
+    isUserScrolling = !isScrolledToBottom();
+  }
+
   function scrollToBottom() {
     setTimeout(() => {
-      if (consoleContainer && !isPaused) {
+      if (consoleContainer && !isPaused && !isUserScrolling) {
         consoleContainer.scrollTop = consoleContainer.scrollHeight;
       }
     }, 10);
@@ -128,6 +141,7 @@
   function togglePause() {
     isPaused = !isPaused;
     if (!isPaused) {
+      isUserScrolling = false; // Reset user scrolling state when resuming
       scrollToBottom();
     }
   }
@@ -320,7 +334,7 @@
       </div>
 
       <!-- Console -->
-      <div class="console-container" bind:this={consoleContainer}>
+      <div class="console-container" bind:this={consoleContainer} on:scroll={handleScroll}>
         {#if isLoading}
           <div class="console-loading">Loading logs...</div>
         {:else if filteredLogs.length === 0}
