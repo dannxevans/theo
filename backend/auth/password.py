@@ -63,6 +63,9 @@ def require_auth(memory):
     """
     Decorator to protect routes with authentication.
     Checks for valid session token in Authorization header.
+
+    Args:
+        memory: MemoryStore instance or callable that returns MemoryStore instance
     """
     def decorator(f):
         @wraps(f)
@@ -74,18 +77,21 @@ def require_auth(memory):
 
             token = auth_header.split(" ")[1]
 
+            # Resolve memory if it's a callable (for lazy loading)
+            memory_store = memory() if callable(memory) else memory
+
             # Validate session
-            session = memory.get_auth_session(token)
+            session = memory_store.get_auth_session(token)
             if not session:
                 return jsonify({"error": "Invalid session"}), 401
 
             # Check if session expired
             if session["expires_at"] < datetime.utcnow():
-                memory.delete_auth_session(token)
+                memory_store.delete_auth_session(token)
                 return jsonify({"error": "Session expired"}), 401
 
             # Get user
-            user = memory.get_user_by_id(session["user_id"])
+            user = memory_store.get_user_by_id(session["user_id"])
             if not user or not user["is_enabled"]:
                 return jsonify({"error": "User disabled"}), 401
 
