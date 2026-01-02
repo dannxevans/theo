@@ -51,14 +51,21 @@ class PlanningService:
         """
         text_lower = user_text.lower()
 
-        # Check for planning keywords
-        planning_keywords = [
-            "going", "planning to", "want to", "need to", "will be",
-            "meeting", "appointment", "shopping", "visit", "heading to",
-            "tomorrow", "later", "this afternoon", "tonight"
+        # Check for planning action verbs (require verb + direction/destination)
+        # More restrictive to avoid false positives on casual conversation
+        planning_patterns = [
+            r'\b(going|heading|traveling|driving|flying)\s+(to|at)\s+\w+',  # "going to X"
+            r'\bplanning\s+to\s+\w+',  # "planning to..."
+            r'\b(want|need)\s+to\s+(go|visit|meet|attend)',  # "want to go..."
+            r'\b(meeting|appointment|lunch|dinner|shopping)\s+(at|in)\s+\w+',  # "meeting at X"
+            r'\bvisit\s+\w+',  # "visit X"
         ]
 
-        has_planning_intent = any(keyword in text_lower for keyword in planning_keywords)
+        has_planning_intent = False
+        for pattern in planning_patterns:
+            if re.search(pattern, text_lower):
+                has_planning_intent = True
+                break
 
         if not has_planning_intent:
             return None
@@ -68,8 +75,10 @@ class PlanningService:
         time_info = self._extract_time(user_text)
         activity_type = self._extract_activity_type(user_text)
 
-        if not location and not time_info:
-            self.logger.info("[PLANNING] Planning keywords detected but no location/time found")
+        # Require both location AND time for planning intent
+        # This prevents false positives on casual mentions
+        if not location or not time_info:
+            self.logger.info("[PLANNING] Planning pattern detected but missing location or time - skipping")
             return None
 
         activity_data = {
