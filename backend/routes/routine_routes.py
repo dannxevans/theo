@@ -5,6 +5,7 @@ Provides endpoints for managing user-defined routines.
 """
 
 from flask import Blueprint, jsonify, request, g
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime
 import json
 import logging
@@ -23,7 +24,7 @@ def get_routines():
     # Get authenticated user
     user_id = g.get('user_id')
     if not user_id:
-        user_id = "local"  # Default user for non-authenticated requests
+        user_id = DEFAULT_USER_ID  # Default user for non-authenticated requests
 
     try:
         # Get user-defined routines from database

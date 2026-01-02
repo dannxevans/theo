@@ -4,7 +4,7 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 **Philosophy**: Not "one model to rule them all," but use different models for different tasks while preserving seamless user experience.
 
-![CI](https://github.com/dannxevans/theo/actions/workflows/ci.yml/badge.svg?branch=stage) [![Tests](https://img.shields.io/badge/tests-445%20passing-brightgreen)]() [![Backend](https://img.shields.io/badge/backend-100%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-27.2%25-orange)]() [![License](https://img.shields.io/badge/license-private-red)]()
+![CI](https://github.com/dannxevans/theo/actions/workflows/ci.yml/badge.svg?branch=stage) [![Tests](https://img.shields.io/badge/tests-667%20passing-brightgreen)]() [![Backend](https://img.shields.io/badge/backend-100%25%20passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-67%25-green)]() [![License](https://img.shields.io/badge/license-private-red)]()
 
 ---
 
@@ -125,7 +125,7 @@ theo/
 │   ├── providers/             # AI provider integrations
 │   ├── voice/                 # TTS/STT providers (OpenAI)
 │   ├── actions/               # Action providers (M365, etc.)
-│   └── tests/                 # 386 backend tests (67.6% passing, core 97.8%)
+│   └── tests/                 # 667 backend tests (100% passing)
 └── frontend/
     ├── src/
     │   ├── components/        # Svelte components
@@ -192,8 +192,8 @@ pytest --cov=. --cov-report=html           # With coverage
 ```
 
 **Current Status**:
-- **All Backend Tests: 445/445 passing (100%)**
-- Code Coverage: 27.2%
+- **All Backend Tests: 667/667 passing (100%)**
+- Code Coverage: 67%
 
 ### Frontend Tests
 
@@ -205,7 +205,7 @@ npm run test:coverage                       # With coverage
 
 **Current Status**: Frontend tests available
 
-**Overall**: 445 backend tests passing (100%)
+**Overall**: 667 backend tests passing (100%)
 
 See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [Test Results](https://github.com/dannxevans/theo/wiki/Test-Results) for detailed documentation.
 
@@ -215,9 +215,9 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 
 - **Backend**: 5,300+ lines across 58 modular files
 - **Frontend**: Refactored from 2,777-line monolith to 12 components
-- **Tests**: 445 backend tests, all passing (100%)
-- **Test Pass Rate**: 100% backend (445/445 passing)
-- **Code Coverage**: 27.2% backend, expanding test coverage
+- **Tests**: 667 backend tests, all passing (100%)
+- **Test Pass Rate**: 100% backend (667/667 passing)
+- **Code Coverage**: 67% backend
 - **Routes**: 15 blueprint modules with 66+ endpoints
 - **Documentation**: 10 comprehensive docs + GitHub Wiki
 
@@ -232,7 +232,7 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 - OAuth 2.0 with automatic token refresh
 - Work/Personal modes with subtab configurations
 - Provider health monitoring and circuit breaker
-- Comprehensive testing infrastructure (445 backend tests, 100% passing)
+- Comprehensive testing infrastructure (667 backend tests, 100% passing)
 - Full codebase refactoring and modularization
 - UK Government OFFICIAL classification compliance
 
@@ -318,4 +318,4 @@ Built with:
 
 ---
 
-**Last Updated**: December 30, 2025
+**Last Updated**: January 2, 2026

@@ -6,6 +6,7 @@ Manages API keys and configuration for external feature providers
 """
 
 from flask import Blueprint, jsonify, request
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime
 
 feature_provider_bp = Blueprint('feature_providers', __name__, url_prefix='/api/feature-providers')
@@ -23,7 +24,7 @@ def get_feature_providers():
     memory = MemoryStore(Config.DATABASE_URL)
 
     # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    user_id = DEFAULT_USER_ID
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -86,7 +87,7 @@ def get_feature_provider(provider_type):
     memory = MemoryStore(Config.DATABASE_URL)
 
     # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    user_id = DEFAULT_USER_ID
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -148,7 +149,7 @@ def configure_feature_provider(provider_type):
     memory = MemoryStore(Config.DATABASE_URL)
 
     # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    user_id = DEFAULT_USER_ID
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -223,7 +224,7 @@ def delete_feature_provider(provider_type):
     memory = MemoryStore(Config.DATABASE_URL)
 
     # Get authenticated user or use "local" for unauthenticated
-    user_id = "local"
+    user_id = DEFAULT_USER_ID
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]

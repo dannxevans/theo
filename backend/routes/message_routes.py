@@ -5,6 +5,7 @@ Provides chat and streaming endpoints for message processing.
 """
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime
 import json
 import logging
@@ -26,7 +27,8 @@ def chat():
     session_id = payload.get("session_id", "default")
     text = payload.get("text", "")
 
-    context = context_manager.build_context(session_id, text)
+    # Note: /chat endpoint doesn't have auth, so user_id will default to DEFAULT_USER_ID
+    context = context_manager.build_context(session_id, text, user_id=None)
     result = route_request(context)
 
     # Pass the full result object so metadata can be extracted
@@ -69,7 +71,7 @@ def stream_chat_sse(session_id):
             else:
                 logging.warning(f"[AUTH] No token provided in request")
 
-            context = context_manager.build_context(session_id, text)
+            context = context_manager.build_context(session_id, text, user_id=user_id)
 
             router_context = dict(context)
             router_context["text"] = text
@@ -79,6 +81,9 @@ def stream_chat_sse(session_id):
                 router_context["user_id"] = user_id
             if forced_provider:
                 router_context["forced_provider"] = forced_provider
+
+            # Initialize current_mode default (will be overridden if user is authenticated)
+            current_mode = "personal"
 
             # Apply mode-specific settings if user is authenticated
             if user_id:
@@ -176,7 +181,7 @@ def stream_chat_sse(session_id):
                         logging.info(f"[MODE] Set subtab_context_prefix for {current_mode} mode: {mode_context_prefix[:100]}")
             else:
                 logging.warning(f"[MODE] No user_id - skipping mode context injection")
-                current_mode = "personal"  # Default to personal if no user
+                # current_mode already defaults to "personal" (set on line 86)
 
             # Apply PII redaction for work mode (OFFICIAL)
             pii_redaction_log = None

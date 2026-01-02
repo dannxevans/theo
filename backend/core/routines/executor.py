@@ -5,6 +5,7 @@ Executes routine actions by delegating to existing action handlers.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from typing import Dict, Any, List
 
 
@@ -30,7 +31,7 @@ def execute_routine(routine_def, context):
             - partial_success: Boolean indicating if some actions failed
     """
     session_id = context.get("session_id")
-    user_id = context.get("user_id", "local")
+    user_id = context.get("user_id", DEFAULT_USER_ID)
     mode = context.get("mode", "personal")
     action_router = context.get("action_router")
     memory = context.get("memory")
@@ -127,7 +128,7 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         from app import context_manager
 
         # Build full context including memory facts
-        context = context_manager.build_context(session_id, custom_prompt)
+        context = context_manager.build_context(session_id, custom_prompt, user_id=user_id)
 
         route_context = dict(context)
         route_context["text"] = custom_prompt
@@ -229,7 +230,7 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         query_text = action_description if action_description and action_description != "Get weather forecast" else "What's the weather?"
 
         # Build full context including memory facts (home/work addresses, etc.)
-        context = context_manager.build_context(session_id, query_text)
+        context = context_manager.build_context(session_id, query_text, user_id=user_id)
 
         route_context = dict(context)
         route_context["text"] = query_text
@@ -254,7 +255,7 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         query_text = action_description if action_description and action_description != "Get route and traffic information" else "Plan a route to work"
 
         # Build full context including memory facts (home/work addresses, etc.)
-        context = context_manager.build_context(session_id, query_text)
+        context = context_manager.build_context(session_id, query_text, user_id=user_id)
 
         route_context = dict(context)
         route_context["text"] = query_text

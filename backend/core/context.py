@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from core.user_utils import normalize_user_id
 
 
 class ContextManager:
@@ -24,28 +25,31 @@ class ContextManager:
     # =============================
     # Context construction
     # =============================
-    def build_context(self, session_id, user_text, system_prompt_override=None, subtab_context_prefix=None):
+    def build_context(self, session_id, user_text, system_prompt_override=None, subtab_context_prefix=None, user_id=None):
         """
         Build the context package sent to the router / provider layer.
         Step 2: Use selective memory recall instead of full dump.
         Args:
             system_prompt_override: Optional custom system prompt to replace the default
             subtab_context_prefix: Optional context prefix from work mode subtabs
+            user_id: Optional user ID (defaults to DEFAULT_USER_ID if not provided)
         """
+        # Normalize user_id to handle None, "local", or integer values
+        user_id = normalize_user_id(user_id)
 
         session_summary = self._get_session_summary(session_id)
 
         # Step 2: Get relevant memories only (max 7)
-        relevant_memories = self.memory.get_relevant_memories("local", user_text, max_results=7)
+        relevant_memories = self.memory.get_relevant_memories(user_id, user_text, max_results=7)
 
         # Legacy fallback for settings/preferences
-        user_memory = self.memory.get_all("local")
+        user_memory = self.memory.get_all(user_id)
 
         # Use override if provided, otherwise build default
         if system_prompt_override:
             system_prompt = system_prompt_override[:self.MAX_SYSTEM_CHARS]
         else:
-            system_prompt = self._build_system_prompt(user_memory, relevant_memories)
+            system_prompt = self._build_system_prompt(user_memory, relevant_memories, user_id)
             system_prompt = system_prompt[:self.MAX_SYSTEM_CHARS]
 
         # Prepend subtab context prefix if provided - this takes precedence over base system prompt
@@ -82,9 +86,12 @@ class ContextManager:
             "relevant_memories": relevant_memories  # Step 2: Pass through for debugging
         }
 
-    def _build_system_prompt(self, user_memory, relevant_memories=None):
+    def _build_system_prompt(self, user_memory, relevant_memories=None, user_id=None):
+        # Normalize user_id
+        user_id = normalize_user_id(user_id)
+
         # Get configurable system prompt settings
-        prompt_config = self.memory.get_system_prompt_config("local")
+        prompt_config = self.memory.get_system_prompt_config(user_id)
 
         # Add current date/time context
         from datetime import datetime

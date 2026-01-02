@@ -6,8 +6,17 @@ user memories.
 """
 
 from flask import Blueprint, jsonify, request
+from core.user_utils import DEFAULT_USER_ID
 
 memory_bp = Blueprint('memory', __name__, url_prefix='/api')
+
+
+
+def get_user_id_from_request():
+    """Extract user_id from auth token or use default."""
+    # For now, just use DEFAULT_USER_ID since we don't have auth implemented in routes yet
+    # TODO: Extract from Authorization header when authentication is fully implemented
+    return DEFAULT_USER_ID
 
 
 @memory_bp.route("/memory/remember", methods=["POST"])
@@ -24,7 +33,7 @@ def remember():
     data = request.json
     
     memory.remember(
-        user_id="local",
+        user_id=get_user_id_from_request(),
         key=data["key"],
         value=data["value"]
     )
@@ -44,7 +53,7 @@ def forget():
     memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
     
-    memory.forget("local", data["key"])
+    memory.forget(get_user_id_from_request(), data["key"])
     return jsonify({"status": "ok"})
 
 
@@ -64,7 +73,7 @@ def list_memories():
     memory_type = request.args.get("type")
     limit = request.args.get("limit", type=int)
 
-    memories = memory.get_memories("local", memory_type=memory_type, limit=limit)
+    memories = memory.get_memories(get_user_id_from_request(), memory_type=memory_type, limit=limit)
     return jsonify(memories)
 
 
@@ -82,7 +91,7 @@ def create_memory():
     data = request.json
     
     memory.store_memory(
-        user_id="local",
+        user_id=get_user_id_from_request(),
         memory_type=data.get("type", "fact"),
         key=data["key"],
         value=data["value"],
@@ -101,7 +110,7 @@ def delete_memory_endpoint(memory_id):
     from config import Config
 
     memory = MemoryStore(Config.DATABASE_URL)
-    memory.delete_memory("local", memory_id)
+    memory.delete_memory(get_user_id_from_request(), memory_id)
 
     return jsonify({"status": "ok"})
 
@@ -120,7 +129,7 @@ def update_memory_endpoint(memory_id):
     data = request.json
 
     memory.update_memory(
-        user_id="local",
+        user_id=get_user_id_from_request(),
         memory_id=memory_id,
         memory_type=data.get("type"),
         key=data.get("key"),
@@ -143,7 +152,7 @@ def pin_memory_endpoint(memory_id):
     data = request.json
     pinned = data.get("pinned", True)
     
-    memory.pin_memory("local", memory_id, pinned)
+    memory.pin_memory(get_user_id_from_request(), memory_id, pinned)
     return jsonify({"status": "ok", "pinned": pinned})
 
 
@@ -163,5 +172,5 @@ def get_relevant_memories():
     if not query:
         return jsonify([])
 
-    relevant = memory.get_relevant_memories("local", query, max_results=7)
+    relevant = memory.get_relevant_memories(get_user_id_from_request(), query, max_results=7)
     return jsonify(relevant)

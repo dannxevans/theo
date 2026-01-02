@@ -6,6 +6,7 @@ Fetches data on-demand without caching.
 """
 
 import logging
+from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 import re
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -384,8 +385,8 @@ class PlanningService:
             Location string or None
         """
         try:
-            # Get facts from memories - user_id is stored as 'local' in the database
-            memories = self.memory.get_memories('local', memory_type='fact')
+            # Get facts from memories - user_id is stored as DEFAULT_USER_ID in the database
+            memories = self.memory.get_memories(DEFAULT_USER_ID, memory_type='fact')
             self.logger.info(f"[PLANNING] Got {len(memories)} fact memories for user {user_id}")
 
             # Look for location facts
