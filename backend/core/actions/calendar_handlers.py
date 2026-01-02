@@ -194,22 +194,30 @@ class CalendarHandlers(BaseActionHandler):
 
             # If LLM was used for enrichment, attribute to the LLM provider
             if llm_provider_info:
-                # Use the friendly provider name as the main identifier
-                # and pass both model and provider info for frontend display
-                provider_name = llm_provider_info.get("name", "Unknown")
-                provider_type = llm_provider_info.get("type", "")
-                model_id = llm_provider_info.get("model", "")
+                # Get the provider ID from llm_provider_info
+                llm_provider_id = llm_provider_info.get("id", "")
+                llm_model = llm_provider_info.get("model", "")
+
+                # Look up the friendly provider name from the database
+                provider_details = self.memory.get_provider(llm_provider_id)
+
+                if provider_details:
+                    friendly_name = provider_details.get("name", llm_provider_id)
+                    provider_type = provider_details.get("type", "")
+                else:
+                    # Fallback if provider not found
+                    friendly_name = llm_provider_id
+                    provider_type = llm_provider_info.get("type", "")
 
                 # Map provider type to company name for display
                 company_name = get_provider_company_name(provider_type)
 
-                # For display purposes, use the model ID if it helps with frontend formatting
-                # Otherwise, use the friendly provider name
-                result["provider"] = provider_name
-                result["model"] = model_id
+                # Set response fields for frontend display
+                result["provider"] = llm_provider_id
+                result["model"] = llm_model
                 result["task_type"] = "summarise_calendar"
                 result["metadata"]["llm_provider_type"] = company_name
-                result["metadata"]["llm_provider_name"] = provider_name
+                result["metadata"]["llm_provider_name"] = friendly_name
             else:
                 # Otherwise attribute to action router
                 result["provider"] = "action_router"
@@ -310,10 +318,13 @@ Keep it concise (2-3 sentences max) and conversational."""
             summary_text = result.get("text", "").strip()
 
             # Extract provider info from result
+            # route_request returns "provider" (not "provider_id")
+            provider_id = result.get("provider")
+
             provider_info = {
-                "id": result.get("provider_id"),
-                "name": result.get("provider_id"),
-                "type": result.get("provider_id").split("-")[0] if result.get("provider_id") else "unknown",
+                "id": provider_id,
+                "name": provider_id,
+                "type": provider_id.split("-")[0] if provider_id else "unknown",
                 "model": result.get("model")
             }
 
