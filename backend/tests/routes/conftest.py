@@ -334,3 +334,33 @@ def sample_intent(memory):
     )
 
     return memory.get_intent("local", "coding")
+
+
+@pytest.fixture
+def debug_logs_table(db_path):
+    """
+    Create debug_logs table for debug console tests.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS debug_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            level VARCHAR(10) NOT NULL,
+            source VARCHAR(20) NOT NULL,
+            component VARCHAR(50),
+            message TEXT NOT NULL,
+            raw_data TEXT,
+            user_id INTEGER,
+            session_id TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return db_path

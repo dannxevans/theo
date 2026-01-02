@@ -15,6 +15,7 @@
   import VoiceSettings from "./VoiceSettings.svelte";
   import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
   import RoutinesSettings from "./RoutinesSettings.svelte";
+  import DebugConsole from "./DebugConsole.svelte";
   import {
     getProviders,
     getIntents,
@@ -402,6 +403,9 @@
           <button class="dropdown-item" class:active={activeTab === "health-monitor"} on:click={() => switchCategory("health", "health-monitor")}>
             Health Monitor
           </button>
+          <button class="dropdown-item" class:active={activeTab === "debug-console"} on:click={() => switchCategory("health", "debug-console")}>
+            Debug Console
+          </button>
         </div>
       {/if}
     </div>
@@ -427,6 +431,7 @@
       {#if activeTab === "integrations"}Integrations{/if}
       {#if activeTab === "service-providers"}Service Providers{/if}
       {#if activeTab === "health-monitor"}Health Monitor{/if}
+      {#if activeTab === "debug-console"}Debug Console{/if}
     </span>
   </div>
 
@@ -485,6 +490,10 @@
         {advancedMode}
         on:reload={() => loadHealthData()}
       />
+    {/if}
+
+    {#if activeTab === "debug-console"}
+      <DebugConsole />
     {/if}
 
     {#if activeTab === "work"}

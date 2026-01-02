@@ -1354,3 +1354,119 @@ export async function updateProactiveSettings(settings) {
 
   return response.json();
 }
+
+// =============================
+// Debug Console
+// =============================
+
+/**
+ * Fetch historical debug logs with filtering and pagination
+ */
+export async function fetchDebugLogs(filters = {}) {
+  const params = new URLSearchParams(filters);
+  const response = await fetch(`${API_BASE}/api/debug/logs?${params}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to fetch debug logs");
+  }
+
+  return response.json();
+}
+
+/**
+ * Stream debug logs in real-time using Server-Sent Events
+ */
+export function streamDebugLogs(onMessage, filters = {}) {
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const params = new URLSearchParams({ ...filters, token });
+  const eventSource = new EventSource(`${API_BASE}/api/debug/logs/stream?${params}`);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      onMessage({ data });
+    } catch (e) {
+      console.error('Failed to parse log event:', e);
+    }
+  };
+
+  eventSource.onerror = (error) => {
+    console.error('Debug log stream error:', error);
+  };
+
+  return eventSource;
+}
+
+/**
+ * Toggle debug mode on/off
+ */
+export async function toggleDebugMode(enabled) {
+  const response = await fetch(`${API_BASE}/api/debug/toggle`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ enabled })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to toggle debug mode");
+  }
+
+  return response.json();
+}
+
+/**
+ * Clear debug logs from database
+ */
+export async function clearDebugLogs(filters = {}) {
+  const params = new URLSearchParams(filters);
+  const response = await fetch(`${API_BASE}/api/debug/logs?${params}`, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to clear debug logs");
+  }
+
+  return response.json();
+}
+
+/**
+ * Send a frontend log to the backend
+ */
+export async function logToBackend(level, message, component, sessionId = null) {
+  try {
+    const response = await fetch(`${API_BASE}/api/debug/log`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        level,
+        message,
+        component,
+        session_id: sessionId
+      })
+    });
+
+    // Don't throw on error for logging - just log to console
+    if (!response.ok) {
+      console.warn('Failed to send log to backend');
+    }
+  } catch (e) {
+    console.warn('Failed to send log to backend:', e);
+  }
+}
