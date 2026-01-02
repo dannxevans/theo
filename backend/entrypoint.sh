@@ -5,11 +5,11 @@ set -e
 DB_PATH="${THEO_DATA_DIR:-/data}/theo.db"
 
 if [ -f "$DB_PATH" ]; then
-    echo "Database found. Running migrations..."
+    echo "Database found at $DB_PATH. Running migrations..."
     cd /app/migrations
-    python run_migrations.py
+    python run_migrations.py "$DB_PATH"
 else
-    echo "Database not found. Will be created on first application start."
+    echo "Database not found at $DB_PATH. Will be created on first application start."
     echo "Note: Run migrations manually after first start if needed."
 fi
 
