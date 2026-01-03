@@ -62,7 +62,10 @@ def init_default_user(memory):
 def require_auth(memory):
     """
     Decorator to protect routes with authentication.
-    Checks for valid session token in Authorization header.
+    Supports both session tokens and API keys in Authorization header.
+
+    Session format: Authorization: Bearer <session_token>
+    API key format: Authorization: Bearer theo_<random>
 
     Args:
         memory: MemoryStore instance or callable that returns MemoryStore instance
@@ -80,20 +83,18 @@ def require_auth(memory):
             # Resolve memory if it's a callable (for lazy loading)
             memory_store = memory() if callable(memory) else memory
 
-            # Validate session
-            session = memory_store.get_auth_session(token)
-            if not session:
-                return jsonify({"error": "Invalid session"}), 401
-
-            # Check if session expired
-            if session["expires_at"] < datetime.utcnow():
-                memory_store.delete_auth_session(token)
-                return jsonify({"error": "Session expired"}), 401
-
-            # Get user
-            user = memory_store.get_user_by_id(session["user_id"])
-            if not user or not user["is_enabled"]:
-                return jsonify({"error": "User disabled"}), 401
+            # Check if this is an API key (starts with "theo_")
+            if token.startswith("theo_"):
+                user = _validate_api_key_auth(memory_store, token)
+                if not user:
+                    return jsonify({"error": "Invalid or expired API key"}), 401
+                request.auth_method = "api_key"
+            else:
+                # Session-based authentication (existing logic)
+                user = _validate_session_auth(memory_store, token)
+                if not user:
+                    return jsonify({"error": "Invalid or expired session"}), 401
+                request.auth_method = "session"
 
             # Attach user to request
             request.current_user = user
@@ -102,3 +103,82 @@ def require_auth(memory):
 
         return decorated_function
     return decorator
+
+
+def _validate_session_auth(memory, token):
+    """
+    Validate session-based authentication.
+
+    Args:
+        memory: MemoryStore instance
+        token: Session token
+
+    Returns:
+        User dictionary if valid, None otherwise
+    """
+    # Validate session
+    session = memory.get_auth_session(token)
+    if not session:
+        return None
+
+    # Check if session expired
+    if session["expires_at"] < datetime.utcnow():
+        memory.delete_auth_session(token)
+        return None
+
+    # Get user
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return None
+
+    return user
+
+
+def _validate_api_key_auth(memory, api_key):
+    """
+    Validate API key authentication.
+
+    Args:
+        memory: MemoryStore instance
+        api_key: API key (format: theo_<random>)
+
+    Returns:
+        User dictionary if valid, None otherwise
+    """
+    from .api_keys import validate_api_key_format, verify_api_key, is_api_key_valid
+
+    # Validate format
+    if not validate_api_key_format(api_key):
+        return None
+
+    # We need to iterate through all API keys to find a match
+    # This is necessary because we can't reverse the bcrypt hash
+    # Note: In production, consider caching or optimizing this lookup
+    with memory.engine.connect() as conn:
+        from sqlalchemy import select
+        rows = conn.execute(
+            select(memory.api_keys)
+        ).fetchall()
+
+        for row in rows:
+            # Check if this key hash matches the provided API key
+            if verify_api_key(api_key, row.key_hash):
+                # Found matching key, now validate it
+                key_record = dict(row._mapping)
+
+                # Check if key is valid (not revoked, not expired)
+                if not is_api_key_valid(key_record):
+                    return None
+
+                # Get the user
+                user = memory.get_user_by_id(key_record["user_id"])
+                if not user or not user["is_enabled"]:
+                    return None
+
+                # Update last used timestamp
+                memory.update_api_key_last_used(key_record["id"])
+
+                return user
+
+    # No matching key found
+    return None

@@ -815,6 +815,81 @@ export async function changePassword(currentPassword, newPassword) {
 }
 
 // =============================
+// API Key Management
+// =============================
+
+export async function createApiKey(name, expiresInDays = null) {
+  const response = await fetch(`${API_BASE}/api/api-keys`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      name,
+      expires_in_days: expiresInDays
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to create API key");
+  }
+
+  return response.json();
+}
+
+export async function listApiKeys() {
+  const response = await fetch(`${API_BASE}/api/api-keys`, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to list API keys");
+  }
+
+  return response.json();
+}
+
+export async function revokeApiKey(keyId) {
+  const response = await fetch(`${API_BASE}/api/api-keys/${keyId}`, {
+    method: "DELETE",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to revoke API key");
+  }
+
+  return response.json();
+}
+
+export async function updateApiKey(keyId, updates) {
+  const response = await fetch(`${API_BASE}/api/api-keys/${keyId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(updates)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update API key");
+  }
+
+  return response.json();
+}
+
+// =============================
 // Mode Management
 // =============================
 

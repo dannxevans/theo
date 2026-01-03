@@ -251,3 +251,190 @@ class UserOperations(BaseMemoryOperations):
                 .where(self.debug_settings.c.user_id == user_id)
             ).fetchone()
             return bool(row.enabled) if row and row.enabled else False
+
+    # =============================
+    # API Key Management
+    # =============================
+
+    def create_api_key(self, user_id, name, key_hash, expires_at=None):
+        """
+        Create a new API key for a user.
+
+        Args:
+            user_id: User ID
+            name: User-friendly label for the key
+            key_hash: Bcrypt hash of the API key
+            expires_at: Optional expiration datetime
+
+        Returns:
+            Created API key ID
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            result = conn.execute(
+                insert(self.api_keys).values(
+                    user_id=user_id,
+                    name=name,
+                    key_hash=key_hash,
+                    expires_at=expires_at,
+                    created_at=datetime.utcnow(),
+                    is_revoked=False,
+                )
+            )
+            return result.lastrowid
+
+    def get_api_key_by_id(self, key_id, user_id=None):
+        """
+        Get API key by ID.
+
+        Args:
+            key_id: API key ID
+            user_id: Optional user ID to verify ownership
+
+        Returns:
+            API key dictionary or None
+        """
+        with self._get_connection() as conn:
+            query = select(self.api_keys).where(self.api_keys.c.id == key_id)
+
+            if user_id is not None:
+                user_id = normalize_user_id(user_id)
+                query = query.where(self.api_keys.c.user_id == user_id)
+
+            row = conn.execute(query).fetchone()
+            return dict(row._mapping) if row else None
+
+    def find_api_key_by_hash(self, key_hash):
+        """
+        Find API key by its hash (for authentication).
+
+        Args:
+            key_hash: The hash to search for
+
+        Returns:
+            API key dictionary or None
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                select(self.api_keys)
+                .where(self.api_keys.c.key_hash == key_hash)
+            ).fetchone()
+            return dict(row._mapping) if row else None
+
+    def list_user_api_keys(self, user_id):
+        """
+        List all API keys for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            List of API key dictionaries (without hashes)
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                select(self.api_keys)
+                .where(self.api_keys.c.user_id == user_id)
+                .order_by(self.api_keys.c.created_at.desc())
+            ).fetchall()
+
+            # Return keys without hashes for security
+            return [
+                {
+                    "id": row.id,
+                    "user_id": row.user_id,
+                    "name": row.name,
+                    "last_used_at": row.last_used_at,
+                    "created_at": row.created_at,
+                    "expires_at": row.expires_at,
+                    "is_revoked": row.is_revoked,
+                    "revoked_at": row.revoked_at,
+                }
+                for row in rows
+            ]
+
+    def update_api_key_last_used(self, key_id):
+        """
+        Update the last used timestamp for an API key.
+
+        Args:
+            key_id: API key ID
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                update(self.api_keys)
+                .where(self.api_keys.c.id == key_id)
+                .values(last_used_at=datetime.utcnow())
+            )
+
+    def revoke_api_key(self, key_id, user_id):
+        """
+        Revoke an API key (soft delete).
+
+        Args:
+            key_id: API key ID
+            user_id: User ID (for ownership verification)
+
+        Returns:
+            True if key was revoked, False if not found or not owned by user
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            result = conn.execute(
+                update(self.api_keys)
+                .where(self.api_keys.c.id == key_id)
+                .where(self.api_keys.c.user_id == user_id)
+                .values(
+                    is_revoked=True,
+                    revoked_at=datetime.utcnow(),
+                )
+            )
+            return result.rowcount > 0
+
+    def delete_api_key(self, key_id, user_id):
+        """
+        Permanently delete an API key.
+
+        Args:
+            key_id: API key ID
+            user_id: User ID (for ownership verification)
+
+        Returns:
+            True if key was deleted, False if not found or not owned by user
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            result = conn.execute(
+                delete(self.api_keys)
+                .where(self.api_keys.c.id == key_id)
+                .where(self.api_keys.c.user_id == user_id)
+            )
+            return result.rowcount > 0
+
+    def update_api_key_name(self, key_id, user_id, new_name):
+        """
+        Update the name of an API key.
+
+        Args:
+            key_id: API key ID
+            user_id: User ID (for ownership verification)
+            new_name: New name for the key
+
+        Returns:
+            True if key was updated, False if not found or not owned by user
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            result = conn.execute(
+                update(self.api_keys)
+                .where(self.api_keys.c.id == key_id)
+                .where(self.api_keys.c.user_id == user_id)
+                .values(name=new_name)
+            )
+            return result.rowcount > 0

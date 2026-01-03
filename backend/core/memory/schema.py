@@ -58,6 +58,23 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # API Keys (Authentication)
+    # =============================
+    api_keys = Table(
+        "api_keys",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False),
+        Column("key_hash", Text, nullable=False),  # bcrypt hash of the full key
+        Column("name", String, nullable=True),  # user-friendly label
+        Column("last_used_at", DateTime, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("expires_at", DateTime, nullable=True),  # NULL = never expires
+        Column("is_revoked", Boolean, default=False),
+        Column("revoked_at", DateTime, nullable=True),
+    )
+
+    # =============================
     # Mode Configuration (Work/Personal)
     # =============================
     user_mode_config = Table(
@@ -490,6 +507,7 @@ def create_schema(meta: MetaData):
     return {
         "users": users,
         "auth_sessions": auth_sessions,
+        "api_keys": api_keys,
         "user_mode_config": user_mode_config,
         "mode_settings": mode_settings,
         "work_mode_subtab_config": work_mode_subtab_config,
