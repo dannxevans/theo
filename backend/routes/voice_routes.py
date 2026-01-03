@@ -16,6 +16,7 @@ from voice.stt_openai import OpenAIWhisperProvider
 from core.provider_registry import ProviderRegistry
 from core.memory import MemoryStore
 from config import Config
+from auth.password import require_auth
 
 voice_bp = Blueprint("voice", __name__)
 
@@ -23,11 +24,10 @@ voice_bp = Blueprint("voice", __name__)
 def get_tts_provider():
     """Get configured TTS provider."""
     try:
-        memory = MemoryStore(Config.DATABASE_URL)
-        registry = ProviderRegistry(memory)
+        from app import provider_registry
 
         # Get OpenAI provider config
-        openai_config = registry.get_by_type("openai")
+        openai_config = provider_registry.get_by_type("openai")
 
         if not openai_config or not openai_config.get("api_key"):
             return None, "OpenAI API key not configured"
@@ -48,11 +48,10 @@ def get_tts_provider():
 def get_stt_provider():
     """Get configured STT provider."""
     try:
-        memory = MemoryStore(Config.DATABASE_URL)
-        registry = ProviderRegistry(memory)
+        from app import provider_registry
 
         # Get OpenAI provider config
-        openai_config = registry.get_by_type("openai")
+        openai_config = provider_registry.get_by_type("openai")
 
         if not openai_config or not openai_config.get("api_key"):
             return None, "OpenAI API key not configured"
@@ -69,6 +68,7 @@ def get_stt_provider():
 
 
 @voice_bp.route("/tts", methods=["POST"])
+@require_auth(lambda: MemoryStore(Config.DATABASE_URL))
 def text_to_speech():
     """
     Convert text to speech audio.
@@ -156,6 +156,7 @@ def text_to_speech():
 
 
 @voice_bp.route("/stt", methods=["POST"])
+@require_auth(lambda: MemoryStore(Config.DATABASE_URL))
 def speech_to_text():
     """
     Convert speech audio to text.
@@ -216,6 +217,7 @@ def speech_to_text():
 
 
 @voice_bp.route("/voices", methods=["GET"])
+@require_auth(lambda: MemoryStore(Config.DATABASE_URL))
 def list_voices():
     """
     List available TTS voices.

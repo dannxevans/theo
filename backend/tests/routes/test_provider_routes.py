@@ -8,9 +8,9 @@ import pytest
 from unittest.mock import patch
 
 
-def test_list_providers(client, memory, sample_provider):
+def test_list_providers(client, memory, sample_provider, auth_headers):
     """Test list all providers."""
-    response = client.get("/api/providers")
+    response = client.get("/api/providers", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
@@ -25,16 +25,16 @@ def test_list_providers(client, memory, sample_provider):
     assert "api_key" not in provider
 
 
-def test_list_providers_empty(client):
+def test_list_providers_empty(client, auth_headers):
     """Test list providers when none exist."""
-    response = client.get("/api/providers")
+    response = client.get("/api/providers", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
     assert isinstance(data, list)
 
 
-def test_list_providers_no_api_keys_exposed(client, memory):
+def test_list_providers_no_api_keys_exposed(client, memory, auth_headers):
     """Test list providers never exposes API keys."""
     memory.upsert_provider({
         "id": "secret-provider",
@@ -45,7 +45,7 @@ def test_list_providers_no_api_keys_exposed(client, memory):
         "enabled": True
     })
 
-    response = client.get("/api/providers")
+    response = client.get("/api/providers", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
@@ -55,9 +55,9 @@ def test_list_providers_no_api_keys_exposed(client, memory):
         assert "api_key" not in provider
 
 
-def test_upsert_provider_create(client, memory):
+def test_upsert_provider_create(client, memory, auth_headers):
     """Test create new provider."""
-    response = client.post("/api/providers", json={
+    response = client.post("/api/providers", headers=auth_headers, json={
         "id": "new-provider",
         "name": "New Provider",
         "type": "anthropic",
@@ -79,9 +79,9 @@ def test_upsert_provider_create(client, memory):
     assert metadata is not None
 
 
-def test_upsert_provider_update(client, memory, sample_provider):
+def test_upsert_provider_update(client, memory, sample_provider, auth_headers):
     """Test update existing provider."""
-    response = client.post("/api/providers", json={
+    response = client.post("/api/providers", headers=auth_headers, json={
         "id": sample_provider["id"],
         "name": "Updated Name",
         "type": sample_provider["type"],
@@ -99,9 +99,9 @@ def test_upsert_provider_update(client, memory, sample_provider):
     assert provider["enabled"] is False
 
 
-def test_upsert_provider_optional_fields(client, memory):
+def test_upsert_provider_optional_fields(client, memory, auth_headers):
     """Test create provider with optional fields."""
-    response = client.post("/api/providers", json={
+    response = client.post("/api/providers", headers=auth_headers, json={
         "id": "minimal-provider",
         "name": "Minimal Provider",
         "type": "openai",
@@ -116,9 +116,9 @@ def test_upsert_provider_optional_fields(client, memory):
     assert provider["base_url"] == "https://custom.openai.com"
 
 
-def test_delete_provider(client, memory, sample_provider):
+def test_delete_provider(client, memory, sample_provider, auth_headers):
     """Test delete provider."""
-    response = client.delete(f"/api/providers/{sample_provider['id']}")
+    response = client.delete(f"/api/providers/{sample_provider['id']}", headers=auth_headers)
 
     assert response.status_code == 200
     assert response.json["status"] == "ok"
@@ -132,22 +132,22 @@ def test_delete_provider(client, memory, sample_provider):
     assert metadata is None
 
 
-def test_delete_nonexistent_provider(client):
+def test_delete_nonexistent_provider(client, auth_headers):
     """Test delete nonexistent provider."""
-    response = client.delete("/api/providers/nonexistent")
+    response = client.delete("/api/providers/nonexistent", headers=auth_headers)
 
     # Should succeed (idempotent)
     assert response.status_code == 200
 
 
-def test_get_provider_health(client, memory, sample_provider):
+def test_get_provider_health(client, memory, sample_provider, auth_headers):
     """Test get provider health summary."""
     # Log some requests to create health data
     memory.update_provider_health(sample_provider["id"], success=True, latency_ms=100)
     memory.update_provider_health(sample_provider["id"], success=True, latency_ms=150)
     memory.update_provider_health(sample_provider["id"], success=False)
 
-    response = client.get("/api/providers/health")
+    response = client.get("/api/providers/health", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
@@ -160,18 +160,18 @@ def test_get_provider_health(client, memory, sample_provider):
     assert "health_status" in provider_health
 
 
-def test_get_provider_health_empty(client):
+def test_get_provider_health_empty(client, auth_headers):
     """Test get provider health when no providers exist."""
-    response = client.get("/api/providers/health")
+    response = client.get("/api/providers/health", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
     assert isinstance(data, dict)
 
 
-def test_get_provider_metadata(client, memory, sample_provider):
+def test_get_provider_metadata(client, memory, sample_provider, auth_headers):
     """Test get metadata for specific provider."""
-    response = client.get(f"/api/providers/{sample_provider['id']}/metadata")
+    response = client.get(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
@@ -182,17 +182,17 @@ def test_get_provider_metadata(client, memory, sample_provider):
     assert "avg_latency_ms" in data
 
 
-def test_get_provider_metadata_not_found(client):
+def test_get_provider_metadata_not_found(client, auth_headers):
     """Test get metadata for nonexistent provider."""
-    response = client.get("/api/providers/nonexistent/metadata")
+    response = client.get("/api/providers/nonexistent/metadata", headers=auth_headers)
 
     assert response.status_code == 404
     assert "error" in response.json
 
 
-def test_update_provider_metadata(client, memory, sample_provider):
+def test_update_provider_metadata(client, memory, sample_provider, auth_headers):
     """Test update provider cost metadata."""
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={
         "cost_per_1k_input": 100,
         "cost_per_1k_output": 300
     })
@@ -206,9 +206,9 @@ def test_update_provider_metadata(client, memory, sample_provider):
     assert metadata["cost_per_1k_output_tokens"] == 300
 
 
-def test_update_provider_metadata_defaults(client, memory, sample_provider):
+def test_update_provider_metadata_defaults(client, memory, sample_provider, auth_headers):
     """Test update provider metadata with default values."""
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={})
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={})
 
     assert response.status_code == 200
 
@@ -222,9 +222,9 @@ def test_update_provider_metadata_defaults(client, memory, sample_provider):
 # Circuit Breaker Cooldown Tests
 # ====================
 
-def test_update_provider_metadata_with_cooldown(client, memory, sample_provider):
+def test_update_provider_metadata_with_cooldown(client, memory, sample_provider, auth_headers):
     """Test update provider metadata with circuit breaker cooldown."""
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={
         "cost_per_1k_input": 100,
         "cost_per_1k_output": 300,
         "circuit_breaker_cooldown_minutes": 90
@@ -238,9 +238,9 @@ def test_update_provider_metadata_with_cooldown(client, memory, sample_provider)
     assert metadata["circuit_breaker_cooldown_minutes"] == 90
 
 
-def test_update_provider_metadata_cooldown_only(client, memory, sample_provider):
+def test_update_provider_metadata_cooldown_only(client, memory, sample_provider, auth_headers):
     """Test update only circuit breaker cooldown without cost data."""
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={
         "circuit_breaker_cooldown_minutes": 120
     })
 
@@ -251,10 +251,10 @@ def test_update_provider_metadata_cooldown_only(client, memory, sample_provider)
     assert metadata["circuit_breaker_cooldown_minutes"] == 120
 
 
-def test_update_provider_metadata_cooldown_validation(client, memory, sample_provider):
+def test_update_provider_metadata_cooldown_validation(client, memory, sample_provider, auth_headers):
     """Test circuit breaker cooldown validation in metadata endpoint."""
     # Test minimum value
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={
         "circuit_breaker_cooldown_minutes": 0
     })
 
@@ -263,7 +263,7 @@ def test_update_provider_metadata_cooldown_validation(client, memory, sample_pro
     assert metadata["circuit_breaker_cooldown_minutes"] == 1  # Should be clamped to 1
 
     # Test maximum value
-    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", json={
+    response = client.post(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers, json={
         "circuit_breaker_cooldown_minutes": 2000
     })
 
@@ -272,12 +272,12 @@ def test_update_provider_metadata_cooldown_validation(client, memory, sample_pro
     assert metadata["circuit_breaker_cooldown_minutes"] == 1440  # Should be clamped to 1440
 
 
-def test_get_provider_metadata_includes_cooldown(client, memory, sample_provider):
+def test_get_provider_metadata_includes_cooldown(client, memory, sample_provider, auth_headers):
     """Test GET provider metadata includes cooldown information."""
     # Set cooldown
     memory.update_circuit_breaker_cooldown(sample_provider["id"], 75)
 
-    response = client.get(f"/api/providers/{sample_provider['id']}/metadata")
+    response = client.get(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json
@@ -286,7 +286,7 @@ def test_get_provider_metadata_includes_cooldown(client, memory, sample_provider
     assert data["circuit_breaker_cooldown_minutes"] == 75
 
 
-def test_get_provider_metadata_includes_opened_at(client, memory, sample_provider):
+def test_get_provider_metadata_includes_opened_at(client, memory, sample_provider, auth_headers):
     """Test GET provider metadata includes circuit_breaker_opened_at."""
     # Trigger circuit breaker - use log_request
     for i in range(5):
@@ -299,7 +299,7 @@ def test_get_provider_metadata_includes_opened_at(client, memory, sample_provide
             error_message="Test failure"
         )
 
-    response = client.get(f"/api/providers/{sample_provider['id']}/metadata")
+    response = client.get(f"/api/providers/{sample_provider['id']}/metadata", headers=auth_headers)
 
     assert response.status_code == 200
     data = response.json

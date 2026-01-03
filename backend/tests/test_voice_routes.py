@@ -25,6 +25,52 @@ def client(app):
 
 
 @pytest.fixture
+def test_user(app):
+    """Create a test user."""
+    from core.memory import MemoryStore
+    from config import Config
+    from auth.password import hash_password
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    password_hash = hash_password("test_password")
+    import uuid
+    username = f"testuser_{uuid.uuid4().hex[:8]}"
+    memory.create_user(username, password_hash, is_admin=False)
+    user = memory.get_user_by_username(username)
+
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "is_admin": user["is_admin"]
+    }
+
+
+@pytest.fixture
+def auth_token(app, test_user):
+    """Create an authentication token for the test user."""
+    from core.memory import MemoryStore
+    from config import Config
+    from datetime import datetime, timedelta
+    from auth.password import generate_session_token
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    token = generate_session_token()
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+    memory.create_auth_session(token, test_user["id"], expires_at)
+    return token
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    """Create authorization headers with bearer token."""
+    return {
+        "Authorization": f"Bearer {auth_token}",
+        "Content-Type": "application/json"
+    }
+
+
+@pytest.fixture
 def mock_tts_provider():
     """Mock TTS provider."""
     with patch('routes.voice_routes.get_tts_provider') as mock:
@@ -55,9 +101,9 @@ def mock_stt_provider():
 class TestVoiceRoutes:
     """Test suite for voice API routes."""
 
-    def test_tts_endpoint_success(self, client, mock_tts_provider):
+    def test_tts_endpoint_success(self, client, mock_tts_provider, auth_headers):
         """Test TTS endpoint with valid request."""
-        response = client.post('/api/voice/tts', json={
+        response = client.post('/api/voice/tts', headers=auth_headers, json={
             'text': 'Hello world',
             'voice': 'alloy',
             'speed': 1.0
@@ -76,39 +122,39 @@ class TestVoiceRoutes:
             output_format='mp3'
         )
 
-    def test_tts_endpoint_missing_text(self, client, mock_tts_provider):
+    def test_tts_endpoint_missing_text(self, client, mock_tts_provider, auth_headers):
         """Test TTS endpoint without text."""
-        response = client.post('/api/voice/tts', json={})
+        response = client.post('/api/voice/tts', headers=auth_headers, json={})
 
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
 
-    def test_tts_endpoint_provider_not_configured(self, client):
+    def test_tts_endpoint_provider_not_configured(self, client, auth_headers):
         """Test TTS endpoint when provider is not configured."""
         with patch('routes.voice_routes.get_tts_provider') as mock:
             mock.return_value = (None, "Provider not configured")
 
-            response = client.post('/api/voice/tts', json={'text': 'test'})
+            response = client.post('/api/voice/tts', headers=auth_headers, json={'text': 'test'})
 
             assert response.status_code == 500
             data = response.get_json()
             assert 'error' in data
 
-    def test_tts_endpoint_synthesis_error(self, client, mock_tts_provider):
+    def test_tts_endpoint_synthesis_error(self, client, mock_tts_provider, auth_headers):
         """Test TTS endpoint with synthesis error."""
         provider = mock_tts_provider.return_value[0]
         provider.synthesize.side_effect = Exception("Synthesis failed")
 
-        response = client.post('/api/voice/tts', json={'text': 'test'})
+        response = client.post('/api/voice/tts', headers=auth_headers, json={'text': 'test'})
 
         assert response.status_code == 500
         data = response.get_json()
         assert 'error' in data
 
-    def test_tts_endpoint_default_parameters(self, client, mock_tts_provider):
+    def test_tts_endpoint_default_parameters(self, client, mock_tts_provider, auth_headers):
         """Test TTS endpoint with default parameters."""
-        response = client.post('/api/voice/tts', json={'text': 'test'})
+        response = client.post('/api/voice/tts', headers=auth_headers, json={'text': 'test'})
 
         assert response.status_code == 200
 
@@ -117,7 +163,7 @@ class TestVoiceRoutes:
         assert call_kwargs.get('voice') == 'alloy'
         assert call_kwargs.get('speed') == 1.0
 
-    def test_stt_endpoint_success(self, client, mock_stt_provider):
+    def test_stt_endpoint_success(self, client, mock_stt_provider, auth_headers):
         """Test STT endpoint with valid audio file."""
         # Create a mock audio file
         audio_data = b"fake_audio_data"
@@ -129,7 +175,8 @@ class TestVoiceRoutes:
         response = client.post(
             '/api/voice/stt',
             data=data,
-            content_type='multipart/form-data'
+            content_type='multipart/form-data',
+            headers=auth_headers
         )
 
         assert response.status_code == 200
@@ -141,15 +188,15 @@ class TestVoiceRoutes:
         provider = mock_stt_provider.return_value[0]
         provider.transcribe.assert_called_once()
 
-    def test_stt_endpoint_missing_audio(self, client, mock_stt_provider):
+    def test_stt_endpoint_missing_audio(self, client, mock_stt_provider, auth_headers):
         """Test STT endpoint without audio file."""
-        response = client.post('/api/voice/stt', data={})
+        response = client.post('/api/voice/stt', data={}, headers=auth_headers)
 
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
 
-    def test_stt_endpoint_with_language(self, client, mock_stt_provider):
+    def test_stt_endpoint_with_language(self, client, mock_stt_provider, auth_headers):
         """Test STT endpoint with specified language."""
         audio_data = b"fake_audio_data"
         data = {
@@ -161,7 +208,8 @@ class TestVoiceRoutes:
         response = client.post(
             '/api/voice/stt',
             data=data,
-            content_type='multipart/form-data'
+            content_type='multipart/form-data',
+            headers=auth_headers
         )
 
         assert response.status_code == 200
@@ -170,7 +218,7 @@ class TestVoiceRoutes:
         call_kwargs = provider.transcribe.call_args.kwargs
         assert call_kwargs.get('language') == 'es'
 
-    def test_stt_endpoint_provider_not_configured(self, client):
+    def test_stt_endpoint_provider_not_configured(self, client, auth_headers):
         """Test STT endpoint when provider is not configured."""
         with patch('routes.voice_routes.get_stt_provider') as mock:
             mock.return_value = (None, "Provider not configured")
@@ -184,14 +232,15 @@ class TestVoiceRoutes:
             response = client.post(
                 '/api/voice/stt',
                 data=data,
-                content_type='multipart/form-data'
+                content_type='multipart/form-data',
+            headers=auth_headers
             )
 
             assert response.status_code == 500
             data = response.get_json()
             assert 'error' in data
 
-    def test_stt_endpoint_transcription_error(self, client, mock_stt_provider):
+    def test_stt_endpoint_transcription_error(self, client, mock_stt_provider, auth_headers):
         """Test STT endpoint with transcription error."""
         provider = mock_stt_provider.return_value[0]
         provider.transcribe.side_effect = Exception("Transcription failed")
@@ -205,16 +254,17 @@ class TestVoiceRoutes:
         response = client.post(
             '/api/voice/stt',
             data=data,
-            content_type='multipart/form-data'
+            content_type='multipart/form-data',
+            headers=auth_headers
         )
 
         assert response.status_code == 500
         data = response.get_json()
         assert 'error' in data
 
-    def test_voices_endpoint_success(self, client, mock_tts_provider):
+    def test_voices_endpoint_success(self, client, mock_tts_provider, auth_headers):
         """Test voices endpoint."""
-        response = client.get('/api/voice/voices')
+        response = client.get('/api/voice/voices', headers=auth_headers)
 
         assert response.status_code == 200
         data = response.get_json()
@@ -223,23 +273,23 @@ class TestVoiceRoutes:
         assert data['voices'][0]['id'] == 'alloy'
         assert data['voices'][1]['id'] == 'echo'
 
-    def test_voices_endpoint_provider_not_configured(self, client):
+    def test_voices_endpoint_provider_not_configured(self, client, auth_headers):
         """Test voices endpoint when provider is not configured."""
         with patch('routes.voice_routes.get_tts_provider') as mock:
             mock.return_value = (None, "Provider not configured")
 
-            response = client.get('/api/voice/voices')
+            response = client.get('/api/voice/voices', headers=auth_headers)
 
             assert response.status_code == 500
             data = response.get_json()
             assert 'error' in data
 
-    def test_voices_endpoint_error(self, client, mock_tts_provider):
+    def test_voices_endpoint_error(self, client, mock_tts_provider, auth_headers):
         """Test voices endpoint with error."""
         provider = mock_tts_provider.return_value[0]
         provider.list_voices.side_effect = Exception("Failed to list voices")
 
-        response = client.get('/api/voice/voices')
+        response = client.get('/api/voice/voices', headers=auth_headers)
 
         assert response.status_code == 500
         data = response.get_json()
@@ -252,7 +302,7 @@ class TestProviderHelpers:
     @patch('routes.voice_routes.MemoryStore')
     @patch('routes.voice_routes.ProviderRegistry')
     @patch('routes.voice_routes.OpenAITTSProvider')
-    def test_get_tts_provider_success(self, mock_provider_class, mock_registry, mock_memory):
+    def test_get_tts_provider_success(self, mock_provider_class, mock_registry, mock_memory, auth_headers):
         """Test successful TTS provider initialization."""
         from routes.voice_routes import get_tts_provider
 
@@ -277,7 +327,7 @@ class TestProviderHelpers:
 
     @patch('routes.voice_routes.MemoryStore')
     @patch('routes.voice_routes.ProviderRegistry')
-    def test_get_tts_provider_no_api_key(self, mock_registry, mock_memory):
+    def test_get_tts_provider_no_api_key(self, mock_registry, mock_memory, auth_headers):
         """Test TTS provider when API key is not configured."""
         from routes.voice_routes import get_tts_provider
 
@@ -292,7 +342,7 @@ class TestProviderHelpers:
     @patch('routes.voice_routes.MemoryStore')
     @patch('routes.voice_routes.ProviderRegistry')
     @patch('routes.voice_routes.OpenAIWhisperProvider')
-    def test_get_stt_provider_success(self, mock_provider_class, mock_registry, mock_memory):
+    def test_get_stt_provider_success(self, mock_provider_class, mock_registry, mock_memory, auth_headers):
         """Test successful STT provider initialization."""
         from routes.voice_routes import get_stt_provider
 
