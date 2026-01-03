@@ -71,11 +71,9 @@ class PlanningHandlers(BaseActionHandler):
         )
 
         if not activity_data or not activity_data.get("has_planning_intent"):
-            return self._format_success_response(
-                "I can help you plan activities! Please include a location and/or time. "
-                "For example: 'I'm going shopping at Westfield tomorrow at 2pm'",
-                "planning"
-            )
+            # No valid planning intent detected - don't respond
+            # Let the regular LLM handle this as normal conversation
+            return None
 
         # Check for missing information
         missing_info = []

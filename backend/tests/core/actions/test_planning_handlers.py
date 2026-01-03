@@ -57,8 +57,8 @@ class TestPlanningHandlers:
             context={}
         )
 
-        assert "I can help you plan activities" in result["text"]
-        assert "requires_confirmation" not in result
+        # Should return None to let regular LLM handle it
+        assert result is None
 
     def test_handle_planning_query_missing_location(self, handler):
         """Test handling query with missing location."""
@@ -69,8 +69,8 @@ class TestPlanningHandlers:
             context={}
         )
 
-        assert "location" in result["text"].lower()
-        assert "requires_confirmation" not in result
+        # Should return None when location is missing (not enough info for planning)
+        assert result is None
 
     def test_handle_planning_query_missing_time(self, handler):
         """Test handling query with missing time."""
@@ -81,8 +81,8 @@ class TestPlanningHandlers:
             context={}
         )
 
-        assert "time" in result["text"].lower()
-        assert "requires_confirmation" not in result
+        # Should return None when time is missing (not enough info for planning)
+        assert result is None
 
     def test_handle_planning_query_missing_both(self, handler):
         """Test handling query with missing time and location."""
@@ -93,9 +93,8 @@ class TestPlanningHandlers:
             context={}
         )
 
-        # Should ask for location and/or time
-        assert ("location" in result["text"].lower() or "time" in result["text"].lower())
-        assert "requires_confirmation" not in result
+        # Should return None when both time and location are missing
+        assert result is None
 
     # NOTE: M365 connection test removed due to complex mocking requirements
     # This scenario is better tested via end-to-end integration tests
