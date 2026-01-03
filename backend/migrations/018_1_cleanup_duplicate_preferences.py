@@ -54,45 +54,62 @@ def run_cleanup():
             print("[CLEANUP 018] ✓ preferences table doesn't exist yet, skipping")
             return True
 
-        # Get all preferences with user_id='local'
-        cursor.execute("""
-            SELECT user_id, key, value FROM preferences
-            WHERE user_id = 'local'
-        """)
-        local_prefs = cursor.fetchall()
+        # Tables that might have both 'local' and user_id=1 entries
+        # These tables have UNIQUE constraints on user_id (or user_id + key)
+        tables_to_clean = [
+            ('preferences', 'key'),  # UNIQUE(user_id, key)
+            ('proactive_settings', None),  # UNIQUE(user_id)
+            ('system_prompt_config', None),  # UNIQUE(user_id)
+        ]
 
-        if not local_prefs:
-            print("[CLEANUP 018] ✓ No 'local' user_id preferences found, skipping")
-            return True
+        total_deleted = 0
 
-        print(f"[CLEANUP 018] Found {len(local_prefs)} 'local' user_id preferences")
-
-        # For each 'local' preference, check if user_id=1 has the same key
-        duplicates_to_delete = []
-        for user_id, key, value in local_prefs:
+        for table_name, key_column in tables_to_clean:
+            # Check if table exists
             cursor.execute("""
-                SELECT 1 FROM preferences
-                WHERE user_id = 1 AND key = ?
-            """, (key,))
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name=?
+            """, (table_name,))
 
-            if cursor.fetchone():
-                # Duplicate exists - delete the 'local' version
-                duplicates_to_delete.append(key)
-                print(f"[CLEANUP 018]   Duplicate found: {key} (will delete 'local' version)")
-            else:
-                # No duplicate - migration 018 will safely convert this to user_id=1
-                print(f"[CLEANUP 018]   No conflict: {key} (will be migrated)")
+            if not cursor.fetchone():
+                print(f"[CLEANUP 018] ✓ {table_name} table doesn't exist, skipping")
+                continue
 
-        if duplicates_to_delete:
-            # Delete duplicate 'local' preferences
-            placeholders = ','.join('?' * len(duplicates_to_delete))
+            # Check if there are 'local' entries
             cursor.execute(f"""
-                DELETE FROM preferences
-                WHERE user_id = 'local' AND key IN ({placeholders})
-            """, duplicates_to_delete)
+                SELECT COUNT(*) FROM {table_name}
+                WHERE user_id = 'local'
+            """)
+            local_count = cursor.fetchone()[0]
 
+            if local_count == 0:
+                print(f"[CLEANUP 018] ✓ No 'local' entries in {table_name}")
+                continue
+
+            # Check if user_id=1 exists in this table
+            cursor.execute(f"""
+                SELECT COUNT(*) FROM {table_name}
+                WHERE user_id = 1
+            """)
+            user1_count = cursor.fetchone()[0]
+
+            if user1_count == 0:
+                # No conflict - migration will safely convert 'local' → 1
+                print(f"[CLEANUP 018] ✓ {table_name}: {local_count} 'local' entries will be migrated (no conflict)")
+                continue
+
+            # Both 'local' and user_id=1 exist - delete 'local' entries
+            cursor.execute(f"""
+                DELETE FROM {table_name}
+                WHERE user_id = 'local'
+            """)
+            deleted = cursor.rowcount
+            total_deleted += deleted
+            print(f"[CLEANUP 018] ✓ {table_name}: Deleted {deleted} 'local' entries (user_id=1 exists)")
+
+        if total_deleted > 0:
             conn.commit()
-            print(f"[CLEANUP 018] ✓ Deleted {len(duplicates_to_delete)} duplicate 'local' preferences")
+            print(f"[CLEANUP 018] ✓ Total deleted: {total_deleted} 'local' entries across all tables")
         else:
             print("[CLEANUP 018] ✓ No duplicates to delete")
 
