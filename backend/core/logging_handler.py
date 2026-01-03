@@ -80,10 +80,19 @@ class DatabaseLogHandler(logging.Handler):
                 return enabled
             except Exception as e:
                 # On error, assume disabled and cache for shorter time
+                # NOTE: Can't use logging.error here - would cause recursion!
                 self._debug_enabled_cache = False
                 self._cache_timestamp = now - self._cache_ttl + 5  # Retry in 5 seconds
-                logging.error(f"[DEBUG-HANDLER] Error checking debug_enabled: {e}")
                 return False
+
+    def invalidate_cache(self):
+        """
+        Force cache invalidation to immediately pick up debug_enabled changes.
+        Should be called when the debug_enabled preference is toggled.
+        """
+        with self._cache_lock:
+            self._cache_timestamp = 0
+            self._debug_enabled_cache = None
 
     def _extract_component(self, message: str) -> Optional[str]:
         """
@@ -107,6 +116,10 @@ class DatabaseLogHandler(logging.Handler):
         Args:
             record: LogRecord instance to be logged
         """
+        # CRITICAL: Prevent infinite recursion - don't log our own messages
+        if record.name == 'core.logging_handler' or '[DEBUG-HANDLER]' in record.getMessage():
+            return
+
         # Skip if debug mode is not enabled
         if not self._is_debug_enabled():
             return
@@ -141,6 +154,7 @@ class DatabaseLogHandler(logging.Handler):
 
         except Exception as e:
             # Don't let logging errors crash the application
+            # NOTE: Don't use logging.error here - would cause recursion!
             self.handleError(record)
 
     def _flush_worker(self):
