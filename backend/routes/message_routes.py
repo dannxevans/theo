@@ -58,6 +58,9 @@ def stream_chat_sse(session_id):
     text = request.args.get("text", "").strip()
     forced_provider = request.args.get("forced_provider")
 
+    # Debug logging for Siri shortcuts troubleshooting
+    logging.info(f"[STREAM] Received request - text param: '{request.args.get('text')}', stripped: '{text}', all params: {dict(request.args)}")
+
     # Validate text is not empty
     if not text:
         def error_stream():
