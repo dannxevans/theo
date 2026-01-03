@@ -476,6 +476,10 @@ def toggle_debug():
     """
     from app import memory, db_handler
     from core.user_utils import DEFAULT_USER_ID
+    import logging
+    import sys
+
+    logging.warning("[DEBUG-TOGGLE] Toggle debug endpoint called")
 
     # Check admin status
     user = request.current_user
@@ -485,50 +489,73 @@ def toggle_debug():
     data = request.json
     enabled = bool(data.get("enabled", False))
 
-    # Update preference
-    memory.remember(
-        user_id=DEFAULT_USER_ID,
-        key="debug_enabled",
-        value=str(enabled).lower()
-    )
+    logging.warning(f"[DEBUG-TOGGLE] Setting debug_enabled to {enabled}")
 
-    # Safety: When disabling debug, reset all verbose logger filters to OFF and clear logs
-    if not enabled:
-        verbose_filters = [
-            "debug_filter_sqlalchemy",
-            "debug_filter_werkzeug",
-            "debug_filter_urllib3",
-            "debug_filter_botocore"
-        ]
-        for filter_key in verbose_filters:
-            memory.remember(
-                user_id=DEFAULT_USER_ID,
-                key=filter_key,
-                value="false"
-            )
+    try:
+        # Update preference
+        memory.remember(
+            user_id=DEFAULT_USER_ID,
+            key="debug_enabled",
+            value=str(enabled).lower()
+        )
 
-        # Clear all debug logs
-        try:
-            db_path = get_db_path(memory)
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+        logging.warning("[DEBUG-TOGGLE] Updated debug_enabled preference")
 
-            # Check if debug_logs table exists
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
-            if cursor.fetchone():
-                cursor.execute("DELETE FROM debug_logs")
-                conn.commit()
+        # Safety: When disabling debug, reset all verbose logger filters to OFF and clear logs
+        if not enabled:
+            logging.warning("[DEBUG-TOGGLE] Disabling debug - resetting filters and clearing logs")
 
-            conn.close()
-        except Exception as e:
-            # Log error but don't fail the disable operation
-            import sys
-            print(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}", file=sys.stderr)
+            verbose_filters = [
+                "debug_filter_sqlalchemy",
+                "debug_filter_werkzeug",
+                "debug_filter_urllib3",
+                "debug_filter_botocore"
+            ]
+            for filter_key in verbose_filters:
+                memory.remember(
+                    user_id=DEFAULT_USER_ID,
+                    key=filter_key,
+                    value="false"
+                )
 
-    # Invalidate cache so handler picks up change immediately
-    db_handler.invalidate_cache()
+            logging.warning("[DEBUG-TOGGLE] Reset filter preferences")
 
-    return jsonify({"status": "ok", "enabled": enabled})
+            # Clear all debug logs
+            try:
+                db_path = get_db_path(memory)
+                logging.warning(f"[DEBUG-TOGGLE] Clearing debug logs from {db_path}")
+
+                conn = sqlite3.connect(db_path, timeout=5.0)  # Add timeout
+                cursor = conn.cursor()
+
+                # Check if debug_logs table exists
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+                if cursor.fetchone():
+                    cursor.execute("DELETE FROM debug_logs")
+                    deleted = cursor.rowcount
+                    conn.commit()
+                    logging.warning(f"[DEBUG-TOGGLE] Deleted {deleted} log entries")
+                else:
+                    logging.warning("[DEBUG-TOGGLE] debug_logs table doesn't exist")
+
+                conn.close()
+            except Exception as e:
+                # Log error but don't fail the disable operation
+                logging.error(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}")
+                print(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}", file=sys.stderr)
+
+        # Invalidate cache so handler picks up change immediately
+        logging.warning("[DEBUG-TOGGLE] Invalidating cache")
+        db_handler.invalidate_cache()
+
+        logging.warning("[DEBUG-TOGGLE] Toggle complete, returning response")
+        return jsonify({"status": "ok", "enabled": enabled})
+
+    except Exception as e:
+        logging.error(f"[DEBUG-TOGGLE] Error in toggle: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 @debug_bp.route("/filters", methods=["POST"])
@@ -551,6 +578,9 @@ def update_filters():
     """
     from app import memory, db_handler
     from core.user_utils import DEFAULT_USER_ID
+    import logging
+
+    logging.warning("[DEBUG-FILTERS] Update filters endpoint called")
 
     # Check admin status
     user = request.current_user
@@ -559,6 +589,8 @@ def update_filters():
 
     data = request.json
     filters = data.get("filters", {})
+
+    logging.warning(f"[DEBUG-FILTERS] Received filters: {filters}")
 
     # Update each filter preference
     filter_map = {
@@ -569,17 +601,27 @@ def update_filters():
     }
 
     updated_filters = {}
-    for key, pref_key in filter_map.items():
-        if key in filters:
-            value = bool(filters[key])
-            memory.remember(
-                user_id=DEFAULT_USER_ID,
-                key=pref_key,
-                value=str(value).lower()
-            )
-            updated_filters[key] = value
+    try:
+        for key, pref_key in filter_map.items():
+            if key in filters:
+                value = bool(filters[key])
+                logging.warning(f"[DEBUG-FILTERS] Updating {key} -> {value}")
+                memory.remember(
+                    user_id=DEFAULT_USER_ID,
+                    key=pref_key,
+                    value=str(value).lower()
+                )
+                updated_filters[key] = value
 
-    # Invalidate cache so handler picks up changes immediately
-    db_handler.invalidate_cache()
+        # Invalidate cache so handler picks up changes immediately
+        logging.warning("[DEBUG-FILTERS] Invalidating cache")
+        db_handler.invalidate_cache()
 
-    return jsonify({"status": "ok", "filters": updated_filters})
+        logging.warning("[DEBUG-FILTERS] Update complete, returning response")
+        return jsonify({"status": "ok", "filters": updated_filters})
+
+    except Exception as e:
+        logging.error(f"[DEBUG-FILTERS] Error updating filters: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
