@@ -194,4 +194,4 @@ if __name__ == "__main__":
         print("[SECURITY WARNING] Flask debug mode is ENABLED - only use in development!")
 
     print("THEO backend starting on port 1066")
-    app.run(host="0.0.0.0", port=1066, debug=debug_mode)
+    app.run(host="0.0.0.0", port=1066, debug=True)
