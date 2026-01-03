@@ -57,6 +57,21 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
 
+          # Extract PR number from merge commit message
+          PR_NUMBER=$(git log -1 --pretty=%B | grep -oP 'Merge pull request #\K\d+' || echo "")
+
+          # Determine primary deployment tag
+          if [[ -n "$PR_NUMBER" ]]; then
+            # PR merge - use PR number as primary tag
+            DEPLOY_TAG="pr-${PR_NUMBER}"
+            echo "📦 Detected PR merge: #${PR_NUMBER}"
+          else
+            # Direct push or manual trigger - use commit SHA
+            DEPLOY_TAG="git-${SHORT_SHA}"
+            echo "📦 Direct push detected, using commit: ${SHORT_SHA}"
+          fi
+
+          # Version tag for compatibility
           if [[ "${GITHUB_REF}" == refs/heads/release ]]; then
             VERSION_TAG=latest
           elif [[ "${GITHUB_REF}" == refs/heads/dev ]]; then
@@ -67,14 +82,21 @@ jobs:
             VERSION_TAG=unknown
           fi
 
+          echo "deploy_tag=${DEPLOY_TAG}" >> $GITHUB_OUTPUT
           echo "sha_tag=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+
+          echo "🏷️  Tags:"
+          echo "  - Deploy: ${DEPLOY_TAG}"
+          echo "  - SHA: git-${SHORT_SHA}"
+          echo "  - Version: ${VERSION_TAG}"
 
       # ---------- FRONTEND ----------
       - name: Frontend Image
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            -t $REGISTRY/$OWNER/theo-frontend:${{ steps.meta.outputs.deploy_tag }} \
             -t $REGISTRY/$OWNER/theo-frontend:${{ steps.meta.outputs.sha_tag }} \
             -t $REGISTRY/$OWNER/theo-frontend:${{ steps.meta.outputs.version_tag }} \
             -f frontend/Dockerfile \
@@ -85,6 +107,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.deploy_tag }} \
             -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.sha_tag }} \
             -t $REGISTRY/$OWNER/theo-backend:${{ steps.meta.outputs.version_tag }} \
             -f backend/Dockerfile \
@@ -98,6 +121,24 @@ jobs:
     if: github.ref == 'refs/heads/release' || github.event_name == 'workflow_dispatch'
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Compute deployment tag
+        id: meta
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          PR_NUMBER=$(git log -1 --pretty=%B | grep -oP 'Merge pull request #\K\d+' || echo "")
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            DEPLOY_TAG="pr-${PR_NUMBER}"
+          else
+            DEPLOY_TAG="git-${SHORT_SHA}"
+          fi
+
+          echo "deploy_tag=${DEPLOY_TAG}" >> $GITHUB_OUTPUT
+          echo "🚀 Deploying tag: ${DEPLOY_TAG}"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -105,27 +146,75 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Update backend task definition
+        run: |
+          echo "📝 Updating backend task definition..."
+
+          # Get current task definition
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition theo-backend \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition')
+
+          # Update image with new tag
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.OWNER }}/theo-backend:${{ steps.meta.outputs.deploy_tag }}"
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE |
+             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+
+          # Register new task definition revision
+          aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Backend task definition updated with image: $NEW_IMAGE"
+
       - name: Deploy backend service
         run: |
-          echo "Deploying backend service to ECS..."
+          echo "🚀 Deploying backend service to ECS..."
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.BACKEND_SERVICE }} \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
-          echo "Backend deployment initiated"
+          echo "✅ Backend deployment initiated"
+
+      - name: Update frontend task definition
+        run: |
+          echo "📝 Updating frontend task definition..."
+
+          # Get current task definition
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition theo-frontend \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition')
+
+          # Update image with new tag
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.OWNER }}/theo-frontend:${{ steps.meta.outputs.deploy_tag }}"
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE |
+             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+
+          # Register new task definition revision
+          aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Frontend task definition updated with image: $NEW_IMAGE"
 
       - name: Deploy frontend service
         run: |
-          echo "Deploying frontend service to ECS..."
+          echo "🚀 Deploying frontend service to ECS..."
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.FRONTEND_SERVICE }} \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
-          echo "Frontend deployment initiated"
+          echo "✅ Frontend deployment initiated"
 
       - name: Wait for services to stabilize
         run: |

@@ -6,6 +6,7 @@ Provides chat and streaming endpoints for message processing.
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID
+from auth.password import require_auth
 from datetime import datetime
 import json
 import logging
@@ -14,9 +15,11 @@ message_bp = Blueprint('message', __name__, url_prefix='/api')
 
 
 @message_bp.route("/chat", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
 def chat():
     """
     Process a chat message (non-streaming).
+    Requires authentication via session token or API key.
     Request body: { "session_id": "...", "text": "..." }
     Returns: { "text": "...", "provider": "...", "model": "...", ... }
     """
@@ -27,8 +30,10 @@ def chat():
     session_id = payload.get("session_id", "default")
     text = payload.get("text", "")
 
-    # Note: /chat endpoint doesn't have auth, so user_id will default to DEFAULT_USER_ID
-    context = context_manager.build_context(session_id, text, user_id=None)
+    # Get authenticated user from request context (set by require_auth decorator)
+    user_id = request.user.get("id") if hasattr(request, 'user') else None
+
+    context = context_manager.build_context(session_id, text, user_id=user_id)
     result = route_request(context)
 
     # Pass the full result object so metadata can be extracted
