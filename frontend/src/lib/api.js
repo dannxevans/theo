@@ -1444,6 +1444,27 @@ export async function clearDebugLogs(filters = {}) {
 }
 
 /**
+ * Update debug logger filters
+ */
+export async function updateDebugFilters(filters) {
+  const response = await fetch(`${API_BASE}/api/debug/filters`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ filters })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update filters");
+  }
+
+  return response.json();
+}
+
+/**
  * Send a frontend log to the backend
  */
 export async function logToBackend(level, message, component, sessionId = null) {

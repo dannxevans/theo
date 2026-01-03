@@ -44,13 +44,20 @@ class DatabaseLogHandler(logging.Handler):
         self.flush_interval = flush_interval
 
         # Thread-safe queue for log buffering
-        self.log_queue = Queue()
+        self.log_queue = Queue(maxsize=1000)  # Limit queue size to prevent memory issues
 
         # Cache for debug_enabled preference (refreshed every 30 seconds)
         self._debug_enabled_cache = None
         self._cache_timestamp = 0
         self._cache_ttl = 30  # seconds
         self._cache_lock = threading.Lock()
+
+        # Cache for logger filters (refreshed with debug_enabled)
+        self._logger_filters_cache = None
+
+        # Circuit breaker to prevent log flooding
+        self._dropped_logs = 0
+        self._last_drop_warning = 0
 
         # Background thread for batch processing
         self._running = True
@@ -77,11 +84,21 @@ class DatabaseLogHandler(logging.Handler):
                 enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
                 self._debug_enabled_cache = enabled
                 self._cache_timestamp = now
+
+                # Also refresh logger filters cache
+                self._logger_filters_cache = {
+                    'debug_filter_sqlalchemy': str(prefs.get("debug_filter_sqlalchemy", "false")).lower() == "true",
+                    'debug_filter_werkzeug': str(prefs.get("debug_filter_werkzeug", "false")).lower() == "true",
+                    'debug_filter_urllib3': str(prefs.get("debug_filter_urllib3", "false")).lower() == "true",
+                    'debug_filter_botocore': str(prefs.get("debug_filter_botocore", "false")).lower() == "true",
+                }
+
                 return enabled
             except Exception as e:
                 # On error, assume disabled and cache for shorter time
                 # NOTE: Can't use logging.error here - would cause recursion!
                 self._debug_enabled_cache = False
+                self._logger_filters_cache = {}
                 self._cache_timestamp = now - self._cache_ttl + 5  # Retry in 5 seconds
                 return False
 
@@ -93,6 +110,19 @@ class DatabaseLogHandler(logging.Handler):
         with self._cache_lock:
             self._cache_timestamp = 0
             self._debug_enabled_cache = None
+            self._logger_filters_cache = None
+
+    def _get_logger_filters(self) -> dict:
+        """
+        Get logger filter settings from cache.
+
+        Returns:
+            Dict of filter_key -> enabled (bool)
+        """
+        with self._cache_lock:
+            if self._logger_filters_cache is None:
+                return {}
+            return self._logger_filters_cache
 
     def _extract_component(self, message: str) -> Optional[str]:
         """
@@ -119,6 +149,27 @@ class DatabaseLogHandler(logging.Handler):
         # CRITICAL: Prevent infinite recursion - don't log our own messages
         if record.name == 'core.logging_handler' or '[DEBUG-HANDLER]' in record.getMessage():
             return
+
+        # Check logger filters (user-configurable via preferences)
+        # Default to filtering out noisy loggers unless explicitly enabled
+        logger_filters = self._get_logger_filters()
+
+        # Map logger names to filter keys
+        logger_filter_map = {
+            'sqlalchemy.engine': 'debug_filter_sqlalchemy',
+            'sqlalchemy.pool': 'debug_filter_sqlalchemy',
+            'sqlalchemy.orm': 'debug_filter_sqlalchemy',
+            'werkzeug': 'debug_filter_werkzeug',
+            'urllib3': 'debug_filter_urllib3',
+            'botocore': 'debug_filter_botocore',
+            's3transfer': 'debug_filter_botocore',
+        }
+
+        for logger_prefix, filter_key in logger_filter_map.items():
+            if record.name.startswith(logger_prefix):
+                # Skip if filter is disabled (default)
+                if not logger_filters.get(filter_key, False):
+                    return
 
         # Skip if debug mode is not enabled
         if not self._is_debug_enabled():
@@ -150,7 +201,20 @@ class DatabaseLogHandler(logging.Handler):
             }
 
             # Add to queue (non-blocking)
-            self.log_queue.put_nowait(log_entry)
+            try:
+                self.log_queue.put_nowait(log_entry)
+            except:
+                # Queue is full - drop this log to prevent memory issues
+                # Track dropped logs and warn periodically (not too often to avoid spam)
+                self._dropped_logs += 1
+                now = time.time()
+                if now - self._last_drop_warning > 60:  # Warn at most once per minute
+                    self._last_drop_warning = now
+                    # Use stderr directly to avoid recursion
+                    import sys
+                    print(f"[DEBUG-HANDLER] Warning: Log queue full, dropped {self._dropped_logs} logs",
+                          file=sys.stderr)
+                    self._dropped_logs = 0
 
         except Exception as e:
             # Don't let logging errors crash the application
@@ -187,7 +251,12 @@ class DatabaseLogHandler(logging.Handler):
                     last_flush = now
 
             except Exception as e:
-                logging.error(f"[DEBUG-HANDLER] Error in flush worker: {e}")
+                # Don't use logging.error - would cause recursion!
+                # Use stderr directly
+                import sys
+                print(f"[DEBUG-HANDLER] Error in flush worker: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
 
         # Final flush on shutdown
         if buffer:
@@ -234,7 +303,11 @@ class DatabaseLogHandler(logging.Handler):
             conn.close()
 
         except Exception as e:
-            logging.error(f"[DEBUG-HANDLER] Error flushing logs to database: {e}")
+            # Don't use logging.error - would cause recursion!
+            # Use stderr directly
+            import sys
+            print(f"[DEBUG-HANDLER] Error flushing logs to database: {e}", file=sys.stderr)
+            # Don't traceback here - would be too noisy, just log the error
 
     def close(self):
         """
