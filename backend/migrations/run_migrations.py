@@ -64,6 +64,8 @@ def run_all_migrations():
         "015_add_proactive_tracking_tables.py",  # Add proactive notification tracking tables
         "016_add_routine_tracking.py",  # Add routine_name and routine_actions columns to turns table
         "017_add_user_routines.py",  # Add user_routines table for custom user-defined routines
+        "018_1_cleanup_duplicate_preferences.py",  # Pre-migration cleanup for migration 018
+        "018_standardize_user_id_to_integer.py",  # Standardize user_id from String to Integer
         "019_create_debug_logs.py"  # Add debug_logs table for debug console feature
     ]
 
