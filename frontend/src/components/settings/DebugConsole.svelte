@@ -17,6 +17,14 @@
   let searchTerm = '';
   let selectedComponent = 'all';
 
+  // Logger filters (noisy loggers - off by default)
+  let loggerFilters = {
+    sqlalchemy: false,
+    werkzeug: false,
+    urllib3: false,
+    botocore: false
+  };
+
   // Component tags (extracted from logs)
   let availableComponents = new Set();
 
@@ -44,6 +52,11 @@
       const data = await response.json();
       debugEnabled = data.enabled;
       totalLogs = data.log_count;
+
+      // Load filter settings
+      if (data.filters) {
+        loggerFilters = data.filters;
+      }
     } catch (e) {
       error = `Failed to check debug status: ${e.message}`;
       console.error('Debug status check error:', e);
@@ -176,6 +189,34 @@
       availableComponents = new Set();
     } catch (e) {
       error = `Failed to clear logs: ${e.message}`;
+    }
+  }
+
+  async function handleFilterChange(filterName, value) {
+    try {
+      // Update local state immediately
+      loggerFilters[filterName] = value;
+
+      // Send to backend
+      const API_BASE = "";
+      const response = await fetch(`${API_BASE}/api/debug/filters`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          filters: { [filterName]: value }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (e) {
+      error = `Failed to update filter: ${e.message}`;
+      // Revert local state on error
+      loggerFilters[filterName] = !value;
     }
   }
 
@@ -330,6 +371,47 @@
             placeholder="Filter messages..."
             bind:value={searchTerm}
           />
+        </div>
+
+        <div class="filter-section">
+          <label>Verbose Loggers:</label>
+          <div class="filter-checkboxes">
+            <label class="checkbox-label" title="SQLAlchemy database queries (very verbose)">
+              <input
+                type="checkbox"
+                checked={loggerFilters.sqlalchemy}
+                on:change={(e) => handleFilterChange('sqlalchemy', e.target.checked)}
+              />
+              SQLAlchemy
+            </label>
+            <label class="checkbox-label" title="Werkzeug HTTP request logs">
+              <input
+                type="checkbox"
+                checked={loggerFilters.werkzeug}
+                on:change={(e) => handleFilterChange('werkzeug', e.target.checked)}
+              />
+              Werkzeug
+            </label>
+            <label class="checkbox-label" title="urllib3 HTTP client logs">
+              <input
+                type="checkbox"
+                checked={loggerFilters.urllib3}
+                on:change={(e) => handleFilterChange('urllib3', e.target.checked)}
+              />
+              urllib3
+            </label>
+            <label class="checkbox-label" title="AWS SDK (botocore) logs">
+              <input
+                type="checkbox"
+                checked={loggerFilters.botocore}
+                on:change={(e) => handleFilterChange('botocore', e.target.checked)}
+              />
+              Botocore/S3
+            </label>
+          </div>
+          <small style="color: #888; margin-top: 4px; display: block;">
+            ⚠️ Enabling these can generate 100s of logs/second
+          </small>
         </div>
       </div>
 

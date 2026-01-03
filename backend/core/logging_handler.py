@@ -52,6 +52,9 @@ class DatabaseLogHandler(logging.Handler):
         self._cache_ttl = 30  # seconds
         self._cache_lock = threading.Lock()
 
+        # Cache for logger filters (refreshed with debug_enabled)
+        self._logger_filters_cache = None
+
         # Circuit breaker to prevent log flooding
         self._dropped_logs = 0
         self._last_drop_warning = 0
@@ -81,11 +84,21 @@ class DatabaseLogHandler(logging.Handler):
                 enabled = str(prefs.get("debug_enabled", "false")).lower() == "true"
                 self._debug_enabled_cache = enabled
                 self._cache_timestamp = now
+
+                # Also refresh logger filters cache
+                self._logger_filters_cache = {
+                    'debug_filter_sqlalchemy': str(prefs.get("debug_filter_sqlalchemy", "false")).lower() == "true",
+                    'debug_filter_werkzeug': str(prefs.get("debug_filter_werkzeug", "false")).lower() == "true",
+                    'debug_filter_urllib3': str(prefs.get("debug_filter_urllib3", "false")).lower() == "true",
+                    'debug_filter_botocore': str(prefs.get("debug_filter_botocore", "false")).lower() == "true",
+                }
+
                 return enabled
             except Exception as e:
                 # On error, assume disabled and cache for shorter time
                 # NOTE: Can't use logging.error here - would cause recursion!
                 self._debug_enabled_cache = False
+                self._logger_filters_cache = {}
                 self._cache_timestamp = now - self._cache_ttl + 5  # Retry in 5 seconds
                 return False
 
@@ -97,6 +110,19 @@ class DatabaseLogHandler(logging.Handler):
         with self._cache_lock:
             self._cache_timestamp = 0
             self._debug_enabled_cache = None
+            self._logger_filters_cache = None
+
+    def _get_logger_filters(self) -> dict:
+        """
+        Get logger filter settings from cache.
+
+        Returns:
+            Dict of filter_key -> enabled (bool)
+        """
+        with self._cache_lock:
+            if self._logger_filters_cache is None:
+                return {}
+            return self._logger_filters_cache
 
     def _extract_component(self, message: str) -> Optional[str]:
         """
@@ -124,21 +150,26 @@ class DatabaseLogHandler(logging.Handler):
         if record.name == 'core.logging_handler' or '[DEBUG-HANDLER]' in record.getMessage():
             return
 
-        # Skip noisy loggers that would flood the debug console
-        # These generate excessive logs that aren't useful for debugging
-        noisy_loggers = [
-            'sqlalchemy.engine',      # Database queries (very verbose)
-            'sqlalchemy.pool',        # Connection pool
-            'sqlalchemy.orm',         # ORM internals
-            'werkzeug',               # Flask HTTP request logs (already have access logs)
-            'urllib3',                # HTTP client logs
-            'botocore',               # AWS SDK logs
-            's3transfer',             # S3 transfer logs
-        ]
+        # Check logger filters (user-configurable via preferences)
+        # Default to filtering out noisy loggers unless explicitly enabled
+        logger_filters = self._get_logger_filters()
 
-        for noisy in noisy_loggers:
-            if record.name.startswith(noisy):
-                return
+        # Map logger names to filter keys
+        logger_filter_map = {
+            'sqlalchemy.engine': 'debug_filter_sqlalchemy',
+            'sqlalchemy.pool': 'debug_filter_sqlalchemy',
+            'sqlalchemy.orm': 'debug_filter_sqlalchemy',
+            'werkzeug': 'debug_filter_werkzeug',
+            'urllib3': 'debug_filter_urllib3',
+            'botocore': 'debug_filter_botocore',
+            's3transfer': 'debug_filter_botocore',
+        }
+
+        for logger_prefix, filter_key in logger_filter_map.items():
+            if record.name.startswith(logger_prefix):
+                # Skip if filter is disabled (default)
+                if not logger_filters.get(filter_key, False):
+                    return
 
         # Skip if debug mode is not enabled
         if not self._is_debug_enabled():

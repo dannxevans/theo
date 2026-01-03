@@ -443,9 +443,18 @@ def get_debug_status():
             # This prevents the entire endpoint from failing
             pass
 
+        # Get logger filter settings
+        filters = {
+            "sqlalchemy": str(prefs.get("debug_filter_sqlalchemy", "false")).lower() == "true",
+            "werkzeug": str(prefs.get("debug_filter_werkzeug", "false")).lower() == "true",
+            "urllib3": str(prefs.get("debug_filter_urllib3", "false")).lower() == "true",
+            "botocore": str(prefs.get("debug_filter_botocore", "false")).lower() == "true",
+        }
+
         return jsonify({
             "enabled": enabled,
-            "log_count": log_count
+            "log_count": log_count,
+            "filters": filters
         })
 
     except Exception as e:
@@ -487,3 +496,57 @@ def toggle_debug():
     db_handler.invalidate_cache()
 
     return jsonify({"status": "ok", "enabled": enabled})
+
+
+@debug_bp.route("/filters", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
+def update_filters():
+    """
+    Update logger filter settings.
+
+    Request body: {
+        "sqlalchemy": bool,
+        "werkzeug": bool,
+        "urllib3": bool,
+        "botocore": bool
+    }
+
+    Returns:
+        JSON: {"status": "ok", "filters": {...}}
+
+    Requires: Admin authentication
+    """
+    from app import memory, db_handler
+    from core.user_utils import DEFAULT_USER_ID
+
+    # Check admin status
+    user = request.current_user
+    if not is_admin(memory, user):
+        return jsonify({"error": "Forbidden - admin access required"}), 403
+
+    data = request.json
+    filters = data.get("filters", {})
+
+    # Update each filter preference
+    filter_map = {
+        "sqlalchemy": "debug_filter_sqlalchemy",
+        "werkzeug": "debug_filter_werkzeug",
+        "urllib3": "debug_filter_urllib3",
+        "botocore": "debug_filter_botocore",
+    }
+
+    updated_filters = {}
+    for key, pref_key in filter_map.items():
+        if key in filters:
+            value = bool(filters[key])
+            memory.remember(
+                user_id=DEFAULT_USER_ID,
+                key=pref_key,
+                value=str(value).lower()
+            )
+            updated_filters[key] = value
+
+    # Invalidate cache so handler picks up changes immediately
+    db_handler.invalidate_cache()
+
+    return jsonify({"status": "ok", "filters": updated_filters})
