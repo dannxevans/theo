@@ -21,7 +21,9 @@ export async function sendMessage({ text, sessionId }) {
 }
 
 export async function fetchSessionSummary(sessionId) {
-  const response = await fetch(`${API_BASE}/api/session/${sessionId}`);
+  const response = await fetch(`${API_BASE}/api/session/${sessionId}`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -93,7 +95,9 @@ export async function forgetMemory(key) {
 // =============================
 
 export async function listProviders() {
-  const response = await fetch(`${API_BASE}/api/providers`);
+  const response = await fetch(`${API_BASE}/api/providers`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -111,6 +115,7 @@ export async function upsertProvider(provider) {
   const response = await fetch(`${API_BASE}/api/providers`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify(provider)
@@ -126,7 +131,8 @@ export async function upsertProvider(provider) {
 
 export async function deleteProvider(providerId) {
   const response = await fetch(`${API_BASE}/api/providers/${providerId}`, {
-    method: "DELETE"
+    method: "DELETE",
+    headers: getAuthHeaders()
   });
 
   if (!response.ok) {
@@ -144,7 +150,8 @@ export async function deleteSessionApi(sessionId) {
   const response = await fetch(
     `${API_BASE}/api/sessions/${sessionId}`,
     {
-      method: "DELETE"
+      method: "DELETE",
+      headers: getAuthHeaders()
     }
   );
 
@@ -163,6 +170,7 @@ export async function getSessionMessages(sessionId) {
     `${API_BASE}/api/sessions/${sessionId}/messages?_=${timestamp}`,
     {
       headers: {
+        ...getAuthHeaders(),
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
@@ -181,7 +189,10 @@ export async function getSessionMessages(sessionId) {
 
 export async function exportSession(sessionId, format = "json") {
   const response = await fetch(
-    `${API_BASE}/api/sessions/${sessionId}/export?format=${format}`
+    `${API_BASE}/api/sessions/${sessionId}/export?format=${format}`,
+    {
+      headers: getAuthHeaders()
+    }
   );
 
   if (!response.ok) {
@@ -207,6 +218,7 @@ export async function forkSession(sessionId, turnIndex = null, title = null) {
     {
       method: "POST",
       headers: {
+        ...getAuthHeaders(),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -228,7 +240,8 @@ export async function generateSessionTitle(sessionId) {
   const response = await fetch(
     `${API_BASE}/api/sessions/${sessionId}/generate-title`,
     {
-      method: "POST"
+      method: "POST",
+      headers: getAuthHeaders()
     }
   );
 
@@ -244,7 +257,8 @@ export async function regenerateMessage(sessionId, turnId) {
   const response = await fetch(
     `${API_BASE}/api/sessions/${sessionId}/regenerate/${turnId}`,
     {
-      method: "POST"
+      method: "POST",
+      headers: getAuthHeaders()
     }
   );
 
@@ -659,7 +673,9 @@ export async function getRelevantMemories(query) {
 // =============================
 
 export async function getProviderHealth() {
-  const response = await fetch(`${API_BASE}/api/providers/health`);
+  const response = await fetch(`${API_BASE}/api/providers/health`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -673,6 +689,7 @@ export async function resetProviderHealth(providerId) {
   const response = await fetch(`${API_BASE}/api/providers/${providerId}/health/reset`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     }
   });
@@ -691,7 +708,9 @@ export async function getProviderCosts(days = 30) {
     params.append("days", days.toString());
   }
 
-  const response = await fetch(`${API_BASE}/api/providers/costs?${params}`);
+  const response = await fetch(`${API_BASE}/api/providers/costs?${params}`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -707,7 +726,9 @@ export async function getVoiceCosts(days = 30) {
     params.append("days", days.toString());
   }
 
-  const response = await fetch(`${API_BASE}/api/providers/voice-costs?${params}`);
+  const response = await fetch(`${API_BASE}/api/providers/voice-costs?${params}`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -721,6 +742,7 @@ export async function resetProviderUsage() {
   const response = await fetch(`${API_BASE}/api/providers/usage/reset`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     }
   });

@@ -6,11 +6,13 @@ health monitoring, and metadata management.
 """
 
 from flask import Blueprint, jsonify, request
+from auth.password import require_auth
 
 provider_bp = Blueprint('provider', __name__, url_prefix='/api/providers')
 
 
 @provider_bp.route("", methods=["GET"])
+@require_auth(lambda: __import__('app').memory)
 def list_providers():
     """
     List all AI providers.
@@ -37,6 +39,7 @@ def list_providers():
 
 
 @provider_bp.route("", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
 def upsert_provider():
     """
     Create or update an AI provider.
@@ -65,6 +68,7 @@ def upsert_provider():
 
 
 @provider_bp.route("/<provider_id>", methods=["DELETE"])
+@require_auth(lambda: __import__('app').memory)
 def delete_provider(provider_id):
     """
     Delete an AI provider.
@@ -81,6 +85,7 @@ def delete_provider(provider_id):
 
 
 @provider_bp.route("/health", methods=["GET"])
+@require_auth(lambda: __import__('app').memory)
 def get_provider_health():
     """
     Get health summary for all providers.
@@ -94,6 +99,7 @@ def get_provider_health():
 
 
 @provider_bp.route("/<provider_id>/metadata", methods=["GET"])
+@require_auth(lambda: __import__('app').memory)
 def get_provider_metadata_endpoint(provider_id):
     """
     Get metadata for a specific provider.
@@ -110,6 +116,7 @@ def get_provider_metadata_endpoint(provider_id):
 
 
 @provider_bp.route("/<provider_id>/metadata", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
 def update_provider_metadata_endpoint(provider_id):
     """
     Update cost metadata and circuit breaker settings for a provider.
@@ -141,6 +148,7 @@ def update_provider_metadata_endpoint(provider_id):
 
 
 @provider_bp.route("/<provider_id>/health/reset", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
 def reset_provider_health(provider_id):
     """
     Reset health metrics for a provider.
@@ -156,6 +164,7 @@ def reset_provider_health(provider_id):
 
 
 @provider_bp.route("/costs", methods=["GET"])
+@require_auth(lambda: __import__('app').memory)
 def get_provider_costs():
     """
     Get cost summary for all providers.
@@ -177,6 +186,7 @@ def get_provider_costs():
 
 
 @provider_bp.route("/voice-costs", methods=["GET"])
+@require_auth(lambda: __import__('app').memory)
 def get_voice_costs():
     """
     Get cost summary for voice services (TTS/STT).
@@ -199,6 +209,7 @@ def get_voice_costs():
 
 
 @provider_bp.route("/usage/reset", methods=["POST"])
+@require_auth(lambda: __import__('app').memory)
 def reset_all_provider_usage():
     """
     Reset ALL provider usage data including request logs, voice usage, and cost tracking.
