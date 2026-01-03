@@ -465,7 +465,7 @@ def toggle_debug():
 
     Requires: Admin authentication
     """
-    from app import memory
+    from app import memory, db_handler
     from core.user_utils import DEFAULT_USER_ID
 
     # Check admin status
@@ -482,5 +482,8 @@ def toggle_debug():
         key="debug_enabled",
         value=str(enabled).lower()
     )
+
+    # Invalidate cache so handler picks up change immediately
+    db_handler.invalidate_cache()
 
     return jsonify({"status": "ok", "enabled": enabled})
