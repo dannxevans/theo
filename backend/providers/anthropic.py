@@ -41,6 +41,9 @@ class AnthropicProvider(LLMProvider):
         for m in messages:
             if m["role"] == "system":
                 continue
+            # Skip messages with empty content to avoid API errors
+            if not m.get("content") or not m.get("content").strip():
+                continue
             user_messages.append({
                 "role": m["role"],
                 "content": m["content"]
@@ -102,6 +105,9 @@ class AnthropicProvider(LLMProvider):
         user_messages = []
         for m in messages:
             if m["role"] == "system":
+                continue
+            # Skip messages with empty content to avoid API errors
+            if not m.get("content") or not m.get("content").strip():
                 continue
             user_messages.append({
                 "role": m["role"],

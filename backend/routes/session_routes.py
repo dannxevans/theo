@@ -7,6 +7,7 @@ export, forking, and title generation.
 
 from flask import Blueprint, jsonify, request, Response
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID
+from auth.password import require_auth
 import json
 import logging
 import uuid
@@ -15,6 +16,7 @@ session_bp = Blueprint('session', __name__, url_prefix='/api')
 
 
 @session_bp.route("/session/<session_id>", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def get_session(session_id):
     """
     Get session summary.
@@ -76,6 +78,7 @@ def list_sessions():
 
 
 @session_bp.route("/sessions/<session_id>/messages", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def get_session_messages(session_id):
     """
     Fetch all messages for a session.
@@ -106,6 +109,7 @@ def get_session_messages(session_id):
 
 
 @session_bp.route("/sessions/<session_id>/mode", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def get_session_mode(session_id):
     """
     Get the mode for a specific session.
@@ -124,6 +128,7 @@ def get_session_mode(session_id):
 
 
 @session_bp.route("/sessions/<session_id>", methods=["DELETE"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def delete_session(session_id):
     """
     Delete a session and all its messages.
@@ -139,6 +144,7 @@ def delete_session(session_id):
 
 
 @session_bp.route("/sessions/<session_id>/export", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def export_session(session_id):
     """
     Export a conversation in JSON or Markdown format.
@@ -221,6 +227,7 @@ def export_session(session_id):
 
 
 @session_bp.route("/sessions/<session_id>/fork", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def fork_session(session_id):
     """
     Create a new session as a fork/branch of the current one.
@@ -275,6 +282,7 @@ def fork_session(session_id):
 
 
 @session_bp.route("/sessions/<session_id>/regenerate/<int:turn_id>", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def regenerate_message(session_id, turn_id):
     """
     Regenerate an assistant response by deleting it and all subsequent turns,
@@ -327,6 +335,7 @@ def regenerate_message(session_id, turn_id):
 
 
 @session_bp.route("/sessions/<session_id>/generate-title", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def generate_session_title(session_id):
     """
     Generate an AI-powered title for a session based on its first few messages.
