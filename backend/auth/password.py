@@ -29,7 +29,6 @@ def hash_password(password):
 def verify_password(password, stored_hash):
     """
     Verify a password against a bcrypt hash.
-    Supports both legacy SHA-256 hashes and new bcrypt hashes for migration.
     """
     try:
         # Convert password to bytes if it's a string
@@ -38,22 +37,9 @@ def verify_password(password, stored_hash):
 
         # Convert stored hash to bytes if it's a string
         if isinstance(stored_hash, str):
-            # Check if this is a legacy SHA-256 hash (contains colon separator)
-            if ':' in stored_hash:
-                # SECURITY NOTE: This legacy SHA-256 code is intentionally kept for
-                # backward compatibility with existing user passwords. New passwords
-                # use bcrypt (above). This code path allows existing users to login
-                # while we migrate to bcrypt. Suppressing CodeQL alert as this is
-                # a temporary migration path, not the primary authentication method.
-                # lgtm[py/weak-sensitive-data-hashing]
-                import hashlib
-                salt, password_hash = stored_hash.split(":")
-                test_hash = hashlib.sha256((password.decode('utf-8') + salt).encode()).hexdigest()
-                return test_hash == password_hash
-
             stored_hash = stored_hash.encode('utf-8')
 
-        # Bcrypt verification (secure, primary method)
+        # Bcrypt verification
         return bcrypt.checkpw(password, stored_hash)
     except (ValueError, AttributeError):
         return False
