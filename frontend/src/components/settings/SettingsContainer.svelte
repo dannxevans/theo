@@ -11,6 +11,7 @@
   import WorkModeSettings from "./WorkModeSettings.svelte";
   import PersonalModeSettings from "./PersonalModeSettings.svelte";
   import AccountSettings from "./AccountSettings.svelte";
+  import ApiKeysSettings from "./ApiKeysSettings.svelte";
   import ThemeSettings from "./ThemeSettings.svelte";
   import VoiceSettings from "./VoiceSettings.svelte";
   import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
@@ -372,6 +373,9 @@
           <button class="dropdown-item" class:active={activeTab === "theo-account"} on:click={() => switchCategory("accounts", "theo-account")}>
             THEO Account
           </button>
+          <button class="dropdown-item" class:active={activeTab === "api-keys"} on:click={() => switchCategory("accounts", "api-keys")}>
+            API Keys
+          </button>
           <button class="dropdown-item" class:active={activeTab === "ai-providers"} on:click={() => switchCategory("accounts", "ai-providers")}>
             AI Providers
           </button>
@@ -427,6 +431,7 @@
       {#if activeTab === "personal"}Personal Mode{/if}
       {#if activeTab === "work"}Work Mode{/if}
       {#if activeTab === "theo-account"}THEO Account{/if}
+      {#if activeTab === "api-keys"}API Keys{/if}
       {#if activeTab === "ai-providers"}AI Providers{/if}
       {#if activeTab === "integrations"}Integrations{/if}
       {#if activeTab === "service-providers"}Service Providers{/if}
@@ -511,6 +516,10 @@
 
     {#if activeTab === "theo-account"}
       <AccountSettings />
+    {/if}
+
+    {#if activeTab === "api-keys"}
+      <ApiKeysSettings />
     {/if}
 
     {#if activeTab === "integrations"}

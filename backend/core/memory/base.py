@@ -36,6 +36,7 @@ class BaseMemoryOperations:
         # Store all tables
         self.users = tables["users"]
         self.auth_sessions = tables["auth_sessions"]
+        self.api_keys = tables["api_keys"]
         self.user_mode_config = tables["user_mode_config"]
         self.mode_settings = tables["mode_settings"]
         self.work_mode_subtab_config = tables["work_mode_subtab_config"]
