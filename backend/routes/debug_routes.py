@@ -501,9 +501,10 @@ def toggle_debug():
 
         logging.warning("[DEBUG-TOGGLE] Updated debug_enabled preference")
 
-        # Safety: When disabling debug, reset all verbose logger filters to OFF and clear logs
+        # Safety: When disabling debug, reset all verbose logger filters to OFF
+        # NOTE: We no longer clear logs here to avoid timeout - use the DELETE /api/debug/logs endpoint instead
         if not enabled:
-            logging.warning("[DEBUG-TOGGLE] Disabling debug - resetting filters and clearing logs")
+            logging.warning("[DEBUG-TOGGLE] Disabling debug - resetting filters")
 
             verbose_filters = [
                 "debug_filter_sqlalchemy",
@@ -519,30 +520,6 @@ def toggle_debug():
                 )
 
             logging.warning("[DEBUG-TOGGLE] Reset filter preferences")
-
-            # Clear all debug logs
-            try:
-                db_path = get_db_path(memory)
-                logging.warning(f"[DEBUG-TOGGLE] Clearing debug logs from {db_path}")
-
-                conn = sqlite3.connect(db_path, timeout=5.0)  # Add timeout
-                cursor = conn.cursor()
-
-                # Check if debug_logs table exists
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
-                if cursor.fetchone():
-                    cursor.execute("DELETE FROM debug_logs")
-                    deleted = cursor.rowcount
-                    conn.commit()
-                    logging.warning(f"[DEBUG-TOGGLE] Deleted {deleted} log entries")
-                else:
-                    logging.warning("[DEBUG-TOGGLE] debug_logs table doesn't exist")
-
-                conn.close()
-            except Exception as e:
-                # Log error but don't fail the disable operation
-                logging.error(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}")
-                print(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}", file=sys.stderr)
 
         # Invalidate cache so handler picks up change immediately
         logging.warning("[DEBUG-TOGGLE] Invalidating cache")
