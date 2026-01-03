@@ -23,7 +23,7 @@ def chat():
     Request body: { "session_id": "...", "text": "..." }
     Returns: { "text": "...", "provider": "...", "model": "...", ... }
     """
-    from app import context_manager, provider_registry
+    from app import context_manager, provider_registry, memory
     from core.router import route_request
 
     payload = request.json
@@ -39,6 +39,10 @@ def chat():
     user_id = request.current_user.get("id") if hasattr(request, 'current_user') else None
 
     context = context_manager.build_context(session_id, text, user_id=user_id)
+    # FIX: route_request() needs text, session_id, and memory in the context
+    context["text"] = text
+    context["session_id"] = session_id
+    context["memory"] = memory
     result = route_request(context)
 
     # Pass the full result object so metadata can be extracted
@@ -52,9 +56,55 @@ def stream_chat_sse(session_id):
     Process a chat message with Server-Sent Events streaming.
     Query params: text, forced_provider, token, work_subtab
     Streams response in chunks with metadata at end.
+    Requires authentication via session token or API key.
     """
     from app import memory, context_manager, provider_registry
     from core.router import route_request
+    from auth.password import _validate_session_auth, _validate_api_key_auth
+
+    # Check authentication FIRST before processing anything
+    auth_header = request.headers.get("Authorization")
+    token = None
+
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    elif request.args.get("token"):
+        token = request.args.get("token")
+
+    if not token:
+        def error_stream():
+            yield f"event: error\ndata: {json.dumps({'error': 'Unauthorized - authentication required'})}\n\n"
+        return Response(
+            stream_with_context(error_stream()),
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # Validate the token
+    user = None
+    if token.startswith("theo_"):
+        user = _validate_api_key_auth(memory, token)
+    else:
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user = memory.get_user_by_id(session["user_id"])
+
+    if not user:
+        def error_stream():
+            yield f"event: error\ndata: {json.dumps({'error': 'Unauthorized - invalid or expired credentials'})}\n\n"
+        return Response(
+            stream_with_context(error_stream()),
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     text = request.args.get("text", "").strip()
     forced_provider = request.args.get("forced_provider")
@@ -75,30 +125,8 @@ def stream_chat_sse(session_id):
 
     def event_stream():
         try:
-            # Get user from auth token (check both header and query param)
-            from auth.password import _validate_session_auth, _validate_api_key_auth
-
-            auth_header = request.headers.get("Authorization")
-            token = None
-            user_id = None
-            user = None
-
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-            elif request.args.get("token"):
-                token = request.args.get("token")
-
-            if token:
-                # Check if it's an API key (starts with "theo_")
-                if token.startswith("theo_"):
-                    user = _validate_api_key_auth(memory, token)
-                    if user:
-                        user_id = user["id"]
-                else:
-                    # Session-based authentication
-                    session = memory.get_auth_session(token)
-                    if session and session["expires_at"] >= datetime.utcnow():
-                        user_id = session["user_id"]
+            # User is already authenticated at this point
+            user_id = user.get("id")
 
             context = context_manager.build_context(session_id, text, user_id=user_id)
 
