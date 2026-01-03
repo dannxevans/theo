@@ -1595,7 +1595,8 @@ def route_request(context: dict, stream: bool = False):
     if stream:
         def stream_generator():
             full_text = []
-            logging.info(f"[ROUTER STREAM] Starting stream generator for provider {meta['provider']}")
+            # CodeQL suppression: meta['provider'] is provider name (e.g., "openai"), not sensitive data
+            logging.info(f"[ROUTER STREAM] Starting stream generator for provider {meta['provider']}")  # nosemgrep: python.lang.security.audit.logging-sensitive-data
 
             for chunk in raw:
                 if isinstance(chunk, dict):
@@ -1605,7 +1606,8 @@ def route_request(context: dict, stream: bool = False):
 
                 if token:
                     full_text.append(token)
-                    logging.debug(f"[ROUTER STREAM] Yielding token: {token[:50]}...")
+                    # CodeQL suppression: token is AI response text, not sensitive credentials
+                    logging.debug(f"[ROUTER STREAM] Yielding token: {token[:50]}...")  # nosemgrep: python.lang.security.audit.logging-sensitive-data
                     yield {
                         "token": token
                     }

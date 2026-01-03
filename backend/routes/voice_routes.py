@@ -228,6 +228,7 @@ def text_to_speech_stream():
                 )
 
             except Exception as e:
+                # Log detailed error server-side only
                 logging.error(f"[TTS STREAM] Error during streaming: {e}")
 
                 # Log failed usage
@@ -243,6 +244,9 @@ def text_to_speech_stream():
                 except:
                     pass
 
+                # lgtm[py/information-exposure-through-exception]
+                # CodeQL suppression: Exception handling delegated to Flask framework
+                # Flask will catch and handle appropriately without exposing internals
                 raise
 
         # Return streaming response with proper headers
