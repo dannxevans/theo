@@ -4,6 +4,7 @@ export async function sendMessage({ text, sessionId }) {
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -35,7 +36,9 @@ export async function fetchSessionSummary(sessionId) {
 
 export async function getSessions() {
   try {
-    const response = await fetch(`${API_BASE}/api/sessions`);
+    const response = await fetch(`${API_BASE}/api/sessions`, {
+      headers: getAuthHeaders()
+    });
 
     if (!response.ok) {
       console.error("Failed to load sessions:", response.status);
