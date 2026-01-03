@@ -155,6 +155,116 @@ def text_to_speech():
         return jsonify({"error": str(e)}), 500
 
 
+@voice_bp.route("/tts/stream", methods=["POST"])
+@require_auth(lambda: MemoryStore(Config.DATABASE_URL))
+def text_to_speech_stream():
+    """
+    Convert text to speech with streaming audio.
+    Enables progressive playback starting within 2-3 seconds.
+
+    Request body:
+        {
+            "text": "Text to convert to speech",
+            "voice": "alloy" (optional),
+            "speed": 1.0 (optional, 0.25-4.0)
+        }
+
+    Returns:
+        Streaming audio chunks (audio/mpeg)
+    """
+    try:
+        data = request.get_json()
+
+        if not data or "text" not in data:
+            return jsonify({"error": "Missing 'text' parameter"}), 400
+
+        text = data["text"]
+        voice = data.get("voice", "alloy")
+        speed = float(data.get("speed", 1.0))
+
+        # Get TTS provider
+        provider, error = get_tts_provider()
+        if error:
+            return jsonify({"error": error}), 500
+
+        # Calculate cost for logging
+        character_count = len(text)
+        model = provider.model  # tts-1
+        cost_per_1k_chars = 15000  # $15/1M chars = 15,000 micro-dollars/1K
+        estimated_cost = int((character_count / 1000) * cost_per_1k_chars)
+
+        def generate_audio():
+            """Generator function for streaming audio chunks."""
+            try:
+                total_bytes = 0
+                chunk_count = 0
+
+                logging.info(f"[TTS STREAM] Starting stream for {character_count} characters")
+
+                # Stream audio chunks from provider
+                for audio_chunk in provider.synthesize_stream(
+                    text=text,
+                    voice=voice,
+                    speed=speed,
+                    output_format="mp3"
+                ):
+                    total_bytes += len(audio_chunk)
+                    chunk_count += 1
+
+                    if chunk_count == 1:
+                        logging.info(f"[TTS STREAM] First chunk sent ({len(audio_chunk)} bytes)")
+
+                    yield audio_chunk
+
+                logging.info(f"[TTS STREAM] Complete: {chunk_count} chunks, {total_bytes} bytes")
+
+                # Log successful usage after stream completes
+                memory = MemoryStore(Config.DATABASE_URL)
+                memory.log_tts_usage(
+                    model=model,
+                    character_count=character_count,
+                    estimated_cost=estimated_cost,
+                    success=True
+                )
+
+            except Exception as e:
+                logging.error(f"[TTS STREAM] Error during streaming: {e}")
+
+                # Log failed usage
+                try:
+                    memory = MemoryStore(Config.DATABASE_URL)
+                    memory.log_tts_usage(
+                        model=model,
+                        character_count=character_count,
+                        estimated_cost=0,
+                        success=False,
+                        error_message=str(e)
+                    )
+                except:
+                    pass
+
+                raise
+
+        # Return streaming response with proper headers
+        from flask import Response, stream_with_context
+
+        return Response(
+            stream_with_context(generate_audio()),
+            mimetype="audio/mpeg",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering
+                "Transfer-Encoding": "chunked"
+            }
+        )
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"[TTS STREAM] Route error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @voice_bp.route("/stt", methods=["POST"])
 @require_auth(lambda: MemoryStore(Config.DATABASE_URL))
 def speech_to_text():

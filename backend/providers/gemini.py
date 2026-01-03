@@ -16,7 +16,7 @@ class GoogleProvider:
     name = "google"
     maxContextTokens = 128000
     costTier = "low"
-    supportsStreaming = False
+    supportsStreaming = True
 
     def __init__(self, api_key=None, base_url=None, model=None):
         self.api_key = api_key
@@ -128,7 +128,7 @@ class GoogleProvider:
 
         return text
 
-    def chat_stream(self, **kwargs):
+    def stream_chat(self, **kwargs):
         model = kwargs.get("model") or getattr(self, "model", None)
         system = kwargs.get("system_prompt") or kwargs.get("system")
         messages = kwargs.get("messages") or []

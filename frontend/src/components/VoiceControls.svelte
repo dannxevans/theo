@@ -1,5 +1,9 @@
 <script>
-  import { textToSpeech, speechToText } from "../lib/api.js";
+  import { textToSpeech, speechToText, getAuthHeaders } from "../lib/api.js";
+  import { MediaSourceAudioStreamer } from "../lib/MediaSourceAudioStreamer.js";
+
+  // API base URL (empty string uses same origin)
+  const API_BASE = "";
 
   // Props
   export let onTranscript = null; // Callback when STT produces text
@@ -13,6 +17,7 @@
   let mediaRecorder = null;
   let audioChunks = [];
   let currentAudio = null;
+  let mediaStreamer = null;
 
   /**
    * Start recording audio from microphone
@@ -74,19 +79,121 @@
   }
 
   /**
-   * Speak text using TTS
+   * Speak text using TTS with streaming for fast playback
    */
   export async function speak(text) {
     if (!text || isSpeaking) return;
 
+    // Stop any currently playing audio
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+
+    if (mediaStreamer) {
+      mediaStreamer.stop();
+      mediaStreamer = null;
+    }
+
+    isSpeaking = true;
+
+    // Check for MediaSource support
+    if (!window.MediaSource) {
+      console.warn('[VoiceControls] MediaSource not supported, using buffered TTS');
+      return speakBuffered(text);
+    }
+
+    try {
+      const startTime = performance.now();
+      console.log('[VoiceControls] Starting streaming TTS');
+
+      // Initialize MediaSource streamer
+      mediaStreamer = new MediaSourceAudioStreamer();
+      const audio = await mediaStreamer.initialize();
+
+      // Store reference for stop/pause controls
+      currentAudio = audio;
+
+      // Handle playback end
+      audio.addEventListener('ended', () => {
+        console.log('[VoiceControls] Playback ended');
+        isSpeaking = false;
+        mediaStreamer = null;
+      });
+
+      // Handle playback errors
+      audio.addEventListener('error', (e) => {
+        console.error('[VoiceControls] Audio error:', e);
+        isSpeaking = false;
+        mediaStreamer = null;
+      });
+
+      // Fetch streaming audio
+      const response = await fetch(`${API_BASE}/api/voice/tts/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
+          text: text,
+          voice: selectedVoice,
+          speed: speechSpeed
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.statusText}`);
+      }
+
+      // Read streaming response
+      const reader = response.body.getReader();
+      let firstChunkTime = null;
+      let chunkCount = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          console.log('[VoiceControls] Stream complete');
+          mediaStreamer.finalize();
+          break;
+        }
+
+        // Track time to first chunk
+        if (firstChunkTime === null) {
+          firstChunkTime = performance.now();
+          const timeToFirst = firstChunkTime - startTime;
+          console.log(`[VoiceControls] First chunk received in ${timeToFirst.toFixed(0)}ms`);
+        }
+
+        // Append chunk to MediaSource
+        chunkCount++;
+        mediaStreamer.appendChunk(value);
+      }
+
+      const totalTime = performance.now() - startTime;
+      console.log(`[VoiceControls] Received ${chunkCount} chunks in ${totalTime.toFixed(0)}ms`);
+
+    } catch (error) {
+      console.error('[VoiceControls] TTS streaming error:', error);
+      isSpeaking = false;
+
+      // Show error to user
+      if (error.message.includes('not configured')) {
+        alert('Text-to-speech is not configured. Please add an OpenAI API key.');
+      } else {
+        alert('Failed to generate speech. Please try again.');
+      }
+    }
+  }
+
+  /**
+   * Fallback buffered TTS for browsers without MediaSource support
+   */
+  async function speakBuffered(text) {
     try {
       isSpeaking = true;
-
-      // Stop any currently playing audio
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio = null;
-      }
 
       // Get audio from TTS API
       const audioBlob = await textToSpeech(text, selectedVoice, speechSpeed);

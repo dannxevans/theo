@@ -273,7 +273,12 @@ def stream_chat_sse(session_id):
                 # Get user routines if authenticated
                 user_routines = None
                 if user_id:
-                    user_routines = memory.get_user_routines(user_id)
+                    try:
+                        user_routines = memory.get_user_routines(user_id)
+                    except Exception as routine_err:
+                        # Routine table may not exist in test environments
+                        logging.debug(f"[ROUTINES] Could not fetch user routines: {routine_err}")
+                        user_routines = None
 
                 detected_routine_name, routine_def = detect_routine(filtered_text, user_routines)
 
@@ -305,41 +310,136 @@ def stream_chat_sse(session_id):
                     routine_name = detected_routine_name
                     routine_actions_list = execution_results.get("actions", [])
 
+                    # Routines return complete responses, not generators
+                    # Stream the complete response in chunks for consistency
+                    full_text = result.get("text", "")
+                    chunk_size = 32
+
+                    for i in range(0, len(full_text), chunk_size):
+                        chunk = full_text[i:i + chunk_size]
+                        yield f"data: {json.dumps({'token': chunk})}\n\n"
+
+                    # Save the turn to database BEFORE sending end event
+                    context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
+
+                    # Send metadata at end of stream
+                    end_payload = {
+                        "provider": result.get("provider"),
+                        "model": result.get("model"),
+                        "task_type": result.get("task_type"),
+                        "fallback_reason": result.get("fallback_reason"),
+                        "routing": result.get("routing"),
+                    }
+
+                    # Include debug instruction if present
+                    if result.get("debug_instruction"):
+                        end_payload["debug_instruction"] = result.get("debug_instruction")
+
+                    yield "event: end\n"
+                    yield f"data: {json.dumps(end_payload)}\n\n"
+
                 else:
-                    # Normal LLM routing
-                    result = route_request(router_context)
+                    # Normal LLM routing with REAL STREAMING
+                    # Pass stream=True to enable token-by-token streaming
+                    import inspect
+                    stream_result = route_request(router_context, stream=True)
+
+                    # Check if result is a generator (streaming) or dict (non-streaming)
+                    if inspect.isgenerator(stream_result):
+                        # Streaming mode: accumulate tokens and stream in real-time
+                        accumulated_tokens = []
+                        result_metadata = None
+                        logging.info("[STREAM] Detected generator, starting real-time streaming")
+
+                        # Stream tokens as they arrive from provider
+                        for chunk in stream_result:
+                            # Check if this is the end event with metadata
+                            if isinstance(chunk, dict) and chunk.get("event") == "end":
+                                result_metadata = chunk
+                                logging.info("[STREAM] Received end event")
+                                continue
+
+                            # Extract token from chunk
+                            token = chunk.get("token") if isinstance(chunk, dict) else chunk
+
+                            if token:
+                                # Accumulate for persistence
+                                accumulated_tokens.append(token)
+                                logging.debug(f"[STREAM] Streaming token to frontend: {token[:30]}...")
+
+                                # Stream immediately to frontend (REAL-TIME)
+                                yield f"data: {json.dumps({'token': token})}\n\n"
+
+                        logging.info(f"[STREAM] Streaming complete, accumulated {len(accumulated_tokens)} tokens")
+
+                        # Build full response for persistence
+                        full_response = "".join(accumulated_tokens)
+
+                        # Build result object for context_manager
+                        result = {
+                            "text": full_response,
+                            "provider": result_metadata.get("provider") if result_metadata else "unknown",
+                            "model": result_metadata.get("model") if result_metadata else None,
+                            "task_type": result_metadata.get("task_type") if result_metadata else None,
+                            "fallback_reason": result_metadata.get("fallback_reason") if result_metadata else None,
+                            "routing": result_metadata.get("routing") if result_metadata else None,
+                        }
+                    else:
+                        # Non-streaming fallback: route_request returned a dict
+                        result = stream_result
+                        full_response = result.get("text", "")
+
+                        # Stream in chunks for consistency
+                        chunk_size = 32
+                        for i in range(0, len(full_response), chunk_size):
+                            chunk = full_response[i:i + chunk_size]
+                            yield f"data: {json.dumps({'token': chunk})}\n\n"
+
+                    # Save the turn to database AFTER streaming completes
+                    context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
+
+                    # Send metadata at end of stream
+                    end_payload = {
+                        "provider": result.get("provider"),
+                        "model": result.get("model"),
+                        "task_type": result.get("task_type"),
+                        "fallback_reason": result.get("fallback_reason"),
+                        "routing": result.get("routing"),
+                    }
+
+                    yield "event: end\n"
+                    yield f"data: {json.dumps(end_payload)}\n\n"
 
             except Exception as e:
-                logging.error(f"[ROUTINES] Routine execution failed: {e}", exc_info=True)
-                # Fall back to normal LLM routing
+                logging.error(f"[STREAM] Streaming error: {str(e)}", exc_info=True)
+                # Fall back to normal LLM routing in case of error
                 result = route_request(router_context)
 
-            full_text = result.get("text", "")
-            chunk_size = 32
+                # Stream the fallback response in chunks
+                full_text = result.get("text", "")
+                chunk_size = 32
 
-            for i in range(0, len(full_text), chunk_size):
-                chunk = full_text[i:i + chunk_size]
-                yield f"data: {json.dumps({'token': chunk})}\n\n"
+                for i in range(0, len(full_text), chunk_size):
+                    chunk = full_text[i:i + chunk_size]
+                    yield f"data: {json.dumps({'token': chunk})}\n\n"
 
-            # Save the turn to database BEFORE sending end event
-            # This ensures metadata is persisted before frontend reloads messages
-            context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
+                # Save the turn to database
+                context_manager.update(session_id, filtered_text, result, provider_registry, mode=current_mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions_list)
 
-            # Send metadata at end of stream
-            end_payload = {
-                "provider": result.get("provider"),
-                "model": result.get("model"),
-                "task_type": result.get("task_type"),
-                "fallback_reason": result.get("fallback_reason"),
-                "routing": result.get("routing"),
-            }
+                # Send metadata at end of stream
+                end_payload = {
+                    "provider": result.get("provider"),
+                    "model": result.get("model"),
+                    "task_type": result.get("task_type"),
+                    "fallback_reason": result.get("fallback_reason"),
+                    "routing": result.get("routing"),
+                }
 
-            # Include debug instruction if present
-            if result.get("debug_instruction"):
-                end_payload["debug_instruction"] = result.get("debug_instruction")
+                if result.get("debug_instruction"):
+                    end_payload["debug_instruction"] = result.get("debug_instruction")
 
-            yield "event: end\n"
-            yield f"data: {json.dumps(end_payload)}\n\n"
+                yield "event: end\n"
+                yield f"data: {json.dumps(end_payload)}\n\n"
 
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
