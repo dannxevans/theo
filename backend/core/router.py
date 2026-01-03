@@ -64,7 +64,18 @@ def _debug(memory: Optional[MemoryStore], msg: str, **context):
         if debug_enabled:
             ctx_str = ""
             if context:
-                ctx_str = " | " + " ".join(f"{k}={v}" for k, v in context.items())
+                # Sanitize context - only log safe metadata, not sensitive data
+                safe_context = {}
+                for k, v in context.items():
+                    # Skip sensitive fields
+                    if k in ('text', 'messages', 'system', 'response', 'api_key', 'token', 'password'):
+                        safe_context[k] = '[REDACTED]'
+                    # Truncate long values
+                    elif isinstance(v, str) and len(v) > 100:
+                        safe_context[k] = f"{v[:97]}..."
+                    else:
+                        safe_context[k] = v
+                ctx_str = " | " + " ".join(f"{k}={v}" for k, v in safe_context.items())
             logging.info(f"[THEO][ROUTER][DEBUG] {msg}{ctx_str}")
     except Exception:
         pass

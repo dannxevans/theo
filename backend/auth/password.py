@@ -2,7 +2,7 @@
 Authentication module for THEO.
 Handles password hashing, session management, and user initialization.
 """
-import hashlib
+import bcrypt
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
@@ -11,23 +11,46 @@ from flask import request, jsonify
 
 def hash_password(password):
     """
-    Hash a password using SHA-256 with a salt.
-    Returns: salted_hash
+    Hash a password using bcrypt.
+    Returns: bcrypt hash as string
     """
-    salt = secrets.token_hex(16)
-    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-    return f"{salt}:{password_hash}"
+    # Convert password to bytes if it's a string
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+
+    # Generate salt and hash
+    salt = bcrypt.gensalt()
+    password_hash = bcrypt.hashpw(password, salt)
+
+    # Return as string for database storage
+    return password_hash.decode('utf-8')
 
 
 def verify_password(password, stored_hash):
     """
-    Verify a password against a stored hash.
+    Verify a password against a bcrypt hash.
+    Supports both legacy SHA-256 hashes and new bcrypt hashes for migration.
     """
     try:
-        salt, password_hash = stored_hash.split(":")
-        test_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-        return test_hash == password_hash
-    except ValueError:
+        # Convert password to bytes if it's a string
+        if isinstance(password, str):
+            password = password.encode('utf-8')
+
+        # Convert stored hash to bytes if it's a string
+        if isinstance(stored_hash, str):
+            # Check if this is a legacy SHA-256 hash (contains colon separator)
+            if ':' in stored_hash:
+                # Legacy SHA-256 verification for backward compatibility
+                import hashlib
+                salt, password_hash = stored_hash.split(":")
+                test_hash = hashlib.sha256((password.decode('utf-8') + salt).encode()).hexdigest()
+                return test_hash == password_hash
+
+            stored_hash = stored_hash.encode('utf-8')
+
+        # Bcrypt verification
+        return bcrypt.checkpw(password, stored_hash)
+    except (ValueError, AttributeError):
         return False
 
 

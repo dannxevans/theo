@@ -10,6 +10,7 @@ anthropic
 eventlet
 gunicorn
 boto3
+bcrypt
 pytest
 pytest-cov
 pytest-mock
