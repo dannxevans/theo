@@ -492,6 +492,21 @@ def toggle_debug():
         value=str(enabled).lower()
     )
 
+    # Safety: When disabling debug, reset all verbose logger filters to OFF
+    if not enabled:
+        verbose_filters = [
+            "debug_filter_sqlalchemy",
+            "debug_filter_werkzeug",
+            "debug_filter_urllib3",
+            "debug_filter_botocore"
+        ]
+        for filter_key in verbose_filters:
+            memory.remember(
+                user_id=DEFAULT_USER_ID,
+                key=filter_key,
+                value="false"
+            )
+
     # Invalidate cache so handler picks up change immediately
     db_handler.invalidate_cache()
 

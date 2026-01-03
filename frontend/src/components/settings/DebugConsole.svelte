@@ -171,6 +171,13 @@
       } else {
         stopLogStream();
         logs = [];
+        // Safety: Reset all verbose logger filters to OFF when disabling debug
+        loggerFilters = {
+          sqlalchemy: false,
+          werkzeug: false,
+          urllib3: false,
+          botocore: false
+        };
       }
     } catch (e) {
       error = `Failed to toggle debug mode: ${e.message}`;
