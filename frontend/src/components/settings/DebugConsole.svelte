@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { fetchDebugLogs, streamDebugLogs, toggleDebugMode, clearDebugLogs } from '../../lib/api.js';
+  import { fetchDebugLogs, streamDebugLogs, toggleDebugMode, clearDebugLogs, updateDebugFilters } from '../../lib/api.js';
 
   let logs = [];
   let eventSource = null;
@@ -197,22 +197,8 @@
       // Update local state immediately
       loggerFilters[filterName] = value;
 
-      // Send to backend
-      const API_BASE = "";
-      const response = await fetch(`${API_BASE}/api/debug/filters`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
-        body: JSON.stringify({
-          filters: { [filterName]: value }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      // Send to backend using API function (handles auth)
+      await updateDebugFilters({ [filterName]: value });
     } catch (e) {
       error = `Failed to update filter: ${e.message}`;
       // Revert local state on error
@@ -329,6 +315,7 @@
     {#if debugEnabled}
       <!-- Filters -->
       <div class="filters">
+        <!-- Row 1: Levels and Verbose Loggers -->
         <div class="filter-section">
           <label>Levels:</label>
           <div class="filter-checkboxes">
@@ -342,35 +329,6 @@
               </label>
             {/each}
           </div>
-        </div>
-
-        <div class="filter-section">
-          <label for="source-filter">Source:</label>
-          <select id="source-filter" bind:value={selectedSource}>
-            <option value="all">All</option>
-            <option value="backend">Backend</option>
-            <option value="frontend">Frontend</option>
-          </select>
-        </div>
-
-        <div class="filter-section">
-          <label for="component-filter">Component:</label>
-          <select id="component-filter" bind:value={selectedComponent}>
-            <option value="all">All Components</option>
-            {#each Array.from(availableComponents).sort() as component}
-              <option value={component}>{component}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="filter-section">
-          <label for="search">Search:</label>
-          <input
-            id="search"
-            type="text"
-            placeholder="Filter messages..."
-            bind:value={searchTerm}
-          />
         </div>
 
         <div class="filter-section">
@@ -412,6 +370,37 @@
           <small style="color: #888; margin-top: 4px; display: block;">
             ⚠️ Enabling these can generate 100s of logs/second
           </small>
+        </div>
+
+        <!-- Row 2: Source and Component -->
+        <div class="filter-section">
+          <label for="source-filter">Source:</label>
+          <select id="source-filter" bind:value={selectedSource}>
+            <option value="all">All</option>
+            <option value="backend">Backend</option>
+            <option value="frontend">Frontend</option>
+          </select>
+        </div>
+
+        <div class="filter-section">
+          <label for="component-filter">Component:</label>
+          <select id="component-filter" bind:value={selectedComponent}>
+            <option value="all">All Components</option>
+            {#each Array.from(availableComponents).sort() as component}
+              <option value={component}>{component}</option>
+            {/each}
+          </select>
+        </div>
+
+        <!-- Row 3: Search (full width) -->
+        <div class="filter-section filter-section-full">
+          <label for="search">Search:</label>
+          <input
+            id="search"
+            type="text"
+            placeholder="Filter messages..."
+            bind:value={searchTerm}
+          />
         </div>
       </div>
 
@@ -584,6 +573,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .filter-section-full {
+    grid-column: 1 / -1;
   }
 
   .filter-section label {
