@@ -93,6 +93,9 @@ def stream_chat_sse(session_id):
         if session and session["expires_at"] >= datetime.utcnow():
             user = memory.get_user_by_id(session["user_id"])
 
+    # Clear token from memory after validation for security
+    token = None
+
     if not user:
         def error_stream():
             yield f"event: error\ndata: {json.dumps({'error': 'Unauthorized - invalid or expired credentials'})}\n\n"
