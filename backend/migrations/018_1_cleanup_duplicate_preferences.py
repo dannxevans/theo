@@ -25,6 +25,10 @@ def get_db_path():
         "theo.db"
     )
 
+def run_migration():
+    """Execute the cleanup (using standard migration function name)."""
+    return run_cleanup()
+
 def run_cleanup():
     """Execute the cleanup."""
     DB_PATH = get_db_path()
