@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { fetchDebugLogs, streamDebugLogs, toggleDebugMode, clearDebugLogs } from '../../lib/api.js';
+  import { fetchDebugLogs, streamDebugLogs, toggleDebugMode, clearDebugLogs, updateDebugFilters } from '../../lib/api.js';
 
   let logs = [];
   let eventSource = null;
@@ -16,6 +16,14 @@
   let selectedSource = 'all'; // 'all', 'backend', 'frontend'
   let searchTerm = '';
   let selectedComponent = 'all';
+
+  // Logger filters (noisy loggers - off by default)
+  let loggerFilters = {
+    sqlalchemy: false,
+    werkzeug: false,
+    urllib3: false,
+    botocore: false
+  };
 
   // Component tags (extracted from logs)
   let availableComponents = new Set();
@@ -44,6 +52,11 @@
       const data = await response.json();
       debugEnabled = data.enabled;
       totalLogs = data.log_count;
+
+      // Load filter settings
+      if (data.filters) {
+        loggerFilters = data.filters;
+      }
     } catch (e) {
       error = `Failed to check debug status: ${e.message}`;
       console.error('Debug status check error:', e);
@@ -158,6 +171,16 @@
       } else {
         stopLogStream();
         logs = [];
+        totalLogs = 0;
+        availableComponents = new Set();
+        // Safety: Reset all verbose logger filters to OFF when disabling debug
+        // Backend also clears all logs from database
+        loggerFilters = {
+          sqlalchemy: false,
+          werkzeug: false,
+          urllib3: false,
+          botocore: false
+        };
       }
     } catch (e) {
       error = `Failed to toggle debug mode: ${e.message}`;
@@ -176,6 +199,20 @@
       availableComponents = new Set();
     } catch (e) {
       error = `Failed to clear logs: ${e.message}`;
+    }
+  }
+
+  async function handleFilterChange(filterName, value) {
+    try {
+      // Update local state immediately
+      loggerFilters[filterName] = value;
+
+      // Send to backend using API function (handles auth)
+      await updateDebugFilters({ [filterName]: value });
+    } catch (e) {
+      error = `Failed to update filter: ${e.message}`;
+      // Revert local state on error
+      loggerFilters[filterName] = !value;
     }
   }
 
@@ -288,48 +325,95 @@
     {#if debugEnabled}
       <!-- Filters -->
       <div class="filters">
-        <div class="filter-section">
-          <label>Levels:</label>
-          <div class="filter-checkboxes">
-            {#each ['DEBUG', 'INFO', 'WARNING', 'ERROR'] as level}
-              <label class="checkbox-label level-{level.toLowerCase()}">
+        <!-- Left Column: Levels and Verbose Loggers -->
+        <div class="filter-column-left">
+          <div class="filter-section">
+            <label>Levels:</label>
+            <div class="filter-checkboxes">
+              {#each ['DEBUG', 'INFO', 'WARNING', 'ERROR'] as level}
+                <label class="checkbox-label level-{level.toLowerCase()}">
+                  <input
+                    type="checkbox"
+                    bind:checked={selectedLevels[level]}
+                  />
+                  {level}
+                </label>
+              {/each}
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <label>Verbose Loggers:</label>
+            <div class="filter-checkboxes">
+              <label class="checkbox-label" title="SQLAlchemy database queries (very verbose)">
                 <input
                   type="checkbox"
-                  bind:checked={selectedLevels[level]}
+                  checked={loggerFilters.sqlalchemy}
+                  on:change={(e) => handleFilterChange('sqlalchemy', e.target.checked)}
                 />
-                {level}
+                SQLAlchemy
               </label>
-            {/each}
+              <label class="checkbox-label" title="Werkzeug HTTP request logs">
+                <input
+                  type="checkbox"
+                  checked={loggerFilters.werkzeug}
+                  on:change={(e) => handleFilterChange('werkzeug', e.target.checked)}
+                />
+                Werkzeug
+              </label>
+              <label class="checkbox-label" title="urllib3 HTTP client logs">
+                <input
+                  type="checkbox"
+                  checked={loggerFilters.urllib3}
+                  on:change={(e) => handleFilterChange('urllib3', e.target.checked)}
+                />
+                urllib3
+              </label>
+              <label class="checkbox-label" title="AWS SDK (botocore) logs">
+                <input
+                  type="checkbox"
+                  checked={loggerFilters.botocore}
+                  on:change={(e) => handleFilterChange('botocore', e.target.checked)}
+                />
+                Botocore/S3
+              </label>
+            </div>
+            <small style="color: #888; margin-top: 4px; display: block;">
+              ⚠️ Enabling these can generate 100s of logs/second
+            </small>
           </div>
         </div>
 
-        <div class="filter-section">
-          <label for="source-filter">Source:</label>
-          <select id="source-filter" bind:value={selectedSource}>
-            <option value="all">All</option>
-            <option value="backend">Backend</option>
-            <option value="frontend">Frontend</option>
-          </select>
-        </div>
+        <!-- Right Column: Source, Component, Search -->
+        <div class="filter-column-right">
+          <div class="filter-section">
+            <label for="source-filter">Source:</label>
+            <select id="source-filter" bind:value={selectedSource}>
+              <option value="all">All</option>
+              <option value="backend">Backend</option>
+              <option value="frontend">Frontend</option>
+            </select>
+          </div>
 
-        <div class="filter-section">
-          <label for="component-filter">Component:</label>
-          <select id="component-filter" bind:value={selectedComponent}>
-            <option value="all">All Components</option>
-            {#each Array.from(availableComponents).sort() as component}
-              <option value={component}>{component}</option>
-            {/each}
-          </select>
-        </div>
+          <div class="filter-section">
+            <label for="component-filter">Component:</label>
+            <select id="component-filter" bind:value={selectedComponent}>
+              <option value="all">All Components</option>
+              {#each Array.from(availableComponents).sort() as component}
+                <option value={component}>{component}</option>
+              {/each}
+            </select>
+          </div>
 
-        <div class="filter-section">
-          <label for="search">Search:</label>
-          <input
-            id="search"
-            type="text"
-            placeholder="Filter messages..."
-            bind:value={searchTerm}
-          />
+          <div class="filter-section">
+            <label for="search">Search:</label>
+            <input
+              id="search"
+              type="text"
+              placeholder="Filter messages..."
+              bind:value={searchTerm}
+            />
+          </div>
         </div>
       </div>
 
@@ -494,8 +578,20 @@
     border-radius: 6px;
     margin-bottom: 1rem;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .filter-column-left {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
+  }
+
+  .filter-column-right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .filter-section {
