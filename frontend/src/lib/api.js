@@ -766,7 +766,7 @@ function getAuthToken() {
   return localStorage.getItem("auth_token");
 }
 
-function getAuthHeaders() {
+export function getAuthHeaders() {
   const token = getAuthToken();
   return token ? { "Authorization": `Bearer ${token}` } : {};
 }

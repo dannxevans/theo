@@ -1460,11 +1460,19 @@ def route_request(context: dict, stream: bool = False):
     session_id = context.get("session_id", "default")
 
     try:
-        _debug_log(memory, f"[ROUTER] About to call provider.chat() for {provider_cfg['id']} (type: {provider_cfg.get('type')}, model: {provider_cfg.get('model')})")
-        raw = provider.chat(
-            system=system_prompt,
-            messages=messages,
-        )
+        # Use stream_chat if available and streaming is requested
+        if stream and hasattr(provider, 'stream_chat'):
+            _debug_log(memory, f"[ROUTER] About to call provider.stream_chat() for {provider_cfg['id']} (type: {provider_cfg.get('type')}, model: {provider_cfg.get('model')})")
+            raw = provider.stream_chat(
+                system=system_prompt,
+                messages=messages,
+            )
+        else:
+            _debug_log(memory, f"[ROUTER] About to call provider.chat() for {provider_cfg['id']} (type: {provider_cfg.get('type')}, model: {provider_cfg.get('model')})")
+            raw = provider.chat(
+                system=system_prompt,
+                messages=messages,
+            )
         latency_ms = int((time.time() - start_time) * 1000)
 
         # Log successful request
@@ -1537,10 +1545,17 @@ def route_request(context: dict, stream: bool = False):
             provider = instantiate_provider(alternative_cfg)
 
             try:
-                raw = provider.chat(
-                    system=system_prompt,
-                    messages=messages,
-                )
+                # Use stream_chat if available and streaming is requested
+                if stream and hasattr(provider, 'stream_chat'):
+                    raw = provider.stream_chat(
+                        system=system_prompt,
+                        messages=messages,
+                    )
+                else:
+                    raw = provider.chat(
+                        system=system_prompt,
+                        messages=messages,
+                    )
                 fallback_latency = int((time.time() - start_time) * 1000)
 
                 if memory:
@@ -1580,6 +1595,8 @@ def route_request(context: dict, stream: bool = False):
     if stream:
         def stream_generator():
             full_text = []
+            # CodeQL suppression: meta['provider'] is provider name (e.g., "openai"), not sensitive data
+            logging.info(f"[ROUTER STREAM] Starting stream generator for provider {meta['provider']}")  # nosemgrep: python.lang.security.audit.logging-sensitive-data
 
             for chunk in raw:
                 if isinstance(chunk, dict):
@@ -1589,14 +1606,16 @@ def route_request(context: dict, stream: bool = False):
 
                 if token:
                     full_text.append(token)
+                    # CodeQL suppression: token is AI response text, not sensitive credentials
+                    logging.debug(f"[ROUTER STREAM] Yielding token: {token[:50]}...")  # nosemgrep: python.lang.security.audit.logging-sensitive-data
                     yield {
                         "token": token
                     }
 
-            # Persist full response
-            final_text = "".join(full_text)
-            if memory:
-                memory.append(DEFAULT_USER_ID, text, final_text)
+            logging.info(f"[ROUTER STREAM] Stream complete, total length: {len(''.join(full_text))}")
+
+            # Note: Memory persistence is handled by context_manager.update() in message_routes.py
+            # Don't persist here to avoid duplicate saves
 
             # ⬇️ THIS IS THE IMPORTANT PART ⬇️
             yield {

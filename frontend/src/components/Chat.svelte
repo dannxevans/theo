@@ -369,6 +369,9 @@
   // Text actually shown to the user during streaming
   let streamedText = "";
 
+  // Track last text length for smooth CSS transitions
+  let lastTextLength = 0;
+
   // Auto-scroll after every update
   afterUpdate(() => {
     scrollToBottom();
@@ -595,6 +598,7 @@
       streaming = true;
       streamedText = "";
       streamBuffer = "";
+      lastTextLength = 0;
 
       await streamMessage({
         sessionId,
@@ -602,10 +606,16 @@
         forcedProvider: forcedModel,
         workSubtab: currentMode === "work" ? activeWorkSubtab : null,
         onToken(token) {
+          // Add tokens directly - CSS will handle smoothness
           streamedText += token;
+          lastTextLength = streamedText.length;
           scrollToBottom();
         },
         async onEnd(meta) {
+          // Capture the completed text IMMEDIATELY for TTS
+          const completedText = streamedText;
+          const shouldSkipTTS = meta?.task_type === "coding";
+
           if (meta?.provider) {
             usedProviders = new Set([...usedProviders, meta.provider]);
           }
@@ -617,14 +627,23 @@
             };
           }
 
+          // Clear streaming state IMMEDIATELY (don't wait for DB)
           streamedText = "";
           streaming = false;
           loading = false;
 
-          await loadSessionMessages(sessionId);
-          await tick();
-          scrollToBottom();
-          enhanceCodeBlocks();
+          // Trigger TTS IMMEDIATELY (in parallel with DB reload)
+          if (autoReadEnabled && completedText && !shouldSkipTTS && hasUserInteracted) {
+            loadVoiceSettings();
+            voiceControls?.speak(completedText);
+          }
+
+          // Reload messages from database in background
+          loadSessionMessages(sessionId).then(async () => {
+            await tick();
+            scrollToBottom();
+            enhanceCodeBlocks();
+          });
         },
         onError(err) {
           error = err;
@@ -677,6 +696,7 @@
     streaming = true;
     streamedText = "";
     streamBuffer = "";
+    lastTextLength = 0;
 
     try {
       await streamMessage({
@@ -685,10 +705,16 @@
         forcedProvider: forcedModel,
         workSubtab: currentMode === "work" ? activeWorkSubtab : null,
         onToken(token) {
+          // Add tokens directly - CSS will handle smoothness
           streamedText += token;
+          lastTextLength = streamedText.length;
           scrollToBottom();
         },
         async onEnd(meta) {
+          // Capture the completed text IMMEDIATELY for TTS
+          const completedText = streamedText;
+          const shouldSkipTTS = meta?.task_type === "coding";
+
           // Add provider to used providers set
           if (meta?.provider) {
             usedProviders = new Set([...usedProviders, meta.provider]);
@@ -702,12 +728,23 @@
             };
           }
 
+          // Clear streaming state IMMEDIATELY (don't wait for DB)
           streamedText = "";
           streaming = false;
           loading = false;
 
-          // Reload messages from database to get metadata (including confirmation data)
-          await loadSessionMessages(sessionId);
+          // Trigger TTS IMMEDIATELY (in parallel with DB reload)
+          if (autoReadEnabled && completedText && !shouldSkipTTS && hasUserInteracted) {
+            loadVoiceSettings();
+            voiceControls?.speak(completedText);
+          }
+
+          // Reload messages from database in background (don't await)
+          loadSessionMessages(sessionId).then(async () => {
+            await tick();
+            scrollToBottom();
+            enhanceCodeBlocks();
+          });
 
           await tick();
           scrollToBottom();
@@ -730,9 +767,15 @@
           }
         },
         onError(err) {
-          error = err?.message || "Streaming failed";
           streaming = false;
           loading = false;
+
+          // If we received a partial response, show it with a warning
+          if (streamedText.length > 0) {
+            error = "Stream interrupted. Partial response displayed. You can try sending your message again.";
+          } else {
+            error = err?.message || "Streaming failed. Please try again.";
+          }
         }
       });
     } catch (e) {
@@ -1156,11 +1199,13 @@
 
           {#if streaming}
             <div class="message assistant">
-              <div class="bubble">
+              <div class="bubble streaming-bubble">
                 <strong>Theo:</strong>
-                <div style="white-space: pre-wrap;">
-                  {streamedText || "…"}
-                </div>
+                {#key lastTextLength}
+                  <div class="streaming-text" style="white-space: pre-wrap;">
+                    {streamedText || "…"}
+                  </div>
+                {/key}
                 <small>streaming</small>
               </div>
             </div>
@@ -1664,5 +1709,43 @@
 
   .debug-toggle:active {
     background: #0757ba;
+  }
+
+  /* Streaming text smooth flow-in effect */
+  .streaming-bubble {
+    position: relative;
+    /* GPU-accelerated rendering */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  .streaming-text {
+    /* Smooth, hardware-accelerated rendering */
+    will-change: contents;
+    transform: translateZ(0);
+    /* Use CSS containment for better performance */
+    contain: layout style paint;
+    /* Smooth text rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Subtle fade transition on content changes */
+    transition: opacity 0.05s ease-out;
+  }
+
+  /* Smooth appearance for new text chunks */
+  @keyframes textFlow {
+    0% {
+      opacity: 0.85;
+      transform: translateY(1px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .streaming-text:not(:empty) {
+    animation: textFlow 0.1s ease-out;
   }
 </style>
