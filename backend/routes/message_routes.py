@@ -55,11 +55,18 @@ def stream_chat_sse(session_id):
     from app import memory, context_manager, provider_registry
     from core.router import route_request
 
+    # CRITICAL DEBUG: Log immediately when endpoint is hit
+    logging.warning(f"[STREAM-ENTRY] ===== STREAMING ENDPOINT HIT ===== session_id={session_id}")
+    logging.warning(f"[STREAM-ENTRY] Request headers: {dict(request.headers)}")
+    logging.warning(f"[STREAM-ENTRY] Request args: {dict(request.args)}")
+    logging.warning(f"[STREAM-ENTRY] Request method: {request.method}")
+    logging.warning(f"[STREAM-ENTRY] Request path: {request.path}")
+
     text = request.args.get("text", "").strip()
     forced_provider = request.args.get("forced_provider")
 
     # Debug logging for Siri shortcuts troubleshooting
-    logging.info(f"[STREAM] Received request - text param: '{request.args.get('text')}', stripped: '{text}', all params: {dict(request.args)}")
+    logging.warning(f"[STREAM] Received request - text param: '{request.args.get('text')}', stripped: '{text}', all params: {dict(request.args)}")
 
     # Validate text is not empty
     if not text:
@@ -78,24 +85,43 @@ def stream_chat_sse(session_id):
     def event_stream():
         try:
             # Get user from auth token (check both header and query param)
+            from auth.password import _validate_session_auth, _validate_api_key_auth
+
             auth_header = request.headers.get("Authorization")
             token = None
             user_id = None
+            user = None
+
+            logging.warning(f"[STREAM-AUTH] Authorization header: {auth_header}")
 
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
             elif request.args.get("token"):
                 token = request.args.get("token")
 
+            logging.warning(f"[STREAM-AUTH] Extracted token: {token[:20] if token else 'None'}...")
+
             if token:
-                session = memory.get_auth_session(token)
-                if session and session["expires_at"] >= datetime.utcnow():
-                    user_id = session["user_id"]
-                    logging.info(f"[AUTH] Authenticated user_id: {user_id}")
+                # Check if it's an API key (starts with "theo_")
+                if token.startswith("theo_"):
+                    logging.warning(f"[STREAM-AUTH] Attempting API key authentication")
+                    user = _validate_api_key_auth(memory, token)
+                    if user:
+                        user_id = user["id"]
+                        logging.warning(f"[STREAM-AUTH] API key authenticated - user_id: {user_id}")
+                    else:
+                        logging.warning(f"[STREAM-AUTH] API key authentication FAILED")
                 else:
-                    logging.warning(f"[AUTH] Invalid or expired session token")
+                    # Session-based authentication
+                    logging.warning(f"[STREAM-AUTH] Attempting session token authentication")
+                    session = memory.get_auth_session(token)
+                    if session and session["expires_at"] >= datetime.utcnow():
+                        user_id = session["user_id"]
+                        logging.warning(f"[STREAM-AUTH] Session authenticated - user_id: {user_id}")
+                    else:
+                        logging.warning(f"[STREAM-AUTH] Session authentication FAILED - invalid or expired")
             else:
-                logging.warning(f"[AUTH] No token provided in request")
+                logging.warning(f"[STREAM-AUTH] No token provided in request")
 
             context = context_manager.build_context(session_id, text, user_id=user_id)
 
