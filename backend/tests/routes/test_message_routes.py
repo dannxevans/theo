@@ -42,11 +42,7 @@ def test_chat_success(mock_route, client, memory, auth_headers):
 @patch("core.router.route_request")
 def test_chat_empty_text(mock_route, client, auth_headers):
     """Test chat endpoint with empty text."""
-    mock_route.return_value = {
-        "text": "Response",
-        "provider": "gpt4"
-    }
-
+    # Empty text should be rejected with 400 error
     response = client.post("/api/chat",
         headers=auth_headers,
         json={
@@ -54,7 +50,10 @@ def test_chat_empty_text(mock_route, client, auth_headers):
             "text": ""
         })
 
-    assert response.status_code == 200
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+    assert "empty" in data["error"].lower()
 
 
 @patch("core.router.route_request")

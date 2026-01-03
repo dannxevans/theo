@@ -28,7 +28,11 @@ def chat():
 
     payload = request.json
     session_id = payload.get("session_id", "default")
-    text = payload.get("text", "")
+    text = payload.get("text", "").strip()
+
+    # Validate text is not empty
+    if not text:
+        return jsonify({"error": "Message text cannot be empty"}), 400
 
     # Get authenticated user from request context (set by require_auth decorator)
     user_id = request.user.get("id") if hasattr(request, 'user') else None
@@ -51,8 +55,22 @@ def stream_chat_sse(session_id):
     from app import memory, context_manager, provider_registry
     from core.router import route_request
 
-    text = request.args.get("text", "")
+    text = request.args.get("text", "").strip()
     forced_provider = request.args.get("forced_provider")
+
+    # Validate text is not empty
+    if not text:
+        def error_stream():
+            yield f"event: error\ndata: {json.dumps({'error': 'Message text cannot be empty'})}\n\n"
+        return Response(
+            stream_with_context(error_stream()),
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     def event_stream():
         try:

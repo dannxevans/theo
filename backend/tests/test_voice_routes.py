@@ -299,16 +299,14 @@ class TestVoiceRoutes:
 class TestProviderHelpers:
     """Test provider initialization helpers."""
 
-    @patch('routes.voice_routes.MemoryStore')
-    @patch('routes.voice_routes.ProviderRegistry')
     @patch('routes.voice_routes.OpenAITTSProvider')
-    def test_get_tts_provider_success(self, mock_provider_class, mock_registry, mock_memory, auth_headers):
+    @patch('app.provider_registry')
+    def test_get_tts_provider_success(self, mock_registry, mock_provider_class, auth_headers):
         """Test successful TTS provider initialization."""
         from routes.voice_routes import get_tts_provider
 
         # Mock registry response
-        mock_reg_instance = mock_registry.return_value
-        mock_reg_instance.get_by_type.return_value = {
+        mock_registry.get_by_type.return_value = {
             'api_key': 'test-key'
         }
 
@@ -325,29 +323,25 @@ class TestProviderHelpers:
             model='tts-1'
         )
 
-    @patch('routes.voice_routes.MemoryStore')
-    @patch('routes.voice_routes.ProviderRegistry')
-    def test_get_tts_provider_no_api_key(self, mock_registry, mock_memory, auth_headers):
+    @patch('app.provider_registry')
+    def test_get_tts_provider_no_api_key(self, mock_registry, auth_headers):
         """Test TTS provider when API key is not configured."""
         from routes.voice_routes import get_tts_provider
 
-        mock_reg_instance = mock_registry.return_value
-        mock_reg_instance.get_by_type.return_value = None
+        mock_registry.get_by_type.return_value = None
 
         provider, error = get_tts_provider()
 
         assert provider is None
         assert error == "OpenAI API key not configured"
 
-    @patch('routes.voice_routes.MemoryStore')
-    @patch('routes.voice_routes.ProviderRegistry')
     @patch('routes.voice_routes.OpenAIWhisperProvider')
-    def test_get_stt_provider_success(self, mock_provider_class, mock_registry, mock_memory, auth_headers):
+    @patch('app.provider_registry')
+    def test_get_stt_provider_success(self, mock_registry, mock_provider_class, auth_headers):
         """Test successful STT provider initialization."""
         from routes.voice_routes import get_stt_provider
 
-        mock_reg_instance = mock_registry.return_value
-        mock_reg_instance.get_by_type.return_value = {
+        mock_registry.get_by_type.return_value = {
             'api_key': 'test-key'
         }
 
