@@ -171,7 +171,10 @@
       } else {
         stopLogStream();
         logs = [];
+        totalLogs = 0;
+        availableComponents = new Set();
         // Safety: Reset all verbose logger filters to OFF when disabling debug
+        // Backend also clears all logs from database
         loggerFilters = {
           sqlalchemy: false,
           werkzeug: false,

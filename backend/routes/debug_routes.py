@@ -492,7 +492,7 @@ def toggle_debug():
         value=str(enabled).lower()
     )
 
-    # Safety: When disabling debug, reset all verbose logger filters to OFF
+    # Safety: When disabling debug, reset all verbose logger filters to OFF and clear logs
     if not enabled:
         verbose_filters = [
             "debug_filter_sqlalchemy",
@@ -506,6 +506,24 @@ def toggle_debug():
                 key=filter_key,
                 value="false"
             )
+
+        # Clear all debug logs
+        try:
+            db_path = get_db_path(memory)
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Check if debug_logs table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debug_logs'")
+            if cursor.fetchone():
+                cursor.execute("DELETE FROM debug_logs")
+                conn.commit()
+
+            conn.close()
+        except Exception as e:
+            # Log error but don't fail the disable operation
+            import sys
+            print(f"[DEBUG-TOGGLE] Warning: Failed to clear logs: {e}", file=sys.stderr)
 
     # Invalidate cache so handler picks up change immediately
     db_handler.invalidate_cache()
