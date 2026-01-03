@@ -54,17 +54,29 @@ def run_cleanup():
             print("[CLEANUP 018] ✓ preferences table doesn't exist yet, skipping")
             return True
 
-        # Tables that might have both 'local' and user_id=1 entries
-        # These tables have UNIQUE constraints on user_id (or user_id + key)
+        # ALL tables that migration 018 touches
+        # If both 'local' and user_id=1 exist, delete 'local' to prevent UNIQUE constraint violations
         tables_to_clean = [
-            ('preferences', 'key'),  # UNIQUE(user_id, key)
-            ('proactive_settings', None),  # UNIQUE(user_id)
-            ('system_prompt_config', None),  # UNIQUE(user_id)
+            'debug_settings',
+            'preferences',
+            'system_prompt_config',
+            'memories',
+            'intents',
+            'routing_preferences',  # CRITICAL: This one had duplicates!
+            'feature_providers',
+            'feature_provider_usage_logs',
+            'user_routines',
+            'proactive_settings',
+            'proactive_calendar_notifications',
+            'proactive_email_tracking',
+            'proactive_email_digests',
+            'proactive_errors',
+            'proactive_rate_limit_tracking',
         ]
 
         total_deleted = 0
 
-        for table_name, key_column in tables_to_clean:
+        for table_name in tables_to_clean:
             # Check if table exists
             cursor.execute("""
                 SELECT name FROM sqlite_master
