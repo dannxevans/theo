@@ -26,28 +26,17 @@ def chat():
     from app import context_manager, provider_registry
     from core.router import route_request
 
-    # CRITICAL DEBUG: Log immediately when endpoint is hit
-    logging.warning(f"[CHAT-ENTRY] ===== CHAT ENDPOINT HIT =====")
-    logging.warning(f"[CHAT-ENTRY] Request headers: {dict(request.headers)}")
-    logging.warning(f"[CHAT-ENTRY] Request body: {request.json}")
-    logging.warning(f"[CHAT-ENTRY] Auth method: {getattr(request, 'auth_method', 'NONE')}")
-    logging.warning(f"[CHAT-ENTRY] Current user: {getattr(request, 'current_user', 'NONE')}")
-
     payload = request.json
     session_id = payload.get("session_id", "default")
     text = payload.get("text", "").strip()
 
-    logging.warning(f"[CHAT] Received text: '{text}', session_id: '{session_id}'")
-
     # Validate text is not empty
     if not text:
-        logging.warning("[CHAT] Text is empty, returning error")
         return jsonify({"error": "Message text cannot be empty"}), 400
 
     # Get authenticated user from request context (set by require_auth decorator)
     # FIX: The decorator sets 'current_user', not 'user'
     user_id = request.current_user.get("id") if hasattr(request, 'current_user') else None
-    logging.warning(f"[CHAT] Authenticated user_id: {user_id}")
 
     context = context_manager.build_context(session_id, text, user_id=user_id)
     result = route_request(context)
@@ -67,18 +56,8 @@ def stream_chat_sse(session_id):
     from app import memory, context_manager, provider_registry
     from core.router import route_request
 
-    # CRITICAL DEBUG: Log immediately when endpoint is hit
-    logging.warning(f"[STREAM-ENTRY] ===== STREAMING ENDPOINT HIT ===== session_id={session_id}")
-    logging.warning(f"[STREAM-ENTRY] Request headers: {dict(request.headers)}")
-    logging.warning(f"[STREAM-ENTRY] Request args: {dict(request.args)}")
-    logging.warning(f"[STREAM-ENTRY] Request method: {request.method}")
-    logging.warning(f"[STREAM-ENTRY] Request path: {request.path}")
-
     text = request.args.get("text", "").strip()
     forced_provider = request.args.get("forced_provider")
-
-    # Debug logging for Siri shortcuts troubleshooting
-    logging.warning(f"[STREAM] Received request - text param: '{request.args.get('text')}', stripped: '{text}', all params: {dict(request.args)}")
 
     # Validate text is not empty
     if not text:
@@ -104,36 +83,22 @@ def stream_chat_sse(session_id):
             user_id = None
             user = None
 
-            logging.warning(f"[STREAM-AUTH] Authorization header: {auth_header}")
-
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
             elif request.args.get("token"):
                 token = request.args.get("token")
 
-            logging.warning(f"[STREAM-AUTH] Extracted token: {token[:20] if token else 'None'}...")
-
             if token:
                 # Check if it's an API key (starts with "theo_")
                 if token.startswith("theo_"):
-                    logging.warning(f"[STREAM-AUTH] Attempting API key authentication")
                     user = _validate_api_key_auth(memory, token)
                     if user:
                         user_id = user["id"]
-                        logging.warning(f"[STREAM-AUTH] API key authenticated - user_id: {user_id}")
-                    else:
-                        logging.warning(f"[STREAM-AUTH] API key authentication FAILED")
                 else:
                     # Session-based authentication
-                    logging.warning(f"[STREAM-AUTH] Attempting session token authentication")
                     session = memory.get_auth_session(token)
                     if session and session["expires_at"] >= datetime.utcnow():
                         user_id = session["user_id"]
-                        logging.warning(f"[STREAM-AUTH] Session authenticated - user_id: {user_id}")
-                    else:
-                        logging.warning(f"[STREAM-AUTH] Session authentication FAILED - invalid or expired")
-            else:
-                logging.warning(f"[STREAM-AUTH] No token provided in request")
 
             context = context_manager.build_context(session_id, text, user_id=user_id)
 
