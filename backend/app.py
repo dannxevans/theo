@@ -116,6 +116,7 @@ except Exception as e:
 # Register route blueprints
 from routes.health_routes import health_bp
 from routes.auth_routes import auth_bp
+from routes.api_key_routes import api_key_bp
 from routes.session_routes import session_bp
 from routes.message_routes import message_bp
 from routes.memory_routes import memory_bp
@@ -136,6 +137,7 @@ from routes.debug_routes import debug_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(auth_bp)
+app.register_blueprint(api_key_bp)
 app.register_blueprint(session_bp)
 app.register_blueprint(message_bp)
 app.register_blueprint(memory_bp)

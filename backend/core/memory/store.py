@@ -56,6 +56,7 @@ class MemoryStore:
         # Assign tables as instance attributes for compatibility
         self.users = tables["users"]
         self.auth_sessions = tables["auth_sessions"]
+        self.api_keys = tables["api_keys"]
         self.user_mode_config = tables["user_mode_config"]
         self.mode_settings = tables["mode_settings"]
         self.work_mode_subtab_config = tables["work_mode_subtab_config"]
@@ -396,6 +397,42 @@ class MemoryStore:
     def is_debug_enabled(self, user_id) -> bool:
         """Check if debug logging is enabled for a user."""
         return self._user_ops.is_debug_enabled(user_id)
+
+    # =============================
+    # API Key Management
+    # =============================
+
+    def create_api_key(self, user_id, name, key_hash, expires_at=None):
+        """Create a new API key for a user."""
+        return self._user_ops.create_api_key(user_id, name, key_hash, expires_at)
+
+    def get_api_key_by_id(self, key_id, user_id=None):
+        """Get API key by ID."""
+        return self._user_ops.get_api_key_by_id(key_id, user_id)
+
+    def find_api_key_by_hash(self, key_hash):
+        """Find API key by its hash (for authentication)."""
+        return self._user_ops.find_api_key_by_hash(key_hash)
+
+    def list_user_api_keys(self, user_id):
+        """List all API keys for a user."""
+        return self._user_ops.list_user_api_keys(user_id)
+
+    def update_api_key_last_used(self, key_id):
+        """Update the last used timestamp for an API key."""
+        return self._user_ops.update_api_key_last_used(key_id)
+
+    def revoke_api_key(self, key_id, user_id):
+        """Revoke an API key (soft delete)."""
+        return self._user_ops.revoke_api_key(key_id, user_id)
+
+    def delete_api_key(self, key_id, user_id):
+        """Permanently delete an API key."""
+        return self._user_ops.delete_api_key(key_id, user_id)
+
+    def update_api_key_name(self, key_id, user_id, new_name):
+        """Update the name of an API key."""
+        return self._user_ops.update_api_key_name(key_id, user_id, new_name)
 
     # =============================
     # Mode Operations (delegated)

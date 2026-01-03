@@ -142,7 +142,8 @@ def run_migrations(db_path: str):
         "017_add_user_routines.py",
         "018_1_cleanup_duplicate_preferences.py",  # Pre-migration cleanup
         "018_standardize_user_id_to_integer.py",
-        "019_create_debug_logs.py"
+        "019_create_debug_logs.py",
+        "020_add_api_keys.py"  # Add api_keys table for API key authentication
     ]
 
     # Filter to only existing files
