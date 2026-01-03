@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 
 
 @patch("core.router.route_request")
-def test_chat_success(mock_route, client, memory):
+def test_chat_success(mock_route, client, memory, auth_headers):
     """Test chat endpoint with successful response."""
     mock_route.return_value = {
         "text": "Hello! How can I help you?",
@@ -19,10 +19,12 @@ def test_chat_success(mock_route, client, memory):
         "task_type": "general"
     }
 
-    response = client.post("/api/chat", json={
-        "session_id": "test-session",
-        "text": "Hello"
-    })
+    response = client.post("/api/chat",
+        headers=auth_headers,
+        json={
+            "session_id": "test-session",
+            "text": "Hello"
+        })
 
     assert response.status_code == 200
     data = response.json
@@ -38,38 +40,42 @@ def test_chat_success(mock_route, client, memory):
 
 
 @patch("core.router.route_request")
-def test_chat_empty_text(mock_route, client):
+def test_chat_empty_text(mock_route, client, auth_headers):
     """Test chat endpoint with empty text."""
     mock_route.return_value = {
         "text": "Response",
         "provider": "gpt4"
     }
 
-    response = client.post("/api/chat", json={
-        "session_id": "test-session",
-        "text": ""
-    })
+    response = client.post("/api/chat",
+        headers=auth_headers,
+        json={
+            "session_id": "test-session",
+            "text": ""
+        })
 
     assert response.status_code == 200
 
 
 @patch("core.router.route_request")
-def test_chat_no_session_id(mock_route, client):
+def test_chat_no_session_id(mock_route, client, auth_headers):
     """Test chat endpoint defaults session_id."""
     mock_route.return_value = {
         "text": "Response",
         "provider": "gpt4"
     }
 
-    response = client.post("/api/chat", json={
-        "text": "Hello"
-    })
+    response = client.post("/api/chat",
+        headers=auth_headers,
+        json={
+            "text": "Hello"
+        })
 
     assert response.status_code == 200
 
 
 @patch("core.router.route_request")
-def test_chat_saves_conversation(mock_route, client, memory):
+def test_chat_saves_conversation(mock_route, client, memory, auth_headers):
     """Test chat saves conversation to database."""
     mock_route.return_value = {
         "text": "AI response",
@@ -79,10 +85,12 @@ def test_chat_saves_conversation(mock_route, client, memory):
     }
 
     session_id = "save-test-session"
-    response = client.post("/api/chat", json={
-        "session_id": session_id,
-        "text": "User message"
-    })
+    response = client.post("/api/chat",
+        headers=auth_headers,
+        json={
+            "session_id": session_id,
+            "text": "User message"
+        })
 
     assert response.status_code == 200
 
