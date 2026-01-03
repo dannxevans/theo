@@ -23,7 +23,7 @@ def chat():
     Request body: { "session_id": "...", "text": "..." }
     Returns: { "text": "...", "provider": "...", "model": "...", ... }
     """
-    from app import context_manager, provider_registry
+    from app import context_manager, provider_registry, memory
     from core.router import route_request
 
     payload = request.json
@@ -39,6 +39,10 @@ def chat():
     user_id = request.current_user.get("id") if hasattr(request, 'current_user') else None
 
     context = context_manager.build_context(session_id, text, user_id=user_id)
+    # FIX: route_request() needs text, session_id, and memory in the context
+    context["text"] = text
+    context["session_id"] = session_id
+    context["memory"] = memory
     result = route_request(context)
 
     # Pass the full result object so metadata can be extracted
