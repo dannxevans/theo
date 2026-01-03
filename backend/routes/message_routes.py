@@ -26,16 +26,28 @@ def chat():
     from app import context_manager, provider_registry
     from core.router import route_request
 
+    # CRITICAL DEBUG: Log immediately when endpoint is hit
+    logging.warning(f"[CHAT-ENTRY] ===== CHAT ENDPOINT HIT =====")
+    logging.warning(f"[CHAT-ENTRY] Request headers: {dict(request.headers)}")
+    logging.warning(f"[CHAT-ENTRY] Request body: {request.json}")
+    logging.warning(f"[CHAT-ENTRY] Auth method: {getattr(request, 'auth_method', 'NONE')}")
+    logging.warning(f"[CHAT-ENTRY] Current user: {getattr(request, 'current_user', 'NONE')}")
+
     payload = request.json
     session_id = payload.get("session_id", "default")
     text = payload.get("text", "").strip()
 
+    logging.warning(f"[CHAT] Received text: '{text}', session_id: '{session_id}'")
+
     # Validate text is not empty
     if not text:
+        logging.warning("[CHAT] Text is empty, returning error")
         return jsonify({"error": "Message text cannot be empty"}), 400
 
     # Get authenticated user from request context (set by require_auth decorator)
-    user_id = request.user.get("id") if hasattr(request, 'user') else None
+    # FIX: The decorator sets 'current_user', not 'user'
+    user_id = request.current_user.get("id") if hasattr(request, 'current_user') else None
+    logging.warning(f"[CHAT] Authenticated user_id: {user_id}")
 
     context = context_manager.build_context(session_id, text, user_id=user_id)
     result = route_request(context)
