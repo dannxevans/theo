@@ -172,9 +172,17 @@ class TestPlanningService:
         time_obj = datetime.fromisoformat(time_str)
         # Should be approximately current time + 1 hour
         now = datetime.utcnow()
-        assert time_obj.date() == now.date()
-        # Should be within the next few hours
-        assert time_obj.hour >= now.hour
+
+        # Handle edge case: if it's close to midnight, "today + 1 hour" might roll to tomorrow
+        # Accept either today or tomorrow (if we're past 23:00)
+        if now.hour >= 23:
+            assert time_obj.date() in [now.date(), (now + timedelta(days=1)).date()]
+        else:
+            assert time_obj.date() == now.date()
+
+        # Should be within the next few hours (accounting for midnight rollover)
+        time_diff = (time_obj - now).total_seconds()
+        assert 0 <= time_diff <= 7200  # Between now and 2 hours from now
 
     def test_extract_time_specific_time_pm(self, service):
         """Test time extraction for specific time with PM."""
