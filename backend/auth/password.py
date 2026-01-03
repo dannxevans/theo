@@ -40,7 +40,12 @@ def verify_password(password, stored_hash):
         if isinstance(stored_hash, str):
             # Check if this is a legacy SHA-256 hash (contains colon separator)
             if ':' in stored_hash:
-                # Legacy SHA-256 verification for backward compatibility
+                # SECURITY NOTE: This legacy SHA-256 code is intentionally kept for
+                # backward compatibility with existing user passwords. New passwords
+                # use bcrypt (above). This code path allows existing users to login
+                # while we migrate to bcrypt. Suppressing CodeQL alert as this is
+                # a temporary migration path, not the primary authentication method.
+                # lgtm[py/weak-sensitive-data-hashing]
                 import hashlib
                 salt, password_hash = stored_hash.split(":")
                 test_hash = hashlib.sha256((password.decode('utf-8') + salt).encode()).hexdigest()
@@ -48,7 +53,7 @@ def verify_password(password, stored_hash):
 
             stored_hash = stored_hash.encode('utf-8')
 
-        # Bcrypt verification
+        # Bcrypt verification (secure, primary method)
         return bcrypt.checkpw(password, stored_hash)
     except (ValueError, AttributeError):
         return False
