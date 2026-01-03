@@ -44,13 +44,17 @@ class DatabaseLogHandler(logging.Handler):
         self.flush_interval = flush_interval
 
         # Thread-safe queue for log buffering
-        self.log_queue = Queue()
+        self.log_queue = Queue(maxsize=1000)  # Limit queue size to prevent memory issues
 
         # Cache for debug_enabled preference (refreshed every 30 seconds)
         self._debug_enabled_cache = None
         self._cache_timestamp = 0
         self._cache_ttl = 30  # seconds
         self._cache_lock = threading.Lock()
+
+        # Circuit breaker to prevent log flooding
+        self._dropped_logs = 0
+        self._last_drop_warning = 0
 
         # Background thread for batch processing
         self._running = True
@@ -120,6 +124,22 @@ class DatabaseLogHandler(logging.Handler):
         if record.name == 'core.logging_handler' or '[DEBUG-HANDLER]' in record.getMessage():
             return
 
+        # Skip noisy loggers that would flood the debug console
+        # These generate excessive logs that aren't useful for debugging
+        noisy_loggers = [
+            'sqlalchemy.engine',      # Database queries (very verbose)
+            'sqlalchemy.pool',        # Connection pool
+            'sqlalchemy.orm',         # ORM internals
+            'werkzeug',               # Flask HTTP request logs (already have access logs)
+            'urllib3',                # HTTP client logs
+            'botocore',               # AWS SDK logs
+            's3transfer',             # S3 transfer logs
+        ]
+
+        for noisy in noisy_loggers:
+            if record.name.startswith(noisy):
+                return
+
         # Skip if debug mode is not enabled
         if not self._is_debug_enabled():
             return
@@ -150,7 +170,20 @@ class DatabaseLogHandler(logging.Handler):
             }
 
             # Add to queue (non-blocking)
-            self.log_queue.put_nowait(log_entry)
+            try:
+                self.log_queue.put_nowait(log_entry)
+            except:
+                # Queue is full - drop this log to prevent memory issues
+                # Track dropped logs and warn periodically (not too often to avoid spam)
+                self._dropped_logs += 1
+                now = time.time()
+                if now - self._last_drop_warning > 60:  # Warn at most once per minute
+                    self._last_drop_warning = now
+                    # Use stderr directly to avoid recursion
+                    import sys
+                    print(f"[DEBUG-HANDLER] Warning: Log queue full, dropped {self._dropped_logs} logs",
+                          file=sys.stderr)
+                    self._dropped_logs = 0
 
         except Exception as e:
             # Don't let logging errors crash the application
@@ -187,7 +220,12 @@ class DatabaseLogHandler(logging.Handler):
                     last_flush = now
 
             except Exception as e:
-                logging.error(f"[DEBUG-HANDLER] Error in flush worker: {e}")
+                # Don't use logging.error - would cause recursion!
+                # Use stderr directly
+                import sys
+                print(f"[DEBUG-HANDLER] Error in flush worker: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
 
         # Final flush on shutdown
         if buffer:
@@ -234,7 +272,11 @@ class DatabaseLogHandler(logging.Handler):
             conn.close()
 
         except Exception as e:
-            logging.error(f"[DEBUG-HANDLER] Error flushing logs to database: {e}")
+            # Don't use logging.error - would cause recursion!
+            # Use stderr directly
+            import sys
+            print(f"[DEBUG-HANDLER] Error flushing logs to database: {e}", file=sys.stderr)
+            # Don't traceback here - would be too noisy, just log the error
 
     def close(self):
         """
