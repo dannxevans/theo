@@ -185,5 +185,13 @@ def debug_log(message):
         
 
 if __name__ == "__main__":
+    import os
+    # SECURITY: Only enable debug mode via environment variable
+    # Never run with debug=True in production
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() in ("true", "1", "yes")
+
+    if debug_mode:
+        print("[SECURITY WARNING] Flask debug mode is ENABLED - only use in development!")
+
     print("THEO backend starting on port 1066")
-    app.run(host="0.0.0.0", port=1066, debug=True)
+    app.run(host="0.0.0.0", port=1066, debug=debug_mode)
