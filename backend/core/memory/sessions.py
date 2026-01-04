@@ -142,7 +142,7 @@ class SessionOperations(BaseMemoryOperations):
                     latest_turn_subq.c.turn_count,
                     latest_turn_subq.c.latest_turn_created_at,
                 )
-                .join(latest_turn_subq, self.sessions.c.id == latest_turn_subq.c.session_id)
+                .outerjoin(latest_turn_subq, self.sessions.c.id == latest_turn_subq.c.session_id)
             )
 
             # Apply filters
@@ -151,7 +151,11 @@ class SessionOperations(BaseMemoryOperations):
             if mode is not None:
                 query = query.where(self.sessions.c.mode == mode)
 
-            query = query.order_by(latest_turn_subq.c.latest_turn_created_at.desc()).limit(50)
+            # Order by latest turn created_at (DESC), but NULL values first (new sessions at top)
+            # Use COALESCE to treat NULL as a far future date, putting new sessions first
+            query = query.order_by(
+                func.coalesce(latest_turn_subq.c.latest_turn_created_at, self.sessions.c.created_at).desc()
+            ).limit(50)
 
             rows = conn.execute(query).fetchall()
 
@@ -169,8 +173,8 @@ class SessionOperations(BaseMemoryOperations):
                     "title": r.title,
                     "mode": r.mode or "personal",  # Default to personal if NULL
                     "summary": summary_row.content if summary_row else "",
-                    "has_messages": r.turn_count > 0,
-                    "updated_at": r.latest_turn_created_at,
+                    "has_messages": (r.turn_count or 0) > 0,
+                    "updated_at": r.latest_turn_created_at or r.created_at,
                 })
 
             return result
