@@ -198,6 +198,8 @@ def init_database_backup():
     db_url = Config.DATABASE_URL
     s3_bucket = os.getenv("THEO_S3_BACKUP_BUCKET")
     s3_key = os.getenv("THEO_S3_BACKUP_KEY", "theo/theo.db")
+    env = os.getenv("ENV", "dev")
+    auto_restore = os.getenv("AUTO_RESTORE_S3", "false").lower() == "true"
 
     # Extract database path from SQLite URL
     # Format: sqlite:///path/to/db.db
@@ -210,8 +212,14 @@ def init_database_backup():
     # Initialize backup manager
     manager = DatabaseBackupManager(db_path, s3_bucket, s3_key)
 
-    # Restore from S3 on startup
-    restored = manager.restore_from_s3()
+    # Only auto-restore from S3 on startup if explicitly enabled
+    # AWS/Unraid with AUTO_RESTORE_S3=true: Restores on every container/process start
+    # Local dev with AUTO_RESTORE_S3=false: No auto-restore (delete theo.db manually to force restore)
+    if auto_restore and s3_bucket:
+        logger.info("AUTO_RESTORE_S3=true, restoring database from S3 on startup...")
+        restored = manager.restore_from_s3()
+    else:
+        logger.info(f"AUTO_RESTORE_S3={auto_restore}, skipping automatic S3 restore")
 
     # Run migrations after restore (or on fresh database)
     # This ensures the database schema is up-to-date before the app starts using it
@@ -219,7 +227,10 @@ def init_database_backup():
         logger.info("Running database migrations")
         run_migrations(db_path)
 
-    # Setup automatic backups every 5 minutes
-    manager.setup_auto_backup(interval_seconds=300)
+    # Setup automatic backups every 5 minutes (only in production)
+    if env == "prod" and s3_bucket:
+        manager.setup_auto_backup(interval_seconds=300)
+    else:
+        logger.info(f"S3 automatic backups disabled in {env} environment")
 
     return manager
