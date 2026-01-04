@@ -47,7 +47,19 @@ class MemoryStore:
             db_url: SQLAlchemy database URL
         """
         # Create engine and metadata
-        self.engine = create_engine(db_url)
+        # For SQLite: Use URI mode to handle file paths properly and set timeout
+        if db_url.startswith("sqlite"):
+            # Add connect_args for SQLite to handle concurrent access better
+            self.engine = create_engine(
+                db_url,
+                connect_args={
+                    "timeout": 30,  # Wait up to 30 seconds for locks
+                    "check_same_thread": False  # Allow multi-threading
+                },
+                pool_pre_ping=True  # Verify connections before using
+            )
+        else:
+            self.engine = create_engine(db_url)
         self.meta = MetaData()
 
         # Create all table definitions from centralized schema
