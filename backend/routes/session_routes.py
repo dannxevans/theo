@@ -423,7 +423,9 @@ Title:"""
         return jsonify({"title": generated_title})
 
     except Exception as e:
+        import traceback
         logging.error(f"Failed to generate title: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         # Fallback to first user message as title
         first_user = next((t for t in turns if t["role"] == "user"), None)
         if first_user:
