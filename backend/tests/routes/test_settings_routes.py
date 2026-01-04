@@ -248,3 +248,108 @@ def test_set_message_debug_setting_default_false(client):
 
     assert response.status_code == 200
     assert response.json["enabled"] is False
+
+
+# Visual Streaming Settings Tests
+def test_get_visual_streaming_default(client, memory):
+    """Test get visual streaming setting default value."""
+    response = client.get("/api/settings/visual-streaming")
+
+    assert response.status_code == 200
+    data = response.json
+    assert "disabled" in data
+    assert isinstance(data["disabled"], bool)
+    # Default should be False (visual streaming enabled, not disabled)
+    assert data["disabled"] is False
+
+
+def test_get_visual_streaming_disabled(client, memory):
+    """Test get visual streaming setting when disabled."""
+    memory.remember("local", "visual_streaming_disabled", "true")
+
+    response = client.get("/api/settings/visual-streaming")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["disabled"] is True
+
+
+def test_get_visual_streaming_enabled(client, memory):
+    """Test get visual streaming setting when enabled (not disabled)."""
+    memory.remember("local", "visual_streaming_disabled", "false")
+
+    response = client.get("/api/settings/visual-streaming")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["disabled"] is False
+
+
+def test_set_visual_streaming_disable(client, memory):
+    """Test disable visual streaming (turn off typewriter effect)."""
+    response = client.post("/api/settings/visual-streaming", json={
+        "disabled": True
+    })
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["status"] == "ok"
+    assert data["disabled"] is True
+
+    # Verify persisted in database
+    prefs = memory.get_all("local")
+    assert prefs.get("visual_streaming_disabled") == "true"
+
+
+def test_set_visual_streaming_enable(client, memory):
+    """Test enable visual streaming (turn on typewriter effect)."""
+    response = client.post("/api/settings/visual-streaming", json={
+        "disabled": False
+    })
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["status"] == "ok"
+    assert data["disabled"] is False
+
+    # Verify persisted in database
+    prefs = memory.get_all("local")
+    assert prefs.get("visual_streaming_disabled") == "false"
+
+
+def test_set_visual_streaming_default_false(client, memory):
+    """Test set visual streaming defaults to false (enabled)."""
+    response = client.post("/api/settings/visual-streaming", json={})
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["disabled"] is False
+
+    # Verify persisted
+    prefs = memory.get_all("local")
+    assert prefs.get("visual_streaming_disabled") == "false"
+
+
+def test_visual_streaming_persistence(client, memory):
+    """Test visual streaming setting persists across requests."""
+    # Set to disabled
+    response = client.post("/api/settings/visual-streaming", json={
+        "disabled": True
+    })
+    assert response.status_code == 200
+
+    # Retrieve and verify
+    response = client.get("/api/settings/visual-streaming")
+    assert response.status_code == 200
+    assert response.json["disabled"] is True
+
+    # Set to enabled
+    response = client.post("/api/settings/visual-streaming", json={
+        "disabled": False
+    })
+    assert response.status_code == 200
+
+    # Retrieve and verify again
+    response = client.get("/api/settings/visual-streaming")
+    assert response.status_code == 200
+    assert response.json["disabled"] is False
