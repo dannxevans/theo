@@ -1,6 +1,7 @@
 <script>
 
   import DOMPurify from "dompurify";
+  import { fade } from "svelte/transition";
   import {
   streamMessage,
   fetchSessionSummary,
@@ -315,6 +316,11 @@
       advancedMode = e.detail.enabled;
     });
 
+    // Listen for visual streaming preference changes
+    window.addEventListener("visualStreamingChanged", (e) => {
+      visualStreamingDisabled = e.detail.disabled;
+    });
+
     // Listen for mode switching events
     window.addEventListener("modeSwitching", (e) => {
       const { fromMode, toMode } = e.detail;
@@ -371,6 +377,10 @@
 
   // Track last text length for smooth CSS transitions
   let lastTextLength = 0;
+
+  // Check if visual streaming is disabled (user preference)
+  // Initialize from localStorage
+  let visualStreamingDisabled = localStorage.getItem("visual_streaming_disabled") === "true";
 
   // Auto-scroll after every update
   afterUpdate(() => {
@@ -989,7 +999,7 @@
           {/if}
 
           {#each messages.filter(m => !(m.metadata?.proactive && m.metadata?.dismissed)) as m}
-            <div class="message {m.role}">
+            <div class="message {m.role}" transition:fade={{ duration: m.role === 'assistant' ? 200 : 0 }}>
               <div class="bubble">
                 <div class="message-header">
                   <strong>{m.role === "user" ? "Me" : "Theo"}</strong>
@@ -1201,12 +1211,22 @@
             <div class="message assistant">
               <div class="bubble streaming-bubble">
                 <strong>Theo:</strong>
-                {#key lastTextLength}
-                  <div class="streaming-text" style="white-space: pre-wrap;">
-                    {streamedText || "…"}
-                  </div>
+                {#key visualStreamingDisabled}
+                  {#if visualStreamingDisabled}
+                    <!-- Instant display - show loading indicator only -->
+                    <div class="streaming-placeholder">
+                      <span class="loading-dots">Thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>
+                    </div>
+                  {:else}
+                    <!-- Animated typewriter effect -->
+                    {#key lastTextLength}
+                      <div class="streaming-text" style="white-space: pre-wrap;" data-visual-streaming="enabled">
+                        {streamedText || "…"}
+                      </div>
+                    {/key}
+                    <small>streaming</small>
+                  {/if}
                 {/key}
-                <small>streaming</small>
               </div>
             </div>
           {/if}
@@ -1720,20 +1740,21 @@
   }
 
   .streaming-text {
-    /* Smooth, hardware-accelerated rendering */
-    will-change: contents;
-    transform: translateZ(0);
-    /* Use CSS containment for better performance */
-    contain: layout style paint;
-    /* Smooth text rendering */
+    /* Smooth text rendering (always applied) */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* Subtle fade transition on content changes */
+  }
+
+  /* Animated mode - only apply to non-instant elements */
+  .streaming-text:not(.streaming-instant) {
+    will-change: contents;
+    transform: translateZ(0);
+    contain: layout style paint;
     transition: opacity 0.05s ease-out;
   }
 
-  /* Smooth appearance for new text chunks */
+  /* Smooth appearance for new text chunks - only when NOT instant */
   @keyframes textFlow {
     0% {
       opacity: 0.85;
@@ -1745,7 +1766,52 @@
     }
   }
 
-  .streaming-text:not(:empty) {
+  .streaming-text:not(.streaming-instant):not(:empty) {
     animation: textFlow 0.1s ease-out;
+  }
+
+  /* Instant mode - explicitly no animations */
+  .streaming-instant {
+    animation: none;
+    transition: none;
+    will-change: auto;
+    transform: none;
+    opacity: 1;
+  }
+
+  /* Loading indicator for instant mode */
+  .streaming-placeholder {
+    color: var(--text-secondary, #666);
+    font-style: italic;
+  }
+
+  .loading-dots {
+    display: inline-block;
+  }
+
+  .loading-dots .dot {
+    animation: dotPulse 1.4s infinite;
+    opacity: 0;
+  }
+
+  .loading-dots .dot:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  .loading-dots .dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .loading-dots .dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes dotPulse {
+    0%, 20%, 100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 </style>

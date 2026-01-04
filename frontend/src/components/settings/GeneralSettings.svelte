@@ -1,5 +1,6 @@
 <script>
-  import { updateSystemPromptConfig } from "../../lib/api";
+  import { updateSystemPromptConfig, getAuthHeaders } from "../../lib/api";
+  import { onMount } from "svelte";
 
   export let systemPromptConfig = {
     persona_name: "THEO",
@@ -10,6 +11,25 @@
 
   let savingPrompt = false;
   let promptSaveStatus = null;
+  let visualStreamingDisabled = false;
+  let savingVisualStreaming = false;
+
+  onMount(async () => {
+    // Load visual streaming preference
+    try {
+      const response = await fetch("/api/settings/visual-streaming", {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        visualStreamingDisabled = data.disabled;
+        // Also update localStorage for immediate Chat.svelte access
+        localStorage.setItem("visual_streaming_disabled", data.disabled.toString());
+      }
+    } catch (e) {
+      console.error("Failed to load visual streaming setting:", e);
+    }
+  });
 
   async function saveSystemPrompt() {
     try {
@@ -24,6 +44,38 @@
       promptSaveStatus = `Error: ${e.message}`;
     } finally {
       savingPrompt = false;
+    }
+  }
+
+  async function toggleVisualStreaming() {
+    try {
+      savingVisualStreaming = true;
+      const response = await fetch("/api/settings/visual-streaming", {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ disabled: visualStreamingDisabled })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save visual streaming setting");
+      }
+
+      // Update localStorage for immediate Chat.svelte access
+      localStorage.setItem("visual_streaming_disabled", visualStreamingDisabled.toString());
+
+      // Dispatch event to notify Chat component
+      window.dispatchEvent(new CustomEvent("visualStreamingChanged", {
+        detail: { disabled: visualStreamingDisabled }
+      }));
+    } catch (e) {
+      console.error("Failed to save visual streaming setting:", e);
+      // Revert the toggle on error
+      visualStreamingDisabled = !visualStreamingDisabled;
+    } finally {
+      savingVisualStreaming = false;
     }
   }
 </script>
@@ -91,6 +143,26 @@
       >
         {savingPrompt ? "Saving..." : "Save Settings"}
       </button>
+    </div>
+  </div>
+
+  <h2>Display Preferences</h2>
+  <p class="subtitle">Customize how messages appear in the chat interface.</p>
+
+  <div class="section">
+    <div class="form-group">
+      <div class="toggle-container">
+        <label class="toggle-label">
+          <input
+            type="checkbox"
+            bind:checked={visualStreamingDisabled}
+            on:change={toggleVisualStreaming}
+            disabled={savingVisualStreaming}
+          />
+          <span class="toggle-text">Disable Visual Streaming</span>
+        </label>
+        <small>When enabled, messages will appear instantly instead of with a typewriter effect. Reduces CPU usage and may improve accessibility.</small>
+      </div>
     </div>
   </div>
 </div>
