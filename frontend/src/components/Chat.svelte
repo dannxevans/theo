@@ -749,32 +749,32 @@
             voiceControls?.speak(completedText);
           }
 
-          // Reload messages from database in background (don't await)
+          // Reload messages from database and generate title after loading
           loadSessionMessages(sessionId).then(async () => {
             await tick();
             scrollToBottom();
             enhanceCodeBlocks();
+
+            // Generate title after first assistant response (after messages are loaded)
+            const assistantMessages = messages.filter(m => m.role === "assistant");
+            if (assistantMessages.length === 1) {
+              // This is the first response, generate a title
+              try {
+                const result = await generateSessionTitle(sessionId);
+                // Dispatch event to App.svelte to refresh sessions list
+                window.dispatchEvent(new CustomEvent("sessionTitleGenerated", {
+                  detail: { sessionId, title: result.title }
+                }));
+              } catch (e) {
+                console.error("Failed to generate session title:", e);
+              }
+            }
           });
 
           await tick();
           scrollToBottom();
           enhanceCodeBlocks();
           loadSummary();
-
-          // Generate title after first assistant response
-          const assistantMessages = messages.filter(m => m.role === "assistant");
-          if (assistantMessages.length === 1) {
-            // This is the first response, generate a title
-            try {
-              const result = await generateSessionTitle(sessionId);
-              // Dispatch event to App.svelte to refresh sessions list
-              window.dispatchEvent(new CustomEvent("sessionTitleGenerated", {
-                detail: { sessionId, title: result.title }
-              }));
-            } catch (e) {
-              console.warn("Failed to generate session title:", e);
-            }
-          }
         },
         onError(err) {
           streaming = false;
