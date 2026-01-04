@@ -67,12 +67,12 @@ def get_db_path():
 
 
 def create_backup(db_path):
-    """Create timestamped backup of database before migration."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    """Create backup of database before migration (overwrites previous backup)."""
     backup_dir = os.path.join(os.path.dirname(db_path), "backups")
     os.makedirs(backup_dir, exist_ok=True)
 
-    backup_path = os.path.join(backup_dir, f"theo_backup_pre_migration_018_{timestamp}.db")
+    # Use fixed filename instead of timestamp - overwrites previous backup
+    backup_path = os.path.join(backup_dir, "theo_backup_pre_migration_018.db")
 
     print(f"[MIGRATION 018] Creating backup: {backup_path}")
     shutil.copy2(db_path, backup_path)
