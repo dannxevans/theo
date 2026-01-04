@@ -146,33 +146,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update backend task definition
-        run: |
-          echo "📝 Updating backend task definition..."
-
-          # Get current task definition
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition theo-backend \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition')
-
-          # Update image with new tag
-          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.OWNER }}/theo-backend:${{ steps.meta.outputs.deploy_tag }}"
-
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$NEW_IMAGE" \
-            '.containerDefinitions[0].image = $IMAGE |
-             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-
-          # Register new task definition revision
-          aws ecs register-task-definition \
-            --cli-input-json "$NEW_TASK_DEF" \
-            --region ${{ env.AWS_REGION }}
-
-          echo "✅ Backend task definition updated with image: $NEW_IMAGE"
-
       - name: Deploy backend service
         run: |
           echo "🚀 Deploying backend service to ECS..."
+          echo "📦 Image tag: ${{ steps.meta.outputs.deploy_tag }}"
+
+          # Force new deployment to pull latest image
+          # Task definition is managed manually in AWS console
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.BACKEND_SERVICE }} \
@@ -181,33 +161,13 @@ jobs:
 
           echo "✅ Backend deployment initiated"
 
-      - name: Update frontend task definition
-        run: |
-          echo "📝 Updating frontend task definition..."
-
-          # Get current task definition
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition theo-frontend \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition')
-
-          # Update image with new tag
-          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.OWNER }}/theo-frontend:${{ steps.meta.outputs.deploy_tag }}"
-
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$NEW_IMAGE" \
-            '.containerDefinitions[0].image = $IMAGE |
-             del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-
-          # Register new task definition revision
-          aws ecs register-task-definition \
-            --cli-input-json "$NEW_TASK_DEF" \
-            --region ${{ env.AWS_REGION }}
-
-          echo "✅ Frontend task definition updated with image: $NEW_IMAGE"
-
       - name: Deploy frontend service
         run: |
           echo "🚀 Deploying frontend service to ECS..."
+          echo "📦 Image tag: ${{ steps.meta.outputs.deploy_tag }}"
+
+          # Force new deployment to pull latest image
+          # Task definition is managed manually in AWS console
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.FRONTEND_SERVICE }} \
