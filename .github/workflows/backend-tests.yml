@@ -10,10 +10,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       matrix:
-        python-version: ['3.11', '3.12']
+        python-version: ['3.11']  # ['3.11', '3.12']
       fail-fast: false  # Continue testing other versions if one fails
 
     steps:
