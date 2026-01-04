@@ -6,6 +6,7 @@ on:
       - '**'  # All branches
       - '!main'  # Except main
       - '!release'  # Except release
+      - '!stage' # Except stage
     paths:
       - 'backend/**'
       - 'frontend/**'
