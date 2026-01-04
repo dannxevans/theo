@@ -446,3 +446,67 @@ def set_visual_streaming_setting():
     )
 
     return jsonify({"status": "ok", "disabled": disabled})
+
+
+@settings_bp.route("/database/restore-from-s3", methods=["POST"])
+def restore_database_from_s3():
+    """
+    Restore database from S3 backup (Unraid only).
+    Downloads the latest database backup from S3 and replaces the current database.
+    Returns: { "status": "ok", "message": "..." }
+    """
+    import logging
+    import os
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+    from db_backup import DatabaseBackupManager
+    from config import Config
+
+    logging.info("[DB_RESTORE] S3 restore requested")
+
+    # Get S3 configuration
+    s3_bucket = os.getenv("THEO_S3_BACKUP_BUCKET")
+    s3_key = os.getenv("THEO_S3_BACKUP_KEY", "theo/theo.db")
+
+    if not s3_bucket:
+        logging.error("[DB_RESTORE] S3 bucket not configured")
+        return jsonify({"error": "S3 backup not configured. Set THEO_S3_BACKUP_BUCKET environment variable."}), 400
+
+    # Get database path
+    db_url = Config.DATABASE_URL
+    if not db_url.startswith("sqlite:///"):
+        logging.error("[DB_RESTORE] Not using SQLite database")
+        return jsonify({"error": "Database restore only supported for SQLite databases"}), 400
+
+    db_path = Path(db_url.replace("sqlite:///", ""))
+    backup_dir = db_path.parent / "backups"
+    backup_dir.mkdir(exist_ok=True)
+
+    try:
+        # Backup current database before restore
+        if db_path.exists():
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"theo_pre_s3_restore_{timestamp}.db"
+            logging.info(f"[DB_RESTORE] Backing up current database to {backup_path}")
+            shutil.copy2(db_path, backup_path)
+
+        # Initialize backup manager and restore from S3
+        manager = DatabaseBackupManager(str(db_path), s3_bucket, s3_key)
+        success = manager.restore_from_s3()
+
+        if not success:
+            logging.error("[DB_RESTORE] Failed to restore from S3")
+            return jsonify({"error": "Failed to download database from S3. Check logs for details."}), 500
+
+        logging.info("[DB_RESTORE] Database restored successfully from S3")
+        return jsonify({
+            "status": "ok",
+            "message": f"Database restored from s3://{s3_bucket}/{s3_key}"
+        })
+
+    except Exception as e:
+        logging.error(f"[DB_RESTORE] Error during restore: {e}")
+        import traceback
+        logging.error(f"[DB_RESTORE] Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to restore database: {str(e)}"}), 500
