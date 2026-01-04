@@ -369,3 +369,80 @@ def update_proactive_settings():
         import logging
         logging.error(f"[SETTINGS] Error updating proactive settings: {e}")
         return jsonify({"error": "Failed to update proactive settings"}), 500
+
+
+@settings_bp.route("/visual-streaming", methods=["GET"])
+def get_visual_streaming_setting():
+    """
+    Get visual streaming setting (whether to disable the typewriter effect).
+    Returns: { "disabled": bool }
+    """
+    import logging
+    from core.memory import MemoryStore
+    from config import Config
+    from datetime import datetime
+
+    logging.info("[VISUAL_STREAMING] GET request received")
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user or use get_user_id_from_request() for unauthenticated
+    user_id = get_user_id_from_request()
+    logging.info(f"[VISUAL_STREAMING] Initial user_id from request: {user_id}")
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user_id = session["user_id"]
+            logging.info(f"[VISUAL_STREAMING] Authenticated user_id: {user_id}")
+
+    # Read from preferences
+    prefs = memory.get_all(user_id)
+    value = prefs.get("visual_streaming_disabled")
+    logging.info(f"[VISUAL_STREAMING] Retrieved value for user {user_id}: {value}")
+
+    if value is None:
+        disabled = False  # Default: visual streaming enabled (not disabled)
+    else:
+        disabled = str(value).lower() == "true"
+
+    logging.info(f"[VISUAL_STREAMING] Returning disabled={disabled}")
+    return jsonify({"disabled": disabled})
+
+
+@settings_bp.route("/visual-streaming", methods=["POST"])
+def set_visual_streaming_setting():
+    """
+    Set visual streaming setting (whether to disable the typewriter effect).
+    Request body: { "disabled": bool }
+    Returns: { "status": "ok", "disabled": bool }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from datetime import datetime
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user or use get_user_id_from_request() for unauthenticated
+    user_id = get_user_id_from_request()
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        session = memory.get_auth_session(token)
+        if session and session["expires_at"] >= datetime.utcnow():
+            user_id = session["user_id"]
+
+    data = request.json
+    disabled = bool(data.get("disabled", False))
+
+    # Persist as preference
+    import logging
+    logging.info(f"[VISUAL_STREAMING] Saving preference for user_id={user_id}, disabled={disabled}")
+    memory.remember(
+        user_id=user_id,
+        key="visual_streaming_disabled",
+        value=str(disabled).lower()
+    )
+
+    return jsonify({"status": "ok", "disabled": disabled})

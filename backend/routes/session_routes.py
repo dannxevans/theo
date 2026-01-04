@@ -344,6 +344,7 @@ def generate_session_title(session_id):
     from core.memory import MemoryStore
     from config import Config
     from core.router import route_request
+    from datetime import datetime
 
     memory = MemoryStore(Config.DATABASE_URL)
     
