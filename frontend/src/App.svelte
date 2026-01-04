@@ -210,6 +210,12 @@
       if (sessionModeFilter === "all") return true;
       const mode = s.mode || "personal";
       return mode === sessionModeFilter;
+    })
+    .sort((a, b) => {
+      // Sort by updated_at: NULL/missing dates first (new chats at top), then by most recent
+      const aTime = a.updated_at ? new Date(a.updated_at).getTime() : Infinity;
+      const bTime = b.updated_at ? new Date(b.updated_at).getTime() : Infinity;
+      return bTime - aTime; // Descending order (newest/NULL first)
     });
 
   function generateUUID() {
@@ -380,8 +386,8 @@ async function handleLogout() {
     const id = generateUUID();
     activeSessionId = id;
     localStorage.setItem(SESSION_STORAGE_KEY, id);
-    // Optimistically add to top of list with current mode
-    sessions = [{ id, title: "New chat", summary: "", mode: currentMode }, ...sessions].slice(0, MAX_SESSIONS);
+    // Optimistically add to top of list with current timestamp
+    sessions = [{ id, title: "New chat", summary: "", mode: currentMode, updated_at: new Date().toISOString() }, ...sessions].slice(0, MAX_SESSIONS);
   }
 
   async function deleteSession(id) {
