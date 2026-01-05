@@ -652,9 +652,20 @@ def update_whoop_settings():
     try:
         memory.update_whoop_settings(user["id"], data)
 
-        # TODO: Reschedule proactive jobs when scheduler is integrated
-        # from core.scheduler import scheduler
-        # scheduler.schedule_whoop_notifications(user["id"])
+        # Reschedule WHOOP jobs if scheduler is running
+        from core.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        if scheduler and scheduler.is_running():
+            # Remove existing WHOOP jobs
+            for job_id in ['whoop_sleep', 'whoop_workout', 'whoop_stress']:
+                try:
+                    scheduler.scheduler.remove_job(job_id)
+                except:
+                    pass  # Job might not exist
+
+            # Reschedule WHOOP jobs with new settings
+            scheduler._schedule_whoop_jobs()
+            logger.info(f"[WHOOP] Rescheduled WHOOP jobs for user {user['id']}")
 
         logger.info(f"[WHOOP] Settings updated for user {user['id']}")
 

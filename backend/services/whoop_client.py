@@ -216,26 +216,35 @@ class WHOOPClient:
         end = datetime.utcnow().isoformat() + 'Z'
         start = (datetime.utcnow() - timedelta(days=2)).isoformat() + 'Z'
 
+        logger.info(f"[WHOOP_CLIENT] Fetching cycles from {start} to {end}")
+
         cycle_data = self.get_cycle_collection(start=start, end=end, limit=10)
         cycles = cycle_data.get('records', [])
 
+        logger.info(f"[WHOOP_CLIENT] Found {len(cycles)} cycles")
+
         if not cycles:
-            logger.debug("[WHOOP_CLIENT] No recent cycles found")
+            logger.info("[WHOOP_CLIENT] No recent cycles found")
             return None
 
         # Try to get recovery for the most recent cycles
-        for cycle in cycles:
+        for i, cycle in enumerate(cycles):
             cycle_id = cycle.get('id')
             if not cycle_id:
+                logger.debug(f"[WHOOP_CLIENT] Cycle {i} has no ID, skipping")
                 continue
 
+            logger.info(f"[WHOOP_CLIENT] Checking recovery for cycle {cycle_id} ({i+1}/{len(cycles)})")
             recovery = self.get_cycle_recovery(cycle_id)
             if recovery:
                 # Add cycle_id to recovery data for reference
                 recovery['cycle_id'] = cycle_id
+                logger.info(f"[WHOOP_CLIENT] ✓ Found recovery data for cycle {cycle_id}")
                 return recovery
+            else:
+                logger.debug(f"[WHOOP_CLIENT] No recovery data for cycle {cycle_id}")
 
-        logger.debug("[WHOOP_CLIENT] No recovery data found for recent cycles")
+        logger.info(f"[WHOOP_CLIENT] Checked {len(cycles)} cycles, none had recovery data")
         return None
 
     def get_sleep_with_recovery(self, sleep_id: str) -> Optional[Dict]:

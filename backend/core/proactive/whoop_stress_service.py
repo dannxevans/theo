@@ -40,11 +40,15 @@ class WHOOPStressService:
             bool: True if notification sent, False otherwise
         """
         try:
+            logger.info(f"[WHOOP_STRESS] Starting stress check for user {user_id}")
+
             # Check if stress notifications are enabled
             settings = self.memory.get_whoop_settings(user_id)
             if not settings or not settings.get('stress_notifications_enabled'):
-                logger.debug(f"[WHOOP_STRESS] Stress notifications disabled for user {user_id}")
+                logger.info(f"[WHOOP_STRESS] Stress notifications disabled for user {user_id} (settings: {settings})")
                 return False
+
+            logger.info(f"[WHOOP_STRESS] Settings OK, checking credentials...")
 
             # Get WHOOP credentials (with automatic token refresh)
             credentials = self.memory.refresh_whoop_token_if_needed(user_id)
@@ -52,27 +56,37 @@ class WHOOPStressService:
                 logger.warning(f"[WHOOP_STRESS] No valid credentials for user {user_id}")
                 return False
 
+            logger.info(f"[WHOOP_STRESS] Credentials OK, fetching recovery data from WHOOP API...")
+
             # Create WHOOP client
             client = WHOOPClient(credentials['access_token'])
 
             # Get latest recovery record
             recovery = client.get_latest_recovery()
             if not recovery:
-                logger.debug(f"[WHOOP_STRESS] No recent recovery data for user {user_id}")
+                logger.info(f"[WHOOP_STRESS] No recent recovery data for user {user_id}")
                 return False
+
+            logger.info(f"[WHOOP_STRESS] Recovery data found, checking ID...")
 
             recovery_id = recovery.get('id')
             if not recovery_id:
                 logger.warning(f"[WHOOP_STRESS] Recovery record missing ID for user {user_id}")
                 return False
 
+            logger.info(f"[WHOOP_STRESS] Recovery ID: {recovery_id}, checking if already notified...")
+
             # Check if already notified
             if self.memory.has_whoop_data_been_notified(user_id, 'stress', recovery_id):
-                logger.debug(f"[WHOOP_STRESS] Already notified for recovery {recovery_id}")
+                logger.info(f"[WHOOP_STRESS] Already notified for recovery {recovery_id}")
                 return False
+
+            logger.info(f"[WHOOP_STRESS] Not yet notified, generating summary...")
 
             # Generate summary
             summary = self._generate_stress_summary(recovery)
+
+            logger.info(f"[WHOOP_STRESS] Sending notification...")
 
             # Send notification via message system
             self._send_notification(user_id, summary)
@@ -84,7 +98,7 @@ class WHOOPStressService:
             return True
 
         except Exception as e:
-            logger.error(f"[WHOOP_STRESS] Error checking stress for user {user_id}: {e}")
+            logger.error(f"[WHOOP_STRESS] Error checking stress for user {user_id}: {e}", exc_info=True)
             return False
 
     def _generate_stress_summary(self, recovery: dict) -> str:
