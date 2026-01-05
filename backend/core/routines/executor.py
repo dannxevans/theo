@@ -158,6 +158,10 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         # Weather and routing
         "weather": "weather",
         "route": "routing",
+        # WHOOP health & fitness actions
+        "whoop_sleep": "whoop",
+        "whoop_recovery": "whoop",
+        "whoop_workout": "whoop",
     }
 
     intent = action_type_mapping.get(action_type)
@@ -267,6 +271,36 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
 
         result = route_request(route_context)
         return result
+
+    elif action_type == "whoop_sleep":
+        # WHOOP sleep query action
+        action_context = {
+            "text": "How did I sleep last night?",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "whoop_recovery":
+        # WHOOP recovery query action
+        action_context = {
+            "text": "How recovered am I?",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "whoop_workout":
+        # WHOOP workout query action
+        action_context = {
+            "text": "How was my last workout?",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
 
     elif action_type in ["send_email", "compose_email", "email_reply"]:
         # Email composition/sending actions

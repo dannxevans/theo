@@ -349,3 +349,60 @@ def test_routine_context_preservation(simple_routine, mock_context):
     assert call_context["session_id"] == "test-session-123"
     assert call_context["user_id"] == 1
     assert call_context["mode"] == "personal"
+
+
+def test_execute_whoop_sleep_action(mock_context):
+    """Test WHOOP sleep action execution."""
+    result = _execute_action(
+        action_type="whoop_sleep",
+        params={},
+        session_id="test-session",
+        user_id=1,
+        mode="personal",
+        action_router=mock_context["action_router"],
+        memory=mock_context["memory"]
+    )
+
+    # Should call action router with whoop intent
+    mock_context["action_router"].route_action_request.assert_called_once()
+    call_args = mock_context["action_router"].route_action_request.call_args[0][0]
+    assert call_args["intent"] == "whoop"
+    assert "sleep" in call_args["text"].lower()
+
+
+def test_execute_whoop_recovery_action(mock_context):
+    """Test WHOOP recovery action execution."""
+    result = _execute_action(
+        action_type="whoop_recovery",
+        params={},
+        session_id="test-session",
+        user_id=1,
+        mode="personal",
+        action_router=mock_context["action_router"],
+        memory=mock_context["memory"]
+    )
+
+    # Should call action router with whoop intent
+    mock_context["action_router"].route_action_request.assert_called_once()
+    call_args = mock_context["action_router"].route_action_request.call_args[0][0]
+    assert call_args["intent"] == "whoop"
+    assert "recovered" in call_args["text"].lower()
+
+
+def test_execute_whoop_workout_action(mock_context):
+    """Test WHOOP workout action execution."""
+    result = _execute_action(
+        action_type="whoop_workout",
+        params={},
+        session_id="test-session",
+        user_id=1,
+        mode="personal",
+        action_router=mock_context["action_router"],
+        memory=mock_context["memory"]
+    )
+
+    # Should call action router with whoop intent
+    mock_context["action_router"].route_action_request.assert_called_once()
+    call_args = mock_context["action_router"].route_action_request.call_args[0][0]
+    assert call_args["intent"] == "whoop"
+    assert "workout" in call_args["text"].lower()

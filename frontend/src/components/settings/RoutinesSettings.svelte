@@ -97,6 +97,25 @@
       description: "Get route and traffic information",
       defaultParams: {},
     },
+    // WHOOP health & fitness actions
+    {
+      type: "whoop_sleep",
+      label: "WHOOP Sleep",
+      description: "Check last night's sleep data",
+      defaultParams: {},
+    },
+    {
+      type: "whoop_recovery",
+      label: "WHOOP Recovery",
+      description: "Check recovery status",
+      defaultParams: {},
+    },
+    {
+      type: "whoop_workout",
+      label: "WHOOP Workout",
+      description: "Check last workout data",
+      defaultParams: {},
+    },
     // Custom action
     {
       type: "custom_action",

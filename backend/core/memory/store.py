@@ -18,6 +18,7 @@ from .users import UserOperations
 from .modes import ModeOperations
 from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
+from .whoop import WHOOPOperations
 from .actions import ActionOperations
 from .voice import VoiceOperations
 from .routines import RoutineOperations
@@ -110,6 +111,7 @@ class MemoryStore:
         self._mode_ops = ModeOperations(tables, self.Session, self.engine)
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
+        self._whoop_ops = WHOOPOperations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
         self._routine_ops = RoutineOperations(self.engine)
         self._voice_ops = VoiceOperations(self.engine, tables)
@@ -541,6 +543,65 @@ class MemoryStore:
         return self._m365_ops.delete_m365_credentials(user_id)
 
     # =============================
+    # WHOOP Operations (delegated)
+    # =============================
+
+    def store_whoop_credentials(self, user_id, access_token, refresh_token,
+                                 expires_at, whoop_user_id, token_type="Bearer"):
+        """Store WHOOP OAuth credentials."""
+        return self._whoop_ops.store_whoop_credentials(
+            user_id, access_token, refresh_token, expires_at, whoop_user_id, token_type
+        )
+
+    def get_whoop_credentials(self, user_id):
+        """Get WHOOP credentials for a user."""
+        return self._whoop_ops.get_whoop_credentials(user_id)
+
+    def update_whoop_token(self, user_id, access_token, expires_at, refresh_token=None):
+        """Update WHOOP access token after refresh."""
+        return self._whoop_ops.update_whoop_token(user_id, access_token, expires_at, refresh_token)
+
+    def invalidate_whoop_credentials(self, user_id, error=None):
+        """Mark WHOOP credentials as invalid."""
+        return self._whoop_ops.invalidate_whoop_credentials(user_id, error)
+
+    def delete_whoop_credentials(self, user_id):
+        """Delete WHOOP credentials for a user."""
+        return self._whoop_ops.delete_whoop_credentials(user_id)
+
+    def refresh_whoop_token_if_needed(self, user_id):
+        """Check if WHOOP token is expired and refresh if needed."""
+        return self._whoop_ops.refresh_whoop_token_if_needed(user_id)
+
+    def get_whoop_settings(self, user_id):
+        """Get WHOOP notification settings."""
+        return self._whoop_ops.get_whoop_settings(user_id)
+
+    def update_whoop_settings(self, user_id, settings):
+        """Update WHOOP notification settings."""
+        return self._whoop_ops.update_whoop_settings(user_id, settings)
+
+    def track_whoop_data(self, user_id, data_type, whoop_id):
+        """Track processed WHOOP record."""
+        return self._whoop_ops.track_whoop_data(user_id, data_type, whoop_id)
+
+    def is_whoop_data_tracked(self, whoop_id):
+        """Check if WHOOP record already processed."""
+        return self._whoop_ops.is_whoop_data_tracked(whoop_id)
+
+    def get_tracked_whoop_data(self, user_id, data_type=None, days=7):
+        """Get list of tracked WHOOP IDs."""
+        return self._whoop_ops.get_tracked_whoop_data(user_id, data_type, days)
+
+    def cleanup_old_whoop_tracking(self, days=7):
+        """Delete old WHOOP tracking records."""
+        return self._whoop_ops.cleanup_old_whoop_tracking(days)
+
+    def delete_all_whoop_data(self, user_id):
+        """Delete all WHOOP data for a user."""
+        return self._whoop_ops.delete_all_whoop_data(user_id)
+
+    # =============================
     # Action Operations (delegated)
     # =============================
 
@@ -745,3 +806,103 @@ class MemoryStore:
     def delete_user_routine(self, routine_id, user_id):
         """Delete a user routine."""
         return self._routine_ops.delete_user_routine(routine_id, user_id)
+
+    # =============================
+    # OAuth Configuration Storage
+    # =============================
+
+    def store_oauth_config(self, user_id, provider_type, provider_name, config):
+        """
+        Store OAuth configuration for a provider.
+
+        Args:
+            user_id: User ID
+            provider_type: Type of provider (e.g., 'whoop', 'm365')
+            provider_name: Display name for provider
+            config: Dict with OAuth credentials (will be encrypted)
+
+        Returns:
+            int: Provider ID
+        """
+        from utils.encryption import encrypt_oauth_config
+
+        with self.engine.begin() as conn:
+            # Encrypt the config
+            encrypted_config = encrypt_oauth_config(config)
+
+            # Check if provider exists
+            existing = conn.execute(
+                select(self.feature_providers.c.id)
+                .where(self.feature_providers.c.user_id == user_id)
+                .where(self.feature_providers.c.provider_type == provider_type)
+            ).fetchone()
+
+            if existing:
+                # Update existing
+                conn.execute(
+                    update(self.feature_providers)
+                    .where(self.feature_providers.c.id == existing[0])
+                    .values(
+                        encrypted_config=encrypted_config,
+                        updated_at=datetime.utcnow()
+                    )
+                )
+                return existing[0]
+            else:
+                # Insert new
+                result = conn.execute(
+                    insert(self.feature_providers).values(
+                        user_id=user_id,
+                        provider_type=provider_type,
+                        provider_name=provider_name,
+                        is_enabled=True,
+                        encrypted_config=encrypted_config,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                )
+                return result.inserted_primary_key[0]
+
+    def get_oauth_config(self, user_id, provider_type):
+        """
+        Get OAuth configuration for a provider.
+
+        Args:
+            user_id: User ID
+            provider_type: Type of provider (e.g., 'whoop', 'm365')
+
+        Returns:
+            dict: Decrypted OAuth config or None if not found
+        """
+        from utils.encryption import decrypt_oauth_config
+
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.feature_providers)
+                .where(self.feature_providers.c.user_id == user_id)
+                .where(self.feature_providers.c.provider_type == provider_type)
+            ).fetchone()
+
+            if not row or not row.encrypted_config:
+                return None
+
+            try:
+                return decrypt_oauth_config(row.encrypted_config)
+            except Exception:
+                # Config is corrupted or key changed
+                return None
+
+    def delete_oauth_config(self, user_id, provider_type):
+        """
+        Delete OAuth configuration for a provider.
+
+        Args:
+            user_id: User ID
+            provider_type: Type of provider (e.g., 'whoop', 'm365')
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.feature_providers)
+                .where(self.feature_providers.c.user_id == user_id)
+                .where(self.feature_providers.c.provider_type == provider_type)
+            )

@@ -801,7 +801,11 @@ class M365Provider(ActionProvider):
             from auth.m365_oauth import M365OAuth
 
             # Attempt to refresh token
-            new_token_data = M365OAuth.refresh_access_token(self.refresh_token)
+            new_token_data = M365OAuth.refresh_access_token(
+                self.refresh_token,
+                user_id=self.user_id,
+                memory_store=self.memory_store
+            )
 
             if not new_token_data:
                 raise ActionAuthenticationError(

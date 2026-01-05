@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { getProactiveSettings, updateProactiveSettings } from "../../lib/api.js";
 
+  export let hideActions = false;  // Allow parent to hide the save button
+
   let settings = {
     calendar_enabled: true,
     email_enabled: true,
@@ -45,7 +47,7 @@
     }
   }
 
-  async function saveSettings() {
+  export async function saveSettings() {
     try {
       saving = true;
       saveMessage = "";
@@ -250,17 +252,19 @@
     </div>
 
     <!-- Save Button -->
-    <div class="actions">
-      <button class="btn-info" on:click={saveSettings} disabled={saving}>
-        {saving ? "Saving..." : "Save Settings"}
-      </button>
+    {#if !hideActions}
+      <div class="actions">
+        <button class="btn-info" on:click={saveSettings} disabled={saving}>
+          {saving ? "Saving..." : "Save Settings"}
+        </button>
 
-      {#if saveMessage}
-        <span class={saveMessage.includes("Error") ? "save-error" : "save-success"}>
-          {saveMessage}
-        </span>
-      {/if}
-    </div>
+        {#if saveMessage}
+          <span class={saveMessage.includes("Error") ? "save-error" : "save-success"}>
+            {saveMessage}
+          </span>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
 

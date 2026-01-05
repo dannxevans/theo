@@ -58,8 +58,33 @@
     let providerType = "";
 
     // Special cases for non-AI responses (don't show model badge)
-    if (provider === "memory" || provider === "error" || provider === "action_router") {
+    if (provider === "memory" || provider === "error") {
       return null;
+    }
+
+    // Action router responses - check task_type for special handling
+    if (provider === "action_router") {
+      if (taskType === "whoop") {
+        // Extract processing model from metadata if available
+        const processingModel = metadata?.llm_provider_name || "Sonnet-4.5";
+        return `${processingModel} · WHOOP · Live Data`;
+      }
+      return null; // Other action_router responses don't show footer
+    }
+
+    // WHOOP proactive notifications
+    if (provider === "whoop") {
+      // Extract processing model from metadata if available
+      const processingModel = metadata?.llm_provider_name || "Sonnet-4.5";
+
+      if (model === "whoop-stress-notification") {
+        return `${processingModel} · WHOOP · Stress/Recovery`;
+      } else if (model === "whoop-sleep-notification") {
+        return `${processingModel} · WHOOP · Sleep Summary`;
+      } else if (model === "whoop-workout-notification") {
+        return `${processingModel} · WHOOP · Workout Summary`;
+      }
+      return `${processingModel} · WHOOP · Proactive notification`;
     }
 
     // If we have explicit provider info from metadata (e.g., from LLM summarization),
