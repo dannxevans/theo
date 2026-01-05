@@ -1591,3 +1591,61 @@ export async function logToBackend(level, message, component, sessionId = null) 
     console.warn('Failed to send log to backend:', e);
   }
 }
+
+// ============================================================================
+// Database Audit API Functions
+// ============================================================================
+
+export async function getAuditSessions(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.limit) params.append("limit", filters.limit);
+  if (filters.offset) params.append("offset", filters.offset);
+  if (filters.mode) params.append("mode", filters.mode);
+  if (filters.start_date) params.append("start_date", filters.start_date);
+  if (filters.end_date) params.append("end_date", filters.end_date);
+  if (filters.user_id) params.append("user_id", filters.user_id);
+
+  const response = await fetch(`${API_BASE}/api/audit/sessions?${params}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load audit sessions");
+  }
+
+  return response.json();
+}
+
+export async function getSessionTurns(sessionId, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.limit) params.append("limit", filters.limit);
+  if (filters.offset) params.append("offset", filters.offset);
+  if (filters.role) params.append("role", filters.role);
+  if (filters.provider_id) params.append("provider_id", filters.provider_id);
+  if (filters.model) params.append("model", filters.model);
+
+  const response = await fetch(`${API_BASE}/api/audit/sessions/${sessionId}/turns?${params}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load session turns");
+  }
+
+  return response.json();
+}
+
+export async function getAuditStats() {
+  const response = await fetch(`${API_BASE}/api/audit/stats`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to load audit statistics");
+  }
+
+  return response.json();
+}

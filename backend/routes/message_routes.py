@@ -383,6 +383,7 @@ def stream_chat_sse(session_id):
                             "task_type": result_metadata.get("task_type") if result_metadata else None,
                             "fallback_reason": result_metadata.get("fallback_reason") if result_metadata else None,
                             "routing": result_metadata.get("routing") if result_metadata else None,
+                            "full_request_context": result_metadata.get("full_request_context") if result_metadata else None,
                         }
                     else:
                         # Non-streaming fallback: route_request returned a dict

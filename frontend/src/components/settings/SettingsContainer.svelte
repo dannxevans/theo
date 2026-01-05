@@ -17,6 +17,7 @@
   import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
   import RoutinesSettings from "./RoutinesSettings.svelte";
   import DebugConsole from "./DebugConsole.svelte";
+  import DatabaseAuditSettings from "./DatabaseAuditSettings.svelte";
   import {
     getProviders,
     getIntents,
@@ -407,6 +408,9 @@
           <button class="dropdown-item" class:active={activeTab === "health-monitor"} on:click={() => switchCategory("health", "health-monitor")}>
             Health Monitor
           </button>
+          <button class="dropdown-item" class:active={activeTab === "database-audit"} on:click={() => switchCategory("health", "database-audit")}>
+            Database Audit
+          </button>
           <button class="dropdown-item" class:active={activeTab === "debug-console"} on:click={() => switchCategory("health", "debug-console")}>
             Debug Console
           </button>
@@ -436,6 +440,7 @@
       {#if activeTab === "integrations"}Integrations{/if}
       {#if activeTab === "service-providers"}Service Providers{/if}
       {#if activeTab === "health-monitor"}Health Monitor{/if}
+      {#if activeTab === "database-audit"}Database Audit{/if}
       {#if activeTab === "debug-console"}Debug Console{/if}
     </span>
   </div>
@@ -495,6 +500,10 @@
         {advancedMode}
         on:reload={() => loadHealthData()}
       />
+    {/if}
+
+    {#if activeTab === "database-audit"}
+      <DatabaseAuditSettings />
     {/if}
 
     {#if activeTab === "debug-console"}

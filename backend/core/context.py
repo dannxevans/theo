@@ -208,13 +208,17 @@ class ContextManager:
         model = None
         intent = None
         metadata = None
+        full_request_context = None
 
         if isinstance(assistant_text, dict):
             provider_id = assistant_text.get("provider")
             model = assistant_text.get("model")
             intent = assistant_text.get("task_type")  # task_type is the intent
             metadata = assistant_text.get("metadata")  # Extract metadata for confirmations
+            full_request_context = assistant_text.get("full_request_context")  # Extract full LLM request for debugging
             logging.info(f"[CONTEXT] Extracted metadata: {metadata}")
+            if full_request_context:
+                logging.info(f"[CONTEXT] Captured full_request_context with {len(full_request_context)} messages")
 
             if provider_id:
                 self.memory.set_last_provider(session_id, provider_id)
@@ -225,7 +229,7 @@ class ContextManager:
         logging.info(f"[CONTEXT] Storing user turn")
         self._store_turn(session_id, "user", user_text, mode=mode, user_id=user_id)
         logging.info(f"[CONTEXT] Storing assistant turn with metadata: {metadata is not None}, routine={routine_name}")
-        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent, metadata=metadata, mode=mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions)
+        self._store_turn(session_id, "assistant", assistant_text, provider_id=provider_id, model=model, intent=intent, metadata=metadata, mode=mode, user_id=user_id, routine_name=routine_name, routine_actions=routine_actions, full_request_context=full_request_context)
         logging.info(f"[CONTEXT] Turns stored successfully")
 
         # Derive and persist session title if supported by memory store
@@ -292,7 +296,7 @@ class ContextManager:
             limit=self.MAX_RECENT_TURNS * 2
         )
 
-    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
+    def _store_turn(self, session_id, role, content, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None, full_request_context=None):
         self.memory.save_turn(
             session_id=session_id,
             role=role,
@@ -305,7 +309,8 @@ class ContextManager:
             mode=mode,
             user_id=user_id,
             routine_name=routine_name,
-            routine_actions=routine_actions
+            routine_actions=routine_actions,
+            full_request_context=full_request_context
         )
 
     def _generate_summary(self, session_id):
