@@ -12,7 +12,7 @@ This is distinct from the LLM router (router.py):
 from typing import Dict, Any
 import logging
 
-from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers
+from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers, WHOOPHandlers
 
 
 class ActionRouter:
@@ -64,6 +64,11 @@ class ActionRouter:
             memory_store,
             confirmation_manager
         )
+        self.whoop_handlers = WHOOPHandlers(
+            action_registry,
+            memory_store,
+            confirmation_manager
+        )
 
     @property
     def confirmation_manager(self):
@@ -87,6 +92,8 @@ class ActionRouter:
             self.email_handlers.confirmation_manager = value
         if hasattr(self, 'confirmation_handlers'):
             self.confirmation_handlers.confirmation_manager = value
+        if hasattr(self, 'whoop_handlers'):
+            self.whoop_handlers.confirmation_manager = value
 
     def route_action_request(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -138,6 +145,9 @@ class ActionRouter:
             "compose_email": self.email_handlers.handle_compose_email,
             "email_reply": self.email_handlers.handle_email_reply,
             "send_email": self.email_handlers.handle_email_send,
+
+            # WHOOP actions
+            "whoop": self.whoop_handlers.handle_whoop,
 
             # Confirmation actions
             "approve_confirmation": self.confirmation_handlers.handle_approve_confirmation,

@@ -25,14 +25,10 @@ class M365OAuth:
     """
     Microsoft 365 OAuth 2.0 Device Code Flow handler.
 
-    Configuration required in .env:
-    - M365_CLIENT_ID: Azure AD application client ID
-    - M365_TENANT_ID: Azure AD tenant ID (or 'common' for multi-tenant)
+    Configuration can be set via:
+    1. Database (preferences table) - PREFERRED
+    2. Environment variables (.env) - FALLBACK
     """
-
-    # Azure AD app credentials (loaded from environment)
-    CLIENT_ID = os.getenv("M365_CLIENT_ID", "")
-    TENANT_ID = os.getenv("M365_TENANT_ID", "common")
 
     # OAuth scopes required for calendar and email access
     SCOPES = [
@@ -43,15 +39,63 @@ class M365OAuth:
         "offline_access"  # Required for refresh tokens
     ]
 
-    # Microsoft identity platform endpoints
-    AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-    DEVICE_CODE_URL = f"{AUTHORITY}/oauth2/v2.0/devicecode"
-    TOKEN_URL = f"{AUTHORITY}/oauth2/v2.0/token"
+    @classmethod
+    def get_config(cls, user_id: int = None, memory_store=None) -> Dict[str, str]:
+        """
+        Get M365 OAuth configuration from database or environment.
+
+        Priority:
+        1. Database preferences (if user_id and memory_store provided)
+        2. Environment variables
+
+        Args:
+            user_id: User ID for database lookup
+            memory_store: MemoryStore instance
+
+        Returns:
+            dict: {client_id, tenant_id}
+        """
+        # Try database preferences first
+        if user_id and memory_store:
+            prefs = memory_store.get_all(str(user_id))
+            client_id = prefs.get('m365_client_id')
+            tenant_id = prefs.get('m365_tenant_id')
+
+            if client_id:
+                return {
+                    'client_id': client_id,
+                    'tenant_id': tenant_id or 'common'
+                }
+
+        # Fallback to environment variables
+        return {
+            'client_id': os.getenv("M365_CLIENT_ID", ""),
+            'tenant_id': os.getenv("M365_TENANT_ID", "common")
+        }
 
     @classmethod
-    def initiate_device_flow(cls) -> Dict:
+    def is_configured(cls, user_id: int = None, memory_store=None) -> bool:
+        """
+        Check if M365 OAuth is properly configured.
+
+        Args:
+            user_id: User ID for database lookup
+            memory_store: MemoryStore instance
+
+        Returns:
+            True if client_id is set
+        """
+        config = cls.get_config(user_id, memory_store)
+        return bool(config['client_id'])
+
+    @classmethod
+    def initiate_device_flow(cls, user_id: int = None, memory_store=None) -> Dict:
         """
         Step 1: Initiate device code flow.
+
+        Args:
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns device code information to display to user:
         {
@@ -67,22 +111,29 @@ class M365OAuth:
             ValueError: If CLIENT_ID is not configured
             requests.RequestException: If API call fails
         """
-        if not cls.CLIENT_ID:
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError(
                 "M365_CLIENT_ID not configured. "
-                "Please set M365_CLIENT_ID in your .env file. "
-                "See docs for Azure AD app setup instructions."
+                "Please set M365_CLIENT_ID in your .env file "
+                "or configure via Settings → M365 Integration."
             )
 
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
+
+        # Build device code URL with tenant
+        tenant_id = config['tenant_id']
+        device_code_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/devicecode"
+
         payload = {
-            "client_id": cls.CLIENT_ID,
+            "client_id": config['client_id'],
             "scope": " ".join(cls.SCOPES)
         }
 
         logging.info("[M365_OAUTH] Initiating device code flow...")
 
         try:
-            response = requests.post(cls.DEVICE_CODE_URL, data=payload, timeout=10)
+            response = requests.post(device_code_url, data=payload, timeout=10)
             response.raise_for_status()
 
             data = response.json()
@@ -104,7 +155,8 @@ class M365OAuth:
 
     @classmethod
     def poll_for_token(cls, device_code: str, interval: int = 5,
-                       max_attempts: int = 60) -> Optional[Dict]:
+                       max_attempts: int = 60, user_id: int = None,
+                       memory_store=None) -> Optional[Dict]:
         """
         Step 2: Poll for access token after user authenticates.
 
@@ -115,6 +167,8 @@ class M365OAuth:
             device_code: Device code from initiate_device_flow()
             interval: Polling interval in seconds (from device flow response)
             max_attempts: Maximum number of polling attempts (default: 60 = 5 minutes)
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             Token data if successful:
@@ -135,13 +189,20 @@ class M365OAuth:
         Raises:
             ValueError: If CLIENT_ID is not configured
         """
-        if not cls.CLIENT_ID:
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError("M365_CLIENT_ID not configured")
 
         import time
 
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
+
+        # Build token URL with tenant
+        tenant_id = config['tenant_id']
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+
         payload = {
-            "client_id": cls.CLIENT_ID,
+            "client_id": config['client_id'],
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "device_code": device_code
         }
@@ -151,7 +212,7 @@ class M365OAuth:
 
         while attempts < max_attempts:
             try:
-                response = requests.post(cls.TOKEN_URL, data=payload, timeout=10)
+                response = requests.post(token_url, data=payload, timeout=10)
 
                 if response.status_code == 200:
                     # Success! User completed authentication
@@ -207,7 +268,8 @@ class M365OAuth:
         return None
 
     @classmethod
-    def refresh_access_token(cls, refresh_token: str) -> Optional[Dict]:
+    def refresh_access_token(cls, refresh_token: str, user_id: int = None,
+                            memory_store=None) -> Optional[Dict]:
         """
         Refresh an expired access token using refresh token.
 
@@ -216,6 +278,8 @@ class M365OAuth:
 
         Args:
             refresh_token: Refresh token from previous authentication
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             New token data if successful:
@@ -232,11 +296,18 @@ class M365OAuth:
         Raises:
             ValueError: If CLIENT_ID is not configured
         """
-        if not cls.CLIENT_ID:
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError("M365_CLIENT_ID not configured")
 
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
+
+        # Build token URL with tenant
+        tenant_id = config['tenant_id']
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+
         payload = {
-            "client_id": cls.CLIENT_ID,
+            "client_id": config['client_id'],
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
             "scope": " ".join(cls.SCOPES)
@@ -245,7 +316,7 @@ class M365OAuth:
         logging.info("[M365_OAUTH] Refreshing access token...")
 
         try:
-            response = requests.post(cls.TOKEN_URL, data=payload, timeout=10)
+            response = requests.post(token_url, data=payload, timeout=10)
 
             if response.status_code == 200:
                 data = response.json()
@@ -272,16 +343,6 @@ class M365OAuth:
         except requests.RequestException as e:
             logging.error(f"[M365_OAUTH] Token refresh request failed: {e}")
             return None
-
-    @classmethod
-    def is_configured(cls) -> bool:
-        """
-        Check if M365 OAuth is properly configured.
-
-        Returns:
-            True if CLIENT_ID is set, False otherwise
-        """
-        return bool(cls.CLIENT_ID)
 
     @classmethod
     def get_configuration_instructions(cls) -> str:

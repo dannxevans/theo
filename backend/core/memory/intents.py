@@ -369,6 +369,14 @@ class IntentOperations(BaseMemoryOperations):
                 "priority": -1,  # Lower than general - internal only
                 "is_action": False,
             },
+            {
+                "id": "whoop",
+                "name": "WHOOP Health & Fitness",
+                "description": "WHOOP fitness tracker queries about sleep, recovery, workouts, and stress",
+                "keywords": "whoop,sleep,recovery,workout,exercise,strain,hrv,heart rate variability,resting heart rate,how did i sleep,how recovered am i,how hard was my workout,fitness,health metrics,training",
+                "priority": 95,
+                "is_action": True,
+            },
             # Action intents (M365 and HomeKit)
             {
                 "id": "read_calendar",
