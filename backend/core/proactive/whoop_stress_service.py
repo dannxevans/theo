@@ -106,22 +106,26 @@ class WHOOPStressService:
         Generate observational stress/recovery summary with medical guardrails.
 
         Args:
-            recovery: Recovery data from WHOOP API
+            recovery: Recovery data from WHOOP API (already the score dict)
 
         Returns:
             str: Summary text
         """
-        score = recovery.get('score', {})
+        # Debug: log the recovery data structure
+        logger.info(f"[WHOOP_STRESS] Recovery data structure: {recovery}")
 
+        # Recovery data is already the score dict from get_latest_recovery()
         # Recovery metrics
-        recovery_score = score.get('recovery_score', 0)
-        hrv_rmssd = score.get('hrv_rmssd_milli', 0)
-        resting_hr = score.get('resting_heart_rate', 0)
-        spo2 = score.get('spo2_percentage', 0)
-        skin_temp = score.get('skin_temp_celsius', 0)
+        recovery_score = recovery.get('recovery_score', 0)
+        hrv_rmssd = recovery.get('hrv_rmssd_milli', 0)
+        resting_hr = recovery.get('resting_heart_rate', 0)
+        spo2 = recovery.get('spo2_percentage', 0)
+        skin_temp = recovery.get('skin_temp_celsius', 0)
+
+        logger.info(f"[WHOOP_STRESS] Extracted values - recovery_score: {recovery_score}, hrv: {hrv_rmssd}, hr: {resting_hr}")
 
         # User calibrating data (for context)
-        user_calibrating = recovery.get('score', {}).get('user_calibrating', False)
+        user_calibrating = recovery.get('user_calibrating', False)
 
         # Build observational summary (medical guardrails - no advice/diagnosis)
         summary = f"**Daily Recovery & Stress Summary**\n\n"
@@ -177,11 +181,15 @@ class WHOOPStressService:
     def _send_notification(self, user_id: int, summary: str):
         """
         Send notification to user via message system.
+        Uses lightweight LLM to process raw data into natural language.
 
         Args:
             user_id: User ID
-            summary: Summary text to send
+            summary: Summary text to send (raw data)
         """
+        # Process summary through lightweight LLM for natural language
+        processed_content = self._process_with_llm(summary, user_id)
+
         # Store as a proactive message in the turns table
         from core.proactive.message_poster import post_proactive_message
 
@@ -189,7 +197,53 @@ class WHOOPStressService:
             memory_store=self.memory,
             user_id=user_id,
             message_type="whoop_stress",
-            content=summary,
+            content=processed_content,
             provider_id="whoop",
             model="whoop-stress-notification"
         )
+
+    def _process_with_llm(self, raw_data: str, user_id: int) -> str:
+        """
+        Process raw WHOOP data through lightweight LLM for natural language output.
+
+        Args:
+            raw_data: Raw recovery data summary
+            user_id: User ID for routing
+
+        Returns:
+            str: Processed natural language summary
+        """
+        try:
+            from core.router import route_request
+
+            prompt = f"""You are presenting WHOOP recovery data to the user. Convert this technical data into a brief, friendly, conversational summary.
+
+Guidelines:
+- Be concise (2-3 sentences max)
+- Use natural language, avoid bullet points
+- Focus on what the data means for their day
+- Maintain medical guardrails - use observational language only
+- Do NOT give medical advice or diagnosis
+- Keep the tone friendly and supportive
+
+Raw data:
+{raw_data}
+
+Present this data in a natural, conversational way:"""
+
+            router_context = {
+                "text": prompt,
+                "user_id": user_id,
+                "force_intent": "system",  # Use lightweight LLM
+                "memory": self.memory
+            }
+
+            result = route_request(router_context)
+            processed_text = result.get("text", raw_data)
+
+            logger.info(f"[WHOOP_STRESS] Processed notification via lightweight LLM")
+            return processed_text
+
+        except Exception as e:
+            logger.error(f"[WHOOP_STRESS] LLM processing failed: {e}, using raw data")
+            return raw_data

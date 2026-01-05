@@ -1,7 +1,7 @@
 """
 WHOOP API Client
 
-Handles all interactions with WHOOP API v1.
+Handles all interactions with WHOOP API v2.
 Reference: https://developer.whoop.com/api
 """
 
@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class WHOOPClient:
-    """Client for WHOOP API v1."""
+    """Client for WHOOP API v2."""
 
-    BASE_URL = 'https://api.prod.whoop.com/developer/v1'
+    BASE_URL = 'https://api.prod.whoop.com/developer/v2'
 
     def __init__(self, access_token: str):
         """
@@ -139,6 +139,36 @@ class WHOOPClient:
             logger.error(f"[WHOOP_CLIENT] Failed to fetch cycle data: {e}")
             raise
 
+    def get_recovery_collection(self, start: str = None, end: str = None, limit: int = 25) -> Dict:
+        """
+        Get recovery records (V2 API).
+        Recovery includes HRV, resting heart rate, and recovery score.
+
+        Args:
+            start: ISO 8601 timestamp (default: 7 days ago)
+            end: ISO 8601 timestamp (default: now)
+            limit: Max records to return (default: 25, max: 50)
+
+        Returns:
+            dict: Recovery collection with 'records' array
+
+        Raises:
+            requests.HTTPError: If API call fails
+        """
+        params = {'limit': min(limit, 50)}
+        if start:
+            params['start'] = start
+        if end:
+            params['end'] = end
+
+        try:
+            response = self.session.get(f'{self.BASE_URL}/recovery', params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"[WHOOP_CLIENT] Failed to fetch recovery data: {e}")
+            raise
+
     def get_latest_sleep(self) -> Optional[Dict]:
         """
         Get the most recent sleep record.
@@ -167,58 +197,85 @@ class WHOOPClient:
         Raises:
             requests.HTTPError: If API call fails
         """
-        # Get last 12 hours
+        # Get last 7 days to ensure we find recent workouts
         end = datetime.utcnow().isoformat() + 'Z'
-        start = (datetime.utcnow() - timedelta(hours=12)).isoformat() + 'Z'
+        start = (datetime.utcnow() - timedelta(days=7)).isoformat() + 'Z'
 
         data = self.get_workout_collection(start=start, end=end, limit=1)
         records = data.get('records', [])
         return records[0] if records else None
 
-    def get_latest_recovery(self) -> Optional[Dict]:
+    def get_cycle_recovery(self, cycle_id: str) -> Optional[Dict]:
         """
-        Get the most recent recovery record.
-        Recovery includes HRV and resting heart rate used for stress calculations.
+        Get recovery data for a specific cycle.
 
-        In WHOOP API v1, recovery data is embedded within cycle data.
+        Args:
+            cycle_id: Cycle ID
 
         Returns:
-            dict: Latest recovery record or None if no recent recovery found
+            dict: Recovery data or None if not found
 
         Raises:
             requests.HTTPError: If API call fails
         """
-        # Get recent cycles (last 2 days to ensure we have data)
+        try:
+            response = self.session.get(f'{self.BASE_URL}/cycle/{cycle_id}/recovery', timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.debug(f"[WHOOP_CLIENT] No recovery data for cycle {cycle_id}: {e}")
+            return None
+
+    def get_latest_recovery(self) -> Optional[Dict]:
+        """
+        Get the most recent recovery record (V2 API).
+        Recovery includes HRV and resting heart rate used for stress calculations.
+
+        Returns:
+            dict: Latest recovery record with 'score' containing recovery metrics
+
+        Raises:
+            requests.HTTPError: If API call fails
+        """
+        # Get last 2 days of recovery data
         end = datetime.utcnow().isoformat() + 'Z'
         start = (datetime.utcnow() - timedelta(days=2)).isoformat() + 'Z'
 
-        logger.info(f"[WHOOP_CLIENT] Fetching cycles from {start} to {end} for recovery data")
+        logger.info(f"[WHOOP_CLIENT] Fetching recovery data from {start} to {end}")
 
-        cycle_data = self.get_cycle_collection(start=start, end=end, limit=10)
-        cycles = cycle_data.get('records', [])
+        try:
+            data = self.get_recovery_collection(start=start, end=end, limit=1)
+            records = data.get('records', [])
 
-        logger.info(f"[WHOOP_CLIENT] Found {len(cycles)} cycles")
+            if not records:
+                logger.info("[WHOOP_CLIENT] No recent recovery data found")
+                return None
 
-        if not cycles:
-            logger.info("[WHOOP_CLIENT] No recent cycles found")
+            recovery = records[0]
+            logger.info(f"[WHOOP_CLIENT] ✓ Found recovery record: {recovery}")
+
+            # Extract score data for compatibility with stress service
+            score = recovery.get('score', {})
+            return {
+                'id': recovery.get('cycle_id'),  # Use cycle_id as unique ID
+                'cycle_id': recovery.get('cycle_id'),
+                'sleep_id': recovery.get('sleep_id'),
+                'user_id': recovery.get('user_id'),
+                'created_at': recovery.get('created_at'),
+                'updated_at': recovery.get('updated_at'),
+                'score_state': recovery.get('score_state'),
+                # Flatten score metrics to top level for easier access
+                'recovery_score': score.get('recovery_score', 0),
+                'hrv_rmssd_milli': score.get('hrv_rmssd_milli', 0),
+                'resting_heart_rate': score.get('resting_heart_rate', 0),
+                'spo2_percentage': score.get('spo2_percentage', 0),
+                'skin_temp_celsius': score.get('skin_temp_celsius', 0),
+                'user_calibrating': score.get('user_calibrating', False),
+            }
+
+        except Exception as e:
+            logger.error(f"[WHOOP_CLIENT] Error fetching recovery: {e}", exc_info=True)
             return None
-
-        # Look for cycles with recovery data (recovery is embedded in cycle response)
-        for i, cycle in enumerate(cycles):
-            # Recovery data is in the 'score' field of the cycle
-            recovery_score = cycle.get('score')
-            if recovery_score:
-                logger.info(f"[WHOOP_CLIENT] ✓ Found recovery data in cycle {i+1}/{len(cycles)}")
-                # Return the recovery score data with cycle_id for reference
-                recovery_score['cycle_id'] = cycle.get('id')
-                recovery_score['created_at'] = cycle.get('created_at')
-                recovery_score['updated_at'] = cycle.get('updated_at')
-                # Use cycle ID as recovery ID for tracking
-                recovery_score['id'] = cycle.get('id')
-                return recovery_score
-
-        logger.info(f"[WHOOP_CLIENT] Checked {len(cycles)} cycles, none had recovery data")
-        return None
 
     def get_sleep_with_recovery(self, sleep_id: str) -> Optional[Dict]:
         """
