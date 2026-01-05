@@ -1617,6 +1617,9 @@ def route_request(context: dict, stream: bool = False):
             # Note: Memory persistence is handled by context_manager.update() in message_routes.py
             # Don't persist here to avoid duplicate saves
 
+            # Construct full request context for debugging LLM responses
+            full_request_context = [{"role": "system", "content": system_prompt}] + messages
+
             # ⬇️ THIS IS THE IMPORTANT PART ⬇️
             yield {
                 "event": "end",
@@ -1625,6 +1628,7 @@ def route_request(context: dict, stream: bool = False):
                 "task_type": meta["task_type"],
                 "fallback_reason": meta["fallback_reason"],
                 "routing": meta["routing"],
+                "full_request_context": full_request_context,
             }
 
         return stream_generator()
@@ -1650,6 +1654,9 @@ def route_request(context: dict, stream: bool = False):
                 "messages": messages
             }
 
+    # Construct full request context for debugging LLM responses
+    full_request_context = [{"role": "system", "content": system_prompt}] + messages
+
     result = {
         "text": text_out,
         "provider": meta["provider"],
@@ -1657,6 +1664,7 @@ def route_request(context: dict, stream: bool = False):
         "task_type": meta["task_type"],
         "fallback_reason": meta["fallback_reason"],
         "routing": meta["routing"],
+        "full_request_context": full_request_context,
     }
 
     if debug_instruction:
