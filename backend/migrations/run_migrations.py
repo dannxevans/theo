@@ -69,7 +69,10 @@ def run_all_migrations():
         "019_create_debug_logs.py",  # Add debug_logs table for debug console feature
         "020_add_api_keys.py",  # Add api_keys table for API key authentication (Siri Shortcuts, iOS automation)
         "021_add_full_request_context.py",  # Add full_request_context column to turns for LLM prompt debugging
-        "022_add_whoop_integration.py"  # Add WHOOP integration tables (credentials, settings, tracking)
+        "022_add_whoop_integration.py",  # Add WHOOP integration tables (credentials, settings, tracking)
+        "023_add_whoop_stress_notifications.py",  # Add stress notifications to WHOOP settings
+        "024_add_stress_notification_time.py",  # Add stress notification time to WHOOP settings
+        "025_add_oauth_config_to_feature_providers.py"  # Add OAuth config storage to feature providers
     ]
 
     # Filter to only existing files

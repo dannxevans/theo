@@ -27,31 +27,25 @@ class WHOOPOperations(BaseMemoryOperations):
             token_type: Token type (default: Bearer)
         """
         with self.engine.begin() as conn:
-            # Check if exists
-            existing = conn.execute(
-                select(self.whoop_credentials.c.id)
+            # Try to update first
+            result = conn.execute(
+                update(self.whoop_credentials)
                 .where(self.whoop_credentials.c.user_id == user_id)
-            ).fetchone()
-
-            if existing:
-                # Update
-                conn.execute(
-                    update(self.whoop_credentials)
-                    .where(self.whoop_credentials.c.user_id == user_id)
-                    .values(
-                        access_token=access_token,
-                        refresh_token=refresh_token,
-                        token_type=token_type,
-                        expires_at=expires_at,
-                        whoop_user_id=whoop_user_id,
-                        is_valid=True,
-                        last_refreshed_at=datetime.utcnow(),
-                        last_error=None,
-                        updated_at=datetime.utcnow()
-                    )
+                .values(
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_type=token_type,
+                    expires_at=expires_at,
+                    whoop_user_id=whoop_user_id,
+                    is_valid=True,
+                    last_refreshed_at=datetime.utcnow(),
+                    last_error=None,
+                    updated_at=datetime.utcnow()
                 )
-            else:
-                # Insert
+            )
+
+            # If no rows updated, insert new record
+            if result.rowcount == 0:
                 conn.execute(
                     insert(self.whoop_credentials).values(
                         user_id=user_id,
@@ -83,7 +77,7 @@ class WHOOPOperations(BaseMemoryOperations):
             ).fetchone()
             return dict(row._mapping) if row else None
 
-    def update_whoop_token(self, user_id, access_token, expires_at):
+    def update_whoop_token(self, user_id, access_token, expires_at, refresh_token=None):
         """
         Update WHOOP access token after refresh.
 
@@ -91,19 +85,26 @@ class WHOOPOperations(BaseMemoryOperations):
             user_id: User ID
             access_token: New access token
             expires_at: New expiration datetime
+            refresh_token: New refresh token (if rotated)
         """
         with self.engine.begin() as conn:
+            values = {
+                'access_token': access_token,
+                'expires_at': expires_at,
+                'is_valid': True,
+                'last_refreshed_at': datetime.utcnow(),
+                'last_error': None,
+                'updated_at': datetime.utcnow()
+            }
+
+            # Update refresh token if provided (token rotation)
+            if refresh_token:
+                values['refresh_token'] = refresh_token
+
             conn.execute(
                 update(self.whoop_credentials)
                 .where(self.whoop_credentials.c.user_id == user_id)
-                .values(
-                    access_token=access_token,
-                    expires_at=expires_at,
-                    is_valid=True,
-                    last_refreshed_at=datetime.utcnow(),
-                    last_error=None,
-                    updated_at=datetime.utcnow()
-                )
+                .values(**values)
             )
 
     def invalidate_whoop_credentials(self, user_id, error=None):
@@ -137,6 +138,64 @@ class WHOOPOperations(BaseMemoryOperations):
                 delete(self.whoop_credentials)
                 .where(self.whoop_credentials.c.user_id == user_id)
             )
+
+    def refresh_whoop_token_if_needed(self, user_id):
+        """
+        Check if WHOOP token is expired and refresh if needed.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            dict: Current credentials (refreshed if needed) or None
+        """
+        from auth.whoop_oauth import WHOOPOAuth
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        credentials = self.get_whoop_credentials(user_id)
+        if not credentials or not credentials.get('is_valid'):
+            return None
+
+        # Check if token is expired or will expire in next 5 minutes
+        expires_at = credentials.get('expires_at')
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at)
+
+        buffer_time = timedelta(minutes=5)
+        if datetime.utcnow() + buffer_time < expires_at:
+            # Token still valid
+            return credentials
+
+        # Token expired or about to expire - refresh it
+        refresh_token = credentials.get('refresh_token')
+        if not refresh_token:
+            logger.warning(f"[WHOOP_MEMORY] No refresh token for user {user_id}, cannot refresh")
+            self.invalidate_whoop_credentials(user_id, "No refresh token available")
+            return None
+
+        logger.info(f"[WHOOP_MEMORY] Refreshing expired token for user {user_id}")
+
+        # Attempt token refresh
+        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token)
+        if not new_tokens:
+            logger.error(f"[WHOOP_MEMORY] Token refresh failed for user {user_id}")
+            self.invalidate_whoop_credentials(user_id, "Token refresh failed")
+            return None
+
+        # Update stored credentials
+        self.update_whoop_token(
+            user_id,
+            new_tokens['access_token'],
+            new_tokens['expires_at'],
+            new_tokens.get('refresh_token')  # May be rotated
+        )
+
+        logger.info(f"[WHOOP_MEMORY] ✓ Token refreshed successfully for user {user_id}")
+
+        # Return updated credentials
+        return self.get_whoop_credentials(user_id)
 
     # =============================
     # WHOOP Settings
@@ -188,8 +247,20 @@ class WHOOPOperations(BaseMemoryOperations):
             ).fetchone()
 
             if existing:
-                # Update
-                update_values = {**settings, 'updated_at': datetime.utcnow()}
+                # Update - only allow specific fields to be updated
+                allowed_fields = [
+                    'sleep_notifications_enabled',
+                    'workout_notifications_enabled',
+                    'stress_notifications_enabled',
+                    'stress_notification_time',
+                    'check_frequency_minutes',
+                    'quiet_hours_enabled',
+                    'quiet_hours_start',
+                    'quiet_hours_end'
+                ]
+                update_values = {k: v for k, v in settings.items() if k in allowed_fields}
+                update_values['updated_at'] = datetime.utcnow()
+
                 conn.execute(
                     update(self.whoop_settings)
                     .where(self.whoop_settings.c.user_id == user_id)
@@ -201,6 +272,8 @@ class WHOOPOperations(BaseMemoryOperations):
                     'user_id': user_id,
                     'sleep_notifications_enabled': settings.get('sleep_notifications_enabled', True),
                     'workout_notifications_enabled': settings.get('workout_notifications_enabled', True),
+                    'stress_notifications_enabled': settings.get('stress_notifications_enabled', True),
+                    'stress_notification_time': settings.get('stress_notification_time', '14:00'),
                     'check_frequency_minutes': settings.get('check_frequency_minutes', 30),
                     'quiet_hours_enabled': settings.get('quiet_hours_enabled', False),
                     'quiet_hours_start': settings.get('quiet_hours_start'),

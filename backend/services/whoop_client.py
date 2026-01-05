@@ -204,6 +204,25 @@ class WHOOPClient:
         records = data.get('records', [])
         return records[0] if records else None
 
+    def get_latest_recovery(self) -> Optional[Dict]:
+        """
+        Get the most recent recovery record.
+        Recovery includes HRV and resting heart rate used for stress calculations.
+
+        Returns:
+            dict: Latest recovery record or None if no recent recovery found
+
+        Raises:
+            requests.HTTPError: If API call fails
+        """
+        # Get last 24 hours
+        end = datetime.utcnow().isoformat() + 'Z'
+        start = (datetime.utcnow() - timedelta(days=1)).isoformat() + 'Z'
+
+        data = self.get_recovery_collection(start=start, end=end, limit=1)
+        records = data.get('records', [])
+        return records[0] if records else None
+
     def get_sleep_with_recovery(self, sleep_id: str) -> Optional[Dict]:
         """
         Get sleep record with associated recovery score.

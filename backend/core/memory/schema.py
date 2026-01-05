@@ -466,6 +466,8 @@ def create_schema(meta: MetaData):
         Column("user_id", Integer, nullable=False, unique=True),
         Column("sleep_notifications_enabled", Boolean, default=True),
         Column("workout_notifications_enabled", Boolean, default=True),
+        Column("stress_notifications_enabled", Boolean, default=True),
+        Column("stress_notification_time", String, default="14:00"),
         Column("check_frequency_minutes", Integer, default=30),
         Column("quiet_hours_enabled", Boolean, default=False),
         Column("quiet_hours_start", String, nullable=True),
@@ -499,6 +501,7 @@ def create_schema(meta: MetaData):
         Column("provider_type", String(50), nullable=False),
         Column("provider_name", String(100), nullable=False),
         Column("is_enabled", Boolean, default=True),
+        Column("encrypted_config", Text, nullable=True),  # JSON with OAuth credentials (encrypted)
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )

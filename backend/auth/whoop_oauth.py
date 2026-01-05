@@ -30,16 +30,10 @@ class WHOOPOAuth:
     """
     WHOOP OAuth 2.0 Authorization Code Flow handler.
 
-    Configuration required in .env:
-    - WHOOP_CLIENT_ID: WHOOP application client ID
-    - WHOOP_CLIENT_SECRET: WHOOP application client secret
-    - WHOOP_REDIRECT_URI: Redirect URI configured in WHOOP app
+    Configuration can be set via:
+    1. Database (feature_providers table) - PREFERRED
+    2. Environment variables (.env) - FALLBACK
     """
-
-    # WHOOP app credentials (loaded from environment)
-    CLIENT_ID = os.getenv("WHOOP_CLIENT_ID", "")
-    CLIENT_SECRET = os.getenv("WHOOP_CLIENT_SECRET", "")
-    REDIRECT_URI = os.getenv("WHOOP_REDIRECT_URI", "http://localhost:1066/api/whoop/auth/callback")
 
     # OAuth scopes required for health data access
     SCOPES = [
@@ -56,14 +50,52 @@ class WHOOPOAuth:
     REVOKE_URL = "https://api.prod.whoop.com/oauth/oauth2/revoke"
 
     @classmethod
-    def is_configured(cls) -> bool:
+    def get_config(cls, user_id: int = None, memory_store=None) -> Dict[str, str]:
+        """
+        Get WHOOP OAuth configuration from database or environment.
+
+        Priority:
+        1. Database config (if user_id and memory_store provided)
+        2. Environment variables
+
+        Args:
+            user_id: User ID for database lookup
+            memory_store: MemoryStore instance
+
+        Returns:
+            dict: {client_id, client_secret, redirect_uri}
+        """
+        # Try database first
+        if user_id and memory_store:
+            db_config = memory_store.get_oauth_config(user_id, 'whoop')
+            if db_config and db_config.get('client_id'):
+                return {
+                    'client_id': db_config.get('client_id', ''),
+                    'client_secret': db_config.get('client_secret', ''),
+                    'redirect_uri': db_config.get('redirect_uri', 'http://localhost:1066/api/whoop/auth/callback')
+                }
+
+        # Fallback to environment variables
+        return {
+            'client_id': os.getenv("WHOOP_CLIENT_ID", ""),
+            'client_secret': os.getenv("WHOOP_CLIENT_SECRET", ""),
+            'redirect_uri': os.getenv("WHOOP_REDIRECT_URI", "http://localhost:1066/api/whoop/auth/callback")
+        }
+
+    @classmethod
+    def is_configured(cls, user_id: int = None, memory_store=None) -> bool:
         """
         Check if WHOOP OAuth is properly configured.
 
+        Args:
+            user_id: User ID for database lookup
+            memory_store: MemoryStore instance
+
         Returns:
-            True if CLIENT_ID and CLIENT_SECRET are set
+            True if client_id and client_secret are set
         """
-        return bool(cls.CLIENT_ID and cls.CLIENT_SECRET)
+        config = cls.get_config(user_id, memory_store)
+        return bool(config['client_id'] and config['client_secret'])
 
     @classmethod
     def generate_pkce_pair(cls) -> Tuple[str, str]:

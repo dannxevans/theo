@@ -550,9 +550,9 @@ def update_whoop_settings():
     # Validate check_frequency_minutes if provided
     if "check_frequency_minutes" in data:
         freq = data["check_frequency_minutes"]
-        if not isinstance(freq, int) or freq < 15 or freq > 120:
+        if not isinstance(freq, int) or freq < 1 or freq > 120:
             return jsonify({
-                "error": "check_frequency_minutes must be between 15 and 120"
+                "error": "check_frequency_minutes must be between 1 and 120"
             }), 400
 
     try:

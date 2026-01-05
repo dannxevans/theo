@@ -60,6 +60,9 @@ class ProactiveScheduler:
             self._schedule_digest_job(settings)
             self._schedule_cleanup_job()
 
+            # Schedule WHOOP jobs
+            self._schedule_whoop_jobs()
+
             # Start the scheduler
             self.scheduler.start()
             self._running = True
@@ -309,6 +312,65 @@ class ProactiveScheduler:
             args=[self.memory]
         )
         logger.info("[SCHEDULER] Cleanup job scheduled (daily at 03:00 UTC)")
+
+    def _schedule_whoop_jobs(self):
+        """Schedule WHOOP notification jobs for all users with WHOOP connected."""
+        # Import here to avoid circular imports
+        from core.proactive.whoop_sleep_service import WHOOPSleepService
+        from core.proactive.whoop_workout_service import WHOOPWorkoutService
+        from core.proactive.whoop_stress_service import WHOOPStressService
+
+        # Get all users with WHOOP credentials
+        try:
+            # For now, check default user (can be expanded to multi-user)
+            user_id = DEFAULT_USER_ID
+            settings = self.memory.get_whoop_settings(user_id)
+
+            if not settings:
+                logger.debug("[SCHEDULER] No WHOOP settings found, skipping WHOOP jobs")
+                return
+
+            frequency = settings.get('check_frequency_minutes', 30)
+
+            # Create service instances
+            sleep_service = WHOOPSleepService(self.memory)
+            workout_service = WHOOPWorkoutService(self.memory)
+            stress_service = WHOOPStressService(self.memory)
+
+            # Schedule sleep notifications (check periodically)
+            self.scheduler.add_job(
+                func=lambda: sleep_service.check_and_notify(user_id),
+                trigger=IntervalTrigger(minutes=frequency),
+                id='whoop_sleep',
+                name='WHOOP Sleep Notifications',
+                replace_existing=True
+            )
+            logger.info(f"[SCHEDULER] WHOOP sleep job scheduled (every {frequency} minutes)")
+
+            # Schedule workout notifications (check periodically)
+            self.scheduler.add_job(
+                func=lambda: workout_service.check_and_notify(user_id),
+                trigger=IntervalTrigger(minutes=frequency),
+                id='whoop_workout',
+                name='WHOOP Workout Notifications',
+                replace_existing=True
+            )
+            logger.info(f"[SCHEDULER] WHOOP workout job scheduled (every {frequency} minutes)")
+
+            # Schedule stress notifications (daily at user-configured time)
+            stress_time = settings.get('stress_notification_time', '14:00')
+            hour, minute = stress_time.split(':')
+            self.scheduler.add_job(
+                func=lambda: stress_service.check_and_notify(user_id),
+                trigger=CronTrigger(hour=int(hour), minute=int(minute)),
+                id='whoop_stress',
+                name='WHOOP Stress Notifications',
+                replace_existing=True
+            )
+            logger.info(f"[SCHEDULER] WHOOP stress job scheduled (daily at {stress_time} UTC)")
+
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Failed to schedule WHOOP jobs: {e}")
 
 
 # Global scheduler instance

@@ -33,6 +33,8 @@
   let whoopSettings = {
     sleep_notifications_enabled: true,
     workout_notifications_enabled: true,
+    stress_notifications_enabled: true,
+    stress_notification_time: "14:00",
     check_frequency_minutes: 30,
     quiet_hours_enabled: false,
     quiet_hours_start: "22:00",
@@ -501,12 +503,33 @@
             <span>Enable post-workout summaries</span>
           </label>
 
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              bind:checked={whoopSettings.stress_notifications_enabled}
+              on:change={saveWhoopSettings}
+            />
+            <span>Enable daily stress summaries</span>
+          </label>
+
+          {#if whoopSettings.stress_notifications_enabled}
+            <div class="form-group indented">
+              <label for="whoop-stress-time">Daily stress summary time:</label>
+              <input
+                id="whoop-stress-time"
+                type="time"
+                bind:value={whoopSettings.stress_notification_time}
+                on:change={saveWhoopSettings}
+              />
+            </div>
+          {/if}
+
           <div class="form-group">
             <label for="whoop-check-frequency">Check frequency (minutes):</label>
             <input
               id="whoop-check-frequency"
               type="number"
-              min="15"
+              min="1"
               max="120"
               bind:value={whoopSettings.check_frequency_minutes}
               on:change={saveWhoopSettings}
@@ -787,6 +810,10 @@
     display: flex;
     gap: 1rem;
     margin-bottom: 0.75rem;
+  }
+
+  .form-group.indented {
+    margin-left: 1.5rem;
   }
 
   .mode-notice {
