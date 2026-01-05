@@ -40,16 +40,16 @@ def start_m365_auth():
     if not user or not user["is_enabled"]:
         return jsonify({"error": "User not found"}), 401
 
-    # Check if configured
-    if not M365OAuth.is_configured():
+    # Check if configured (pass user_id and memory for database config lookup)
+    if not M365OAuth.is_configured(user["id"], memory):
         return jsonify({
             "error": "M365 not configured",
             "instructions": M365OAuth.get_configuration_instructions()
         }), 500
 
     try:
-        # Initiate device flow
-        device_info = M365OAuth.initiate_device_flow()
+        # Initiate device flow (pass user_id and memory for database config)
+        device_info = M365OAuth.initiate_device_flow(user["id"], memory)
 
         return jsonify({
             "user_code": device_info["user_code"],
@@ -102,14 +102,19 @@ def poll_m365_auth():
         return jsonify({"error": "device_code required"}), 400
 
     try:
+        # Get config for this user
+        config = M365OAuth.get_config(user["id"], memory)
+        tenant_id = config['tenant_id']
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+
         # Poll for token (single attempt)
         payload = {
-            "client_id": M365OAuth.CLIENT_ID,
+            "client_id": config['client_id'],
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "device_code": device_code
         }
 
-        response = requests.post(M365OAuth.TOKEN_URL, data=payload, timeout=10)
+        response = requests.post(token_url, data=payload, timeout=10)
 
         if response.status_code == 200:
             # Success! Store credentials
@@ -254,3 +259,94 @@ def disconnect_m365():
     logging.info(f"[API] M365 disconnected for user {user['id']}")
 
     return jsonify({"status": "disconnected"})
+
+
+@m365_bp.route("/oauth-config", methods=["GET"])
+def get_m365_oauth_config():
+    """
+    Get M365 OAuth configuration for the authenticated user.
+    Requires: Authorization header with bearer token
+    Returns: { "client_id": "...", "tenant_id": "...", "configured": bool }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from auth.m365_oauth import M365OAuth
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    try:
+        # Get config from database or env vars
+        config = M365OAuth.get_config(user["id"], memory)
+
+        return jsonify({
+            "client_id": config.get("client_id", ""),
+            "tenant_id": config.get("tenant_id", "common"),
+            "configured": M365OAuth.is_configured(user["id"], memory)
+        })
+
+    except Exception as e:
+        logging.error(f"[API] Failed to get M365 OAuth config: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@m365_bp.route("/oauth-config", methods=["POST"])
+def save_m365_oauth_config():
+    """
+    Save M365 OAuth configuration.
+    Requires: Authorization header with bearer token
+    Request body: { "client_id": "...", "tenant_id": "..." }
+    Returns: { "success": true }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    token = auth_header.split(" ")[1]
+    session = memory.get_auth_session(token)
+
+    if not session or session["expires_at"] < datetime.utcnow():
+        return jsonify({"error": "Invalid session"}), 401
+
+    user = memory.get_user_by_id(session["user_id"])
+    if not user or not user["is_enabled"]:
+        return jsonify({"error": "User not found"}), 401
+
+    data = request.json
+    if not data:
+        return jsonify({"error": "Request body required"}), 400
+
+    try:
+        # Save OAuth config to preferences (remember expects string user_id)
+        if "client_id" in data and data["client_id"]:
+            memory.remember(str(user["id"]), 'm365_client_id', data["client_id"])
+
+        if "tenant_id" in data and data["tenant_id"]:
+            memory.remember(str(user["id"]), 'm365_tenant_id', data["tenant_id"])
+
+        logging.info(f"[M365] OAuth config saved for user {user['id']}")
+        return jsonify({"success": True})
+
+    except Exception as e:
+        logging.error(f"[API] Failed to save M365 OAuth config: {e}")
+        return jsonify({"error": str(e)}), 500

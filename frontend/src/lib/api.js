@@ -1119,6 +1119,37 @@ export async function disconnectM365() {
   return response.json();
 }
 
+export async function getM365OAuthConfig() {
+  const response = await fetch(`${API_BASE}/api/m365/oauth-config`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to get M365 OAuth config");
+  }
+
+  return response.json();
+}
+
+export async function saveM365OAuthConfig(config) {
+  const response = await fetch(`${API_BASE}/api/m365/oauth-config`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to save M365 OAuth config");
+  }
+
+  return response.json();
+}
+
 // =============================
 // WHOOP Integration
 // =============================
@@ -1215,6 +1246,37 @@ export async function updateWhoopSettings(settings) {
   if (!response.ok) {
     const data = await response.json();
     throw new Error(data.error || "Failed to update WHOOP settings");
+  }
+
+  return response.json();
+}
+
+export async function getWhoopOAuthConfig() {
+  const response = await fetch(`${API_BASE}/api/whoop/oauth-config`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to get WHOOP OAuth config");
+  }
+
+  return response.json();
+}
+
+export async function saveWhoopOAuthConfig(config) {
+  const response = await fetch(`${API_BASE}/api/whoop/oauth-config`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to save WHOOP OAuth config");
   }
 
   return response.json();

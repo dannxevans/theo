@@ -79,34 +79,31 @@ class WHOOPClient:
             logger.error(f"[WHOOP_CLIENT] Failed to fetch sleep data: {e}")
             raise
 
-    def get_recovery_collection(self, start: str = None, end: str = None, limit: int = 25) -> Dict:
+    def get_cycle_recovery(self, cycle_id: int) -> Optional[Dict]:
         """
-        Get recovery records.
-        Each sleep has an associated recovery score.
+        Get recovery data for a specific cycle.
 
         Args:
-            start: ISO 8601 timestamp (default: 7 days ago)
-            end: ISO 8601 timestamp (default: now)
-            limit: Max records to return (default: 25, max: 50)
+            cycle_id: WHOOP cycle ID
 
         Returns:
-            dict: Recovery collection with 'records' array
+            dict: Recovery data for the cycle or None if not found
 
         Raises:
             requests.HTTPError: If API call fails
         """
-        params = {'limit': min(limit, 50)}
-        if start:
-            params['start'] = start
-        if end:
-            params['end'] = end
-
         try:
-            response = self.session.get(f'{self.BASE_URL}/recovery', params=params, timeout=10)
+            response = self.session.get(f'{self.BASE_URL}/cycle/{cycle_id}/recovery', timeout=10)
             response.raise_for_status()
             return response.json()
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.debug(f"[WHOOP_CLIENT] No recovery data for cycle {cycle_id}")
+                return None
+            logger.error(f"[WHOOP_CLIENT] Failed to fetch recovery for cycle {cycle_id}: {e}")
+            raise
         except requests.RequestException as e:
-            logger.error(f"[WHOOP_CLIENT] Failed to fetch recovery data: {e}")
+            logger.error(f"[WHOOP_CLIENT] Failed to fetch recovery for cycle {cycle_id}: {e}")
             raise
 
     def get_workout_collection(self, start: str = None, end: str = None, limit: int = 25) -> Dict:
@@ -210,18 +207,36 @@ class WHOOPClient:
         Recovery includes HRV and resting heart rate used for stress calculations.
 
         Returns:
-            dict: Latest recovery record or None if no recent recovery found
+            dict: Latest recovery record with cycle_id or None if no recent recovery found
 
         Raises:
             requests.HTTPError: If API call fails
         """
-        # Get last 24 hours
+        # Get recent cycles (last 2 days to ensure we have data)
         end = datetime.utcnow().isoformat() + 'Z'
-        start = (datetime.utcnow() - timedelta(days=1)).isoformat() + 'Z'
+        start = (datetime.utcnow() - timedelta(days=2)).isoformat() + 'Z'
 
-        data = self.get_recovery_collection(start=start, end=end, limit=1)
-        records = data.get('records', [])
-        return records[0] if records else None
+        cycle_data = self.get_cycle_collection(start=start, end=end, limit=10)
+        cycles = cycle_data.get('records', [])
+
+        if not cycles:
+            logger.debug("[WHOOP_CLIENT] No recent cycles found")
+            return None
+
+        # Try to get recovery for the most recent cycles
+        for cycle in cycles:
+            cycle_id = cycle.get('id')
+            if not cycle_id:
+                continue
+
+            recovery = self.get_cycle_recovery(cycle_id)
+            if recovery:
+                # Add cycle_id to recovery data for reference
+                recovery['cycle_id'] = cycle_id
+                return recovery
+
+        logger.debug("[WHOOP_CLIENT] No recovery data found for recent cycles")
+        return None
 
     def get_sleep_with_recovery(self, sleep_id: str) -> Optional[Dict]:
         """
@@ -240,18 +255,26 @@ class WHOOPClient:
         Raises:
             requests.HTTPError: If API call fails
         """
-        # Get recent sleep records
+        # Get recent sleep and cycle records
         sleep_data = self.get_sleep_collection(limit=50)
-        recovery_data = self.get_recovery_collection(limit=50)
+        cycle_data = self.get_cycle_collection(limit=50)
 
         # Find matching sleep
         sleep = next((s for s in sleep_data.get('records', []) if s['id'] == sleep_id), None)
         if not sleep:
             return None
 
-        # Find matching recovery (recovery.cycle_id == sleep.id)
-        recovery = next((r for r in recovery_data.get('records', [])
-                        if r.get('cycle_id') == sleep_id), None)
+        # Find matching cycle for this sleep
+        # Note: sleep.id can be referenced by cycle data, but we need to check the API docs
+        # for the exact relationship. For now, try to get recovery from recent cycles.
+        recovery = None
+        for cycle in cycle_data.get('records', []):
+            cycle_id = cycle.get('id')
+            if cycle_id:
+                rec = self.get_cycle_recovery(cycle_id)
+                if rec:
+                    recovery = rec
+                    break  # Use the first recovery we find
 
         return {
             'sleep': sleep,

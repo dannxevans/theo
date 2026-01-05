@@ -177,8 +177,10 @@ class WHOOPOperations(BaseMemoryOperations):
 
         logger.info(f"[WHOOP_MEMORY] Refreshing expired token for user {user_id}")
 
-        # Attempt token refresh
-        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token)
+        # Attempt token refresh (passing user_id for config lookup)
+        # Note: self._memory_store would be needed here, but WHOOPOperations doesn't have direct access
+        # The refresh will fallback to env vars for now until we refactor the dependency structure
+        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token, user_id, None)
         if not new_tokens:
             logger.error(f"[WHOOP_MEMORY] Token refresh failed for user {user_id}")
             self.invalidate_whoop_credentials(user_id, "Token refresh failed")

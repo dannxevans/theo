@@ -65,14 +65,18 @@ class WHOOPOAuth:
         Returns:
             dict: {client_id, client_secret, redirect_uri}
         """
-        # Try database first
+        # Try database preferences first
         if user_id and memory_store:
-            db_config = memory_store.get_oauth_config(user_id, 'whoop')
-            if db_config and db_config.get('client_id'):
+            prefs = memory_store.get_all(str(user_id))
+            client_id = prefs.get('whoop_client_id')
+            client_secret = prefs.get('whoop_client_secret')
+            redirect_uri = prefs.get('whoop_redirect_uri')
+
+            if client_id and client_secret:
                 return {
-                    'client_id': db_config.get('client_id', ''),
-                    'client_secret': db_config.get('client_secret', ''),
-                    'redirect_uri': db_config.get('redirect_uri', 'http://localhost:1066/api/whoop/auth/callback')
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'redirect_uri': redirect_uri or 'http://localhost:1066/api/whoop/auth/callback'
                 }
 
         # Fallback to environment variables
@@ -117,12 +121,14 @@ class WHOOPOAuth:
         return code_verifier, code_challenge
 
     @classmethod
-    def get_authorization_url(cls, state: str) -> Dict[str, str]:
+    def get_authorization_url(cls, state: str, user_id: int = None, memory_store=None) -> Dict[str, str]:
         """
         Generate authorization URL for user to authenticate.
 
         Args:
             state: Random state token for CSRF protection
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             Dictionary containing:
@@ -134,17 +140,20 @@ class WHOOPOAuth:
         Raises:
             ValueError: If CLIENT_ID is not configured
         """
-        if not cls.is_configured():
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError(
                 "WHOOP OAuth not configured. "
-                "Please set WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in your .env file. "
-                "See /dev-docs/WHOOP_SETUP_GUIDE.md for instructions."
+                "Please set WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in your .env file "
+                "or configure via Settings → WHOOP Integration."
             )
+
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
 
         # Build authorization URL with parameters
         params = {
-            "client_id": cls.CLIENT_ID,
-            "redirect_uri": cls.REDIRECT_URI,
+            "client_id": config['client_id'],
+            "redirect_uri": config['redirect_uri'],
             "response_type": "code",
             "scope": " ".join(cls.SCOPES),
             "state": state
@@ -156,7 +165,7 @@ class WHOOPOAuth:
         authorization_url = f"{cls.AUTHORIZATION_URL}?{query_string}"
 
         logger.info("[WHOOP_OAUTH] Generated authorization URL")
-        logger.debug(f"[WHOOP_OAUTH] Redirect URI: {cls.REDIRECT_URI}")
+        logger.debug(f"[WHOOP_OAUTH] Redirect URI: {config['redirect_uri']}")
         logger.debug(f"[WHOOP_OAUTH] Scopes: {', '.join(cls.SCOPES)}")
 
         return {
@@ -165,7 +174,7 @@ class WHOOPOAuth:
         }
 
     @classmethod
-    def exchange_code_for_token(cls, code: str) -> Optional[Dict]:
+    def exchange_code_for_token(cls, code: str, user_id: int = None, memory_store=None) -> Optional[Dict]:
         """
         Exchange authorization code for access token.
 
@@ -174,6 +183,8 @@ class WHOOPOAuth:
 
         Args:
             code: Authorization code from WHOOP callback
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             Token data if successful:
@@ -191,15 +202,18 @@ class WHOOPOAuth:
         Raises:
             ValueError: If CLIENT_ID or CLIENT_SECRET not configured
         """
-        if not cls.is_configured():
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError("WHOOP OAuth not configured")
+
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
 
         payload = {
             "grant_type": "authorization_code",
             "code": code,
-            "client_id": cls.CLIENT_ID,
-            "client_secret": cls.CLIENT_SECRET,
-            "redirect_uri": cls.REDIRECT_URI
+            "client_id": config['client_id'],
+            "client_secret": config['client_secret'],
+            "redirect_uri": config['redirect_uri']
         }
 
         logger.info("[WHOOP_OAUTH] Exchanging authorization code for token...")
@@ -244,7 +258,7 @@ class WHOOPOAuth:
             return None
 
     @classmethod
-    def refresh_access_token(cls, refresh_token: str) -> Optional[Dict]:
+    def refresh_access_token(cls, refresh_token: str, user_id: int = None, memory_store=None) -> Optional[Dict]:
         """
         Refresh an expired access token using refresh token.
 
@@ -252,6 +266,8 @@ class WHOOPOAuth:
 
         Args:
             refresh_token: Refresh token from previous authentication
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             New token data if successful:
@@ -268,14 +284,17 @@ class WHOOPOAuth:
         Raises:
             ValueError: If CLIENT_ID or CLIENT_SECRET not configured
         """
-        if not cls.is_configured():
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError("WHOOP OAuth not configured")
+
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
 
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
-            "client_id": cls.CLIENT_ID,
-            "client_secret": cls.CLIENT_SECRET
+            "client_id": config['client_id'],
+            "client_secret": config['client_secret']
         }
 
         logger.info("[WHOOP_OAUTH] Refreshing access token...")
@@ -318,7 +337,7 @@ class WHOOPOAuth:
             return None
 
     @classmethod
-    def revoke_token(cls, token: str) -> bool:
+    def revoke_token(cls, token: str, user_id: int = None, memory_store=None) -> bool:
         """
         Revoke an access or refresh token.
 
@@ -326,6 +345,8 @@ class WHOOPOAuth:
 
         Args:
             token: Access token or refresh token to revoke
+            user_id: User ID for database config lookup
+            memory_store: MemoryStore instance
 
         Returns:
             True if revocation successful or token already invalid
@@ -334,13 +355,16 @@ class WHOOPOAuth:
         Raises:
             ValueError: If CLIENT_ID or CLIENT_SECRET not configured
         """
-        if not cls.is_configured():
+        if not cls.is_configured(user_id, memory_store):
             raise ValueError("WHOOP OAuth not configured")
+
+        # Get config from database or env vars
+        config = cls.get_config(user_id, memory_store)
 
         payload = {
             "token": token,
-            "client_id": cls.CLIENT_ID,
-            "client_secret": cls.CLIENT_SECRET
+            "client_id": config['client_id'],
+            "client_secret": config['client_secret']
         }
 
         logger.info("[WHOOP_OAUTH] Revoking token...")

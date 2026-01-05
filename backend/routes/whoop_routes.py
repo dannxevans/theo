@@ -78,25 +78,27 @@ def start_whoop_auth():
             "error": "WHOOP integration is only available in Personal Mode"
         }), 403
 
-    # Check if configured
-    if not WHOOPOAuth.is_configured():
+    # Check if configured (pass user_id and memory for database config lookup)
+    if not WHOOPOAuth.is_configured(user["id"], memory):
         return jsonify({
             "error": "WHOOP not configured",
-            "instructions": WHOOPOAuth.get_configuration_instructions()
+            "message": "Please configure WHOOP OAuth credentials in Settings → WHOOP Integration or set environment variables."
         }), 500
 
     try:
         # Generate state token for CSRF protection
         state = secrets.token_urlsafe(32)
 
-        # Store state in preferences for verification on callback
+        # Store state and user_id mapping for callback verification
         # Use short TTL (5 minutes)
         memory.set_user_preference(user["id"], f"whoop_oauth_state", state)
         memory.set_user_preference(user["id"], f"whoop_oauth_state_expires",
                                    (datetime.utcnow() + timedelta(minutes=5)).isoformat())
+        # Store user_id with state for callback lookup (global preference with state as key)
+        memory.set_user_preference(0, f"whoop_state_{state}_user_id", str(user["id"]))
 
-        # Get authorization URL
-        auth_data = WHOOPOAuth.get_authorization_url(state)
+        # Get authorization URL (pass user_id and memory for database config lookup)
+        auth_data = WHOOPOAuth.get_authorization_url(state, user["id"], memory)
 
         logger.info(f"[WHOOP] Starting OAuth flow for user {user['id']}")
 
@@ -143,16 +145,20 @@ def whoop_auth_callback():
         </html>
         """, 400
 
-    # Note: We can't use bearer token auth here since this is a redirect from WHOOP
-    # Instead, we need to identify the user by the state token
-    # This is a security tradeoff - state tokens should be short-lived
-
-    # For now, we'll return a simple success page and let the frontend poll for status
-    # A more secure approach would be to use session cookies
-
+    # Identify user by state token (stored during auth start)
     try:
-        # Exchange code for token
-        token_data = WHOOPOAuth.exchange_code_for_token(code)
+        # Look up user_id from state token
+        user_id_str = memory.get_user_preference(0, f"whoop_state_{state}_user_id")
+        user_id = int(user_id_str) if user_id_str else None
+
+        if not user_id:
+            raise Exception("Invalid state token - user not found")
+
+        # Clean up state mapping
+        memory.set_user_preference(0, f"whoop_state_{state}_user_id", "")
+
+        # Exchange code for token (with user's OAuth config)
+        token_data = WHOOPOAuth.exchange_code_for_token(code, user_id, memory)
 
         if not token_data:
             raise Exception("Failed to exchange code for token")
@@ -353,7 +359,14 @@ def complete_whoop_auth():
     stored_state = memory.get_user_preference(user["id"], "whoop_oauth_state")
     state_expires = memory.get_user_preference(user["id"], "whoop_oauth_state_expires")
 
+    # If state doesn't match, check if credentials are already stored (callback already completed)
     if not stored_state or stored_state != data["state"]:
+        # Check if credentials already exist for this user
+        existing_creds = memory.get_whoop_credentials(user["id"])
+        if existing_creds and existing_creds.get("whoop_user_id") == data["whoop_user_id"]:
+            # Callback already completed successfully, return success
+            logger.info(f"[WHOOP] Credentials already stored for user {user['id']}, skipping duplicate")
+            return jsonify({"success": True})
         return jsonify({"error": "Invalid state token"}), 400
 
     if state_expires and datetime.fromisoformat(state_expires) < datetime.utcnow():
@@ -472,7 +485,7 @@ def disconnect_whoop():
         if creds and creds.get("access_token"):
             # Attempt to revoke token (don't fail disconnect if this fails)
             try:
-                WHOOPOAuth.revoke_token(creds["access_token"])
+                WHOOPOAuth.revoke_token(creds["access_token"], user["id"], memory)
             except Exception as e:
                 logger.warning(f"[WHOOP] Token revocation failed for user {user['id']}: {e}")
 
@@ -519,6 +532,87 @@ def get_whoop_settings():
 
     settings = memory.get_whoop_settings(user["id"])
     return jsonify(settings)
+
+
+@whoop_bp.route("/oauth-config", methods=["GET"])
+def get_whoop_oauth_config():
+    """
+    Get WHOOP OAuth configuration (client_id, redirect_uri - NOT client_secret for security).
+    Requires: Authorization header with bearer token
+    Returns: { "client_id": "...", "redirect_uri": "...", "has_client_secret": bool, "configured": bool }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+    from auth.whoop_oauth import WHOOPOAuth
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user
+    user, error = _get_authenticated_user(memory)
+    if error:
+        return error
+
+    # Check Personal Mode
+    if not _is_personal_mode(memory, user["id"]):
+        return jsonify({
+            "error": "WHOOP integration is only available in Personal Mode"
+        }), 403
+
+    # Get config from database
+    config = WHOOPOAuth.get_config(user["id"], memory)
+
+    return jsonify({
+        "client_id": config.get('client_id', ''),
+        "redirect_uri": config.get('redirect_uri', 'http://localhost:1066/api/whoop/auth/callback'),
+        "has_client_secret": bool(config.get('client_secret')),
+        "configured": WHOOPOAuth.is_configured(user["id"], memory)
+    })
+
+
+@whoop_bp.route("/oauth-config", methods=["POST"])
+def save_whoop_oauth_config():
+    """
+    Save WHOOP OAuth configuration.
+    Requires: Authorization header with bearer token
+    Request body: { "client_id": "...", "client_secret": "...", "redirect_uri": "..." }
+    Returns: { "success": true }
+    """
+    from core.memory import MemoryStore
+    from config import Config
+
+    memory = MemoryStore(Config.DATABASE_URL)
+
+    # Get authenticated user
+    user, error = _get_authenticated_user(memory)
+    if error:
+        return error
+
+    # Check Personal Mode
+    if not _is_personal_mode(memory, user["id"]):
+        return jsonify({
+            "error": "WHOOP integration is only available in Personal Mode"
+        }), 403
+
+    data = request.json
+
+    try:
+        # Save OAuth config to preferences (remember expects string user_id)
+        if "client_id" in data and data["client_id"]:
+            memory.remember(str(user["id"]), 'whoop_client_id', data["client_id"])
+
+        if "client_secret" in data and data["client_secret"]:
+            memory.remember(str(user["id"]), 'whoop_client_secret', data["client_secret"])
+
+        if "redirect_uri" in data and data["redirect_uri"]:
+            memory.remember(str(user["id"]), 'whoop_redirect_uri', data["redirect_uri"])
+
+        logger.info(f"[WHOOP] OAuth config saved for user {user['id']}")
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        logger.error(f"[WHOOP] OAuth config save failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @whoop_bp.route("/settings", methods=["POST"])

@@ -5,12 +5,16 @@
     pollM365Auth,
     getM365Status,
     disconnectM365,
+    getM365OAuthConfig,
+    saveM365OAuthConfig,
     startWhoopAuth,
     completeWhoopAuth,
     getWhoopStatus,
     disconnectWhoop,
     getWhoopSettings,
     updateWhoopSettings,
+    getWhoopOAuthConfig,
+    saveWhoopOAuthConfig,
     getPendingConfirmations,
     approveConfirmation,
     rejectConfirmation,
@@ -40,10 +44,23 @@
     quiet_hours_start: "22:00",
     quiet_hours_end: "07:00"
   };
+  let whoopOAuthConfig = {
+    client_id: '',
+    client_secret: '',
+    redirect_uri: 'http://localhost:1066/api/whoop/auth/callback',
+    configured: false
+  };
+  let whoopOAuthExpanded = false;
   let whoopStatusCheckInterval = null;
 
   // M365 settings panel state
   let m365SettingsExpanded = false;
+  let m365OAuthConfig = {
+    client_id: '',
+    tenant_id: '',
+    configured: false
+  };
+  let m365OAuthExpanded = false;
   let proactiveSettingsComponent;
 
   let pendingConfirmations = [];
@@ -55,6 +72,8 @@
     if (whoopConnected) {
       await loadWhoopSettings();
     }
+    await loadWhoopOAuthConfig();
+    await loadM365OAuthConfig();
     await loadPendingConfirmations();
 
     // Poll for confirmations every 10 seconds
@@ -306,6 +325,56 @@
     }
   }
 
+  async function loadWhoopOAuthConfig() {
+    try {
+      const config = await getWhoopOAuthConfig();
+      whoopOAuthConfig = {
+        client_id: config.client_id || '',
+        client_secret: '', // Never send back from server for security
+        redirect_uri: config.redirect_uri || 'http://localhost:1066/api/whoop/auth/callback',
+        configured: config.configured || false,
+        has_client_secret: config.has_client_secret || false
+      };
+    } catch (err) {
+      console.error("Failed to load WHOOP OAuth config:", err);
+    }
+  }
+
+  async function loadM365OAuthConfig() {
+    try {
+      const config = await getM365OAuthConfig();
+      m365OAuthConfig = {
+        client_id: config.client_id || '',
+        tenant_id: config.tenant_id || 'common',
+        configured: config.configured || false
+      };
+    } catch (err) {
+      console.error("Failed to load M365 OAuth config:", err);
+    }
+  }
+
+  async function handleSaveM365OAuthConfig() {
+    try {
+      await saveM365OAuthConfig(m365OAuthConfig);
+      alert("M365 OAuth configuration saved successfully!");
+      await loadM365OAuthConfig(); // Reload to get updated status
+    } catch (err) {
+      console.error("Failed to save M365 OAuth config:", err);
+      alert(`Failed to save M365 OAuth config: ${err.message}`);
+    }
+  }
+
+  async function handleSaveWhoopOAuthConfig() {
+    try {
+      await saveWhoopOAuthConfig(whoopOAuthConfig);
+      alert("WHOOP OAuth configuration saved successfully!");
+      await loadWhoopOAuthConfig(); // Reload to get updated status
+    } catch (err) {
+      console.error("Failed to save WHOOP OAuth config:", err);
+      alert(`Failed to save OAuth config: ${err.message}`);
+    }
+  }
+
   async function loadPendingConfirmations() {
     if (confirmationsLoading) return;
 
@@ -375,6 +444,54 @@
   <!-- M365 Connection Section -->
   <div class="section">
     <h3>Microsoft 365 Connection</h3>
+
+    <!-- OAuth Configuration (always visible) -->
+    <div class="oauth-config-section">
+      <div class="oauth-config-header" on:click={() => m365OAuthExpanded = !m365OAuthExpanded}>
+        <h4>OAuth Configuration</h4>
+        <span class="toggle-icon">{m365OAuthExpanded ? '▼' : '▶'}</span>
+      </div>
+
+      {#if m365OAuthExpanded}
+        <div class="oauth-config-panel">
+          <p class="oauth-help-text">
+            Configure your Microsoft 365 OAuth credentials. Required to connect to M365.
+            {#if m365OAuthConfig.configured}
+              <span class="config-status config-status--ok">✓ Configured</span>
+            {:else}
+              <span class="config-status config-status--warning">⚠ Not configured</span>
+            {/if}
+          </p>
+
+          <div class="form-group">
+            <label for="m365-client-id">Client ID:</label>
+            <input
+              id="m365-client-id"
+              type="text"
+              bind:value={m365OAuthConfig.client_id}
+              placeholder="Enter M365 Client ID"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="m365-tenant-id">Tenant ID:</label>
+            <input
+              id="m365-tenant-id"
+              type="text"
+              bind:value={m365OAuthConfig.tenant_id}
+              placeholder="common (or your tenant ID)"
+            />
+            <p class="field-help-text">
+              Use "common" for personal Microsoft accounts, or your specific tenant ID for organizational accounts.
+            </p>
+          </div>
+
+          <button class="btn-primary" on:click={handleSaveM365OAuthConfig}>
+            Save OAuth Configuration
+          </button>
+        </div>
+      {/if}
+    </div>
 
     {#if m365Connected}
       <div class="status-card status-card--success connection-status">
@@ -458,6 +575,64 @@
   <!-- WHOOP Integration Section -->
   <div class="section">
     <h3>WHOOP Integration</h3>
+
+    <!-- OAuth Configuration (always visible) -->
+    <div class="oauth-config-section">
+      <div class="oauth-config-header" on:click={() => whoopOAuthExpanded = !whoopOAuthExpanded}>
+        <h4>OAuth Configuration</h4>
+        <span class="toggle-icon">{whoopOAuthExpanded ? '▼' : '▶'}</span>
+      </div>
+
+      {#if whoopOAuthExpanded}
+        <div class="oauth-config-panel">
+          <p class="oauth-help-text">
+            Configure your WHOOP OAuth credentials. Required to connect to WHOOP.
+            {#if whoopOAuthConfig.configured}
+              <span class="config-status config-status--ok">✓ Configured</span>
+            {:else}
+              <span class="config-status config-status--warning">⚠ Not configured</span>
+            {/if}
+          </p>
+
+          <div class="form-group">
+            <label for="whoop-client-id">Client ID:</label>
+            <input
+              id="whoop-client-id"
+              type="text"
+              bind:value={whoopOAuthConfig.client_id}
+              placeholder="Enter WHOOP Client ID"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="whoop-client-secret">Client Secret:</label>
+            <input
+              id="whoop-client-secret"
+              type="password"
+              bind:value={whoopOAuthConfig.client_secret}
+              placeholder={whoopOAuthConfig.has_client_secret ? "••••••••" : "Enter WHOOP Client Secret"}
+            />
+            {#if whoopOAuthConfig.has_client_secret}
+              <small class="help-text">Leave blank to keep existing secret</small>
+            {/if}
+          </div>
+
+          <div class="form-group">
+            <label for="whoop-redirect-uri">Redirect URI:</label>
+            <input
+              id="whoop-redirect-uri"
+              type="text"
+              bind:value={whoopOAuthConfig.redirect_uri}
+              placeholder="http://localhost:1066/api/whoop/auth/callback"
+            />
+          </div>
+
+          <button class="btn-primary" on:click={handleSaveWhoopOAuthConfig}>
+            Save OAuth Config
+          </button>
+        </div>
+      {/if}
+    </div>
 
     {#if whoopConnected}
       <div class="status-card status-card--success connection-status">
@@ -823,6 +998,80 @@
 
   .whoop-configure-btn {
     margin-top: 1rem;
+  }
+
+  .oauth-config-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+  }
+
+  .oauth-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .oauth-config-header:hover {
+    opacity: 0.8;
+  }
+
+  .toggle-icon {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .oauth-config-panel {
+    margin-top: 1rem;
+  }
+
+  .oauth-help-text {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .config-status {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .config-status--ok {
+    background: var(--success-100);
+    color: var(--success-700);
+  }
+
+  .config-status--warning {
+    background: var(--warning-100);
+    color: var(--warning-700);
+  }
+
+  .form-group input[type="text"],
+  .form-group input[type="password"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-secondary);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .help-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-style: italic;
   }
 
   /* All other styles now imported from global CSS:
