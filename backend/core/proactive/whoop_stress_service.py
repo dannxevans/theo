@@ -77,7 +77,7 @@ class WHOOPStressService:
             logger.info(f"[WHOOP_STRESS] Recovery ID: {recovery_id}, checking if already notified...")
 
             # Check if already notified
-            if self.memory.has_whoop_data_been_notified(user_id, 'stress', recovery_id):
+            if self.memory.is_whoop_data_tracked(recovery_id):
                 logger.info(f"[WHOOP_STRESS] Already notified for recovery {recovery_id}")
                 return False
 
@@ -182,12 +182,14 @@ class WHOOPStressService:
             user_id: User ID
             summary: Summary text to send
         """
-        # Store as a pending message in the database
-        # This will be picked up by the chat interface
-        self.memory.store_proactive_message(
+        # Store as a proactive message in the turns table
+        from core.proactive.message_poster import post_proactive_message
+
+        post_proactive_message(
+            memory_store=self.memory,
             user_id=user_id,
-            category="health",
             message_type="whoop_stress",
             content=summary,
-            metadata={"source": "whoop", "data_type": "stress"}
+            provider_id="whoop",
+            model="whoop-stress-notification"
         )

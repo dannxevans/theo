@@ -65,7 +65,7 @@ class WHOOPSleepService:
                 return False
 
             # Check if already notified
-            if self.memory.has_whoop_data_been_notified(user_id, 'sleep', sleep_id):
+            if self.memory.is_whoop_data_tracked(sleep_id):
                 logger.debug(f"[WHOOP_SLEEP] Already notified for sleep {sleep_id}")
                 return False
 
@@ -158,12 +158,14 @@ class WHOOPSleepService:
             user_id: User ID
             summary: Summary text to send
         """
-        # Store as a pending message in the database
-        # This will be picked up by the chat interface
-        self.memory.store_proactive_message(
+        # Store as a proactive message in the turns table
+        from core.proactive.message_poster import post_proactive_message
+
+        post_proactive_message(
+            memory_store=self.memory,
             user_id=user_id,
-            category="health",
             message_type="whoop_sleep",
             content=summary,
-            metadata={"source": "whoop", "data_type": "sleep"}
+            provider_id="whoop",
+            model="whoop-sleep-notification"
         )

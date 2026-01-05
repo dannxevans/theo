@@ -65,7 +65,7 @@ class WHOOPWorkoutService:
                 return False
 
             # Check if already notified
-            if self.memory.has_whoop_data_been_notified(user_id, 'workout', workout_id):
+            if self.memory.is_whoop_data_tracked(workout_id):
                 logger.debug(f"[WHOOP_WORKOUT] Already notified for workout {workout_id}")
                 return False
 
@@ -252,12 +252,14 @@ class WHOOPWorkoutService:
             user_id: User ID
             summary: Summary text to send
         """
-        # Store as a pending message in the database
-        # This will be picked up by the chat interface
-        self.memory.store_proactive_message(
+        # Store as a proactive message in the turns table
+        from core.proactive.message_poster import post_proactive_message
+
+        post_proactive_message(
+            memory_store=self.memory,
             user_id=user_id,
-            category="health",
             message_type="whoop_workout",
             content=summary,
-            metadata={"source": "whoop", "data_type": "workout"}
+            provider_id="whoop",
+            model="whoop-workout-notification"
         )
