@@ -143,7 +143,8 @@ def run_migrations(db_path: str):
         "018_1_cleanup_duplicate_preferences.py",  # Pre-migration cleanup
         "018_standardize_user_id_to_integer.py",
         "019_create_debug_logs.py",
-        "020_add_api_keys.py"  # Add api_keys table for API key authentication
+        "020_add_api_keys.py",  # Add api_keys table for API key authentication
+        "021_add_full_request_context.py"  # Add full_request_context column for LLM prompt debugging
     ]
 
     # Filter to only existing files

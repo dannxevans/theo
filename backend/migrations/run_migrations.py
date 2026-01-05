@@ -67,7 +67,8 @@ def run_all_migrations():
         "018_1_cleanup_duplicate_preferences.py",  # Pre-migration cleanup for migration 018
         "018_standardize_user_id_to_integer.py",  # Standardize user_id from String to Integer
         "019_create_debug_logs.py",  # Add debug_logs table for debug console feature
-        "020_add_api_keys.py"  # Add api_keys table for API key authentication (Siri Shortcuts, iOS automation)
+        "020_add_api_keys.py",  # Add api_keys table for API key authentication (Siri Shortcuts, iOS automation)
+        "021_add_full_request_context.py"  # Add full_request_context column to turns for LLM prompt debugging
     ]
 
     # Filter to only existing files

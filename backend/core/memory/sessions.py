@@ -376,7 +376,7 @@ class SessionOperations(BaseMemoryOperations):
     # Conversation Turns
     # =============================
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None, full_request_context=None):
         """
         Save a conversation turn (message).
 
@@ -393,6 +393,7 @@ class SessionOperations(BaseMemoryOperations):
             user_id: User ID for session filtering
             routine_name: Optional routine name if this is a routine execution
             routine_actions: Optional list of actions executed in routine
+            full_request_context: Optional full message array sent to LLM (for debugging)
         """
         logging.info(f"[MEMORY] save_turn() called: session={session_id}, role={role}, mode={mode}, has_metadata={metadata is not None}")
         self._ensure_session(session_id, mode=mode, user_id=user_id)
@@ -431,6 +432,16 @@ class SessionOperations(BaseMemoryOperations):
                 logging.error(f"[MEMORY] Failed to serialize routine_actions to JSON: {e}")
                 routine_actions_json = None
 
+        # Serialize full_request_context to JSON if it's a list
+        full_request_context_json = None
+        if full_request_context:
+            try:
+                full_request_context_json = json.dumps(full_request_context) if isinstance(full_request_context, (list, dict)) else full_request_context
+                logging.info(f"[MEMORY] Serialized full_request_context to JSON, length={len(full_request_context_json)}")
+            except (TypeError, ValueError) as e:
+                logging.error(f"[MEMORY] Failed to serialize full_request_context to JSON: {e}")
+                full_request_context_json = None
+
         now = created_at or datetime.utcnow()
         with self._get_connection() as conn:
             logging.info(f"[MEMORY] Inserting turn into database...")
@@ -446,6 +457,7 @@ class SessionOperations(BaseMemoryOperations):
                     metadata=metadata_json,
                     routine_name=routine_name,
                     routine_actions=routine_actions_json,
+                    full_request_context=full_request_context_json,
                 )
             )
             turn_id = result.lastrowid

@@ -258,9 +258,9 @@ class MemoryStore:
         """Generate an automatic summary of the conversation using an LLM."""
         return self._session_ops.generate_auto_summary(session_id, provider_call)
 
-    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None):
+    def save_turn(self, session_id, role, content, created_at=None, provider_id=None, model=None, intent=None, metadata=None, mode="personal", user_id=None, routine_name=None, routine_actions=None, full_request_context=None):
         """Save a conversation turn (message)."""
-        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata, mode, user_id, routine_name, routine_actions)
+        return self._session_ops.save_turn(session_id, role, content, created_at, provider_id, model, intent, metadata, mode, user_id, routine_name, routine_actions, full_request_context)
 
     def get_recent_turns(self, session_id, limit=6):
         """Get recent conversation turns for a session."""

@@ -4,13 +4,15 @@ THEO is a self-hosted AI assistant that intelligently routes requests to the mos
 
 **Philosophy**: Not "one model to rule them all," but use different models for different tasks while preserving seamless user experience.
 
-[![CI/CD](https://img.shields.io/badge/CI%2FCD-passing-brightgreen)]() [![Tests](https://img.shields.io/badge/tests-769%20passing-brightgreen)]() [![Backend](https://img.shields.io/badge/backend-100%25%20passing-brightgreen)]() [![codecov](https://codecov.io/github/dannxevans/theo/branch/release/graph/badge.svg?token=H1XKWWQ8NL)](https://codecov.io/github/dannxevans/theo) [![License](https://img.shields.io/badge/license-private-red)]()
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-passing-brightgreen)]() [![Tests](https://img.shields.io/badge/tests-779%20passing-brightgreen)]() [![Backend](https://img.shields.io/badge/backend-100%25%20passing-brightgreen)]() [![codecov](https://codecov.io/github/dannxevans/theo/branch/release/graph/badge.svg?token=H1XKWWQ8NL)](https://codecov.io/github/dannxevans/theo) [![License](https://img.shields.io/badge/license-private-red)]()
 
 ---
 
 ## ✨ Key Features
 
 - **Multi-Model Routing** - Intelligent routing based on user-defined intents
+- **Database Audit** - Admin interface to inspect all sessions and conversation turns (*Issue #290*)
+- **LLM Request Context Capture** - Debug LLM responses by viewing full request context (system prompts, conversation history)
 - **API Key Authentication** - Secure API keys for Siri Shortcuts and automation (*Issue #239*)
 - **Voice Features** - Text-to-Speech and Speech-to-Text powered by OpenAI
 - **Microsoft 365 Integration** - Calendar and email management via Graph API
@@ -127,7 +129,7 @@ theo/
 │   ├── providers/             # AI provider integrations
 │   ├── voice/                 # TTS/STT providers (OpenAI)
 │   ├── actions/               # Action providers (M365, etc.)
-│   └── tests/                 # 752 backend tests (100% passing)
+│   └── tests/                 # 779 backend tests (100% passing)
 └── frontend/
     ├── src/
     │   ├── components/        # Svelte components
@@ -194,7 +196,7 @@ pytest --cov=. --cov-report=html           # With coverage
 ```
 
 **Current Status**:
-- **All Backend Tests: 752/752 passing (100%)**
+- **All Backend Tests: 779/779 passing (100%)**
 - Code Coverage: 51%
 
 ### Frontend Tests
@@ -207,7 +209,7 @@ npm run test:coverage                       # With coverage
 
 **Current Status**: Frontend tests available
 
-**Overall**: 752 backend tests passing (100%)
+**Overall**: 779 backend tests passing (100%)
 
 See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [Test Results](https://github.com/dannxevans/theo/wiki/Test-Results) for detailed documentation.
 
@@ -217,10 +219,10 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 
 - **Backend**: 5,300+ lines across 58 modular files
 - **Frontend**: Refactored from 2,777-line monolith to 12 components
-- **Tests**: 752 backend tests, all passing (100%)
-- **Test Pass Rate**: 100% backend (752/752 passing)
+- **Tests**: 779 backend tests, all passing (100%)
+- **Test Pass Rate**: 100% backend (779/779 passing)
 - **Code Coverage**: 51% backend
-- **Routes**: 15 blueprint modules with 66+ endpoints
+- **Routes**: 16 blueprint modules with 69+ endpoints
 - **Documentation**: 10 comprehensive docs + GitHub Wiki
 
 ---
@@ -229,6 +231,8 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 
 ### ✅ Completed
 - Multi-model routing with intent classification
+- **Database Audit** admin interface with filtering and pagination (*Issue #290*)
+- **Full LLM Request Context Capture** for debugging unexpected responses
 - **API Key Authentication** for Siri Shortcuts and automation (*Issue #239*)
 - **Context-Aware Planning** with weather, traffic, and calendar integration
 - Voice Features (OpenAI TTS/STT with auto-read mode)
@@ -236,7 +240,7 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 - OAuth 2.0 with automatic token refresh
 - Work/Personal modes with subtab configurations
 - Provider health monitoring and circuit breaker
-- Comprehensive testing infrastructure (752 backend tests, 100% passing)
+- Comprehensive testing infrastructure (779 backend tests, 100% passing)
 - Full codebase refactoring and modularization
 - UK Government OFFICIAL classification compliance
 - Explicit planning intent detection (reduced false positives)
@@ -247,6 +251,7 @@ See [Testing Guide](https://github.com/dannxevans/theo/wiki/Testing-Guide) and [
 - Enhanced memory relevance algorithms
 
 ### 📋 Planned
+- **Prompt Caching** - Anthropic prompt caching for 60% cost reduction
 - Google Workspace integration
 - Slack integration
 - Multi-user administration UI
@@ -327,4 +332,4 @@ Built with:
 
 ---
 
-**Last Updated**: January 3, 2026
+**Last Updated**: January 5, 2026
