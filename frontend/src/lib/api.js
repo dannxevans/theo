@@ -1120,6 +1120,107 @@ export async function disconnectM365() {
 }
 
 // =============================
+// WHOOP Integration
+// =============================
+
+export async function startWhoopAuth() {
+  const response = await fetch(`${API_BASE}/api/whoop/auth/start`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    return data; // Return error object with instructions
+  }
+
+  return data;
+}
+
+export async function completeWhoopAuth(credentials) {
+  const response = await fetch(`${API_BASE}/api/whoop/auth/complete`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(credentials)
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to complete WHOOP authentication");
+  }
+
+  return response.json();
+}
+
+export async function getWhoopStatus() {
+  const response = await fetch(`${API_BASE}/api/whoop/status`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get WHOOP status");
+  }
+
+  return response.json();
+}
+
+export async function disconnectWhoop() {
+  const response = await fetch(`${API_BASE}/api/whoop/disconnect`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to disconnect WHOOP");
+  }
+
+  return response.json();
+}
+
+export async function getWhoopSettings() {
+  const response = await fetch(`${API_BASE}/api/whoop/settings`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get WHOOP settings");
+  }
+
+  return response.json();
+}
+
+export async function updateWhoopSettings(settings) {
+  const response = await fetch(`${API_BASE}/api/whoop/settings`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(settings)
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Failed to update WHOOP settings");
+  }
+
+  return response.json();
+}
+
+// =============================
 // Confirmation Workflow
 // =============================
 

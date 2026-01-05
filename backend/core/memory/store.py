@@ -18,6 +18,7 @@ from .users import UserOperations
 from .modes import ModeOperations
 from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
+from .whoop import WHOOPOperations
 from .actions import ActionOperations
 from .voice import VoiceOperations
 from .routines import RoutineOperations
@@ -110,6 +111,7 @@ class MemoryStore:
         self._mode_ops = ModeOperations(tables, self.Session, self.engine)
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
+        self._whoop_ops = WHOOPOperations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
         self._routine_ops = RoutineOperations(self.engine)
         self._voice_ops = VoiceOperations(self.engine, tables)
@@ -539,6 +541,61 @@ class MemoryStore:
     def delete_m365_credentials(self, user_id):
         """Delete M365 credentials for a user."""
         return self._m365_ops.delete_m365_credentials(user_id)
+
+    # =============================
+    # WHOOP Operations (delegated)
+    # =============================
+
+    def store_whoop_credentials(self, user_id, access_token, refresh_token,
+                                 expires_at, whoop_user_id, token_type="Bearer"):
+        """Store WHOOP OAuth credentials."""
+        return self._whoop_ops.store_whoop_credentials(
+            user_id, access_token, refresh_token, expires_at, whoop_user_id, token_type
+        )
+
+    def get_whoop_credentials(self, user_id):
+        """Get WHOOP credentials for a user."""
+        return self._whoop_ops.get_whoop_credentials(user_id)
+
+    def update_whoop_token(self, user_id, access_token, expires_at):
+        """Update WHOOP access token after refresh."""
+        return self._whoop_ops.update_whoop_token(user_id, access_token, expires_at)
+
+    def invalidate_whoop_credentials(self, user_id, error=None):
+        """Mark WHOOP credentials as invalid."""
+        return self._whoop_ops.invalidate_whoop_credentials(user_id, error)
+
+    def delete_whoop_credentials(self, user_id):
+        """Delete WHOOP credentials for a user."""
+        return self._whoop_ops.delete_whoop_credentials(user_id)
+
+    def get_whoop_settings(self, user_id):
+        """Get WHOOP notification settings."""
+        return self._whoop_ops.get_whoop_settings(user_id)
+
+    def update_whoop_settings(self, user_id, settings):
+        """Update WHOOP notification settings."""
+        return self._whoop_ops.update_whoop_settings(user_id, settings)
+
+    def track_whoop_data(self, user_id, data_type, whoop_id):
+        """Track processed WHOOP record."""
+        return self._whoop_ops.track_whoop_data(user_id, data_type, whoop_id)
+
+    def is_whoop_data_tracked(self, whoop_id):
+        """Check if WHOOP record already processed."""
+        return self._whoop_ops.is_whoop_data_tracked(whoop_id)
+
+    def get_tracked_whoop_data(self, user_id, data_type=None, days=7):
+        """Get list of tracked WHOOP IDs."""
+        return self._whoop_ops.get_tracked_whoop_data(user_id, data_type, days)
+
+    def cleanup_old_whoop_tracking(self, days=7):
+        """Delete old WHOOP tracking records."""
+        return self._whoop_ops.cleanup_old_whoop_tracking(days)
+
+    def delete_all_whoop_data(self, user_id):
+        """Delete all WHOOP data for a user."""
+        return self._whoop_ops.delete_all_whoop_data(user_id)
 
     # =============================
     # Action Operations (delegated)

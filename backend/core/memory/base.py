@@ -58,6 +58,9 @@ class BaseMemoryOperations:
         self.actions = tables["actions"]
         self.action_confirmations = tables["action_confirmations"]
         self.m365_credentials = tables["m365_credentials"]
+        self.whoop_credentials = tables["whoop_credentials"]
+        self.whoop_settings = tables["whoop_settings"]
+        self.whoop_data_tracking = tables["whoop_data_tracking"]
         self.calendar_events_cache = tables["calendar_events_cache"]
 
     def _get_connection(self):

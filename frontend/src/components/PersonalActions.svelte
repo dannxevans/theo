@@ -5,6 +5,12 @@
     pollM365Auth,
     getM365Status,
     disconnectM365,
+    startWhoopAuth,
+    completeWhoopAuth,
+    getWhoopStatus,
+    disconnectWhoop,
+    getWhoopSettings,
+    updateWhoopSettings,
     getPendingConfirmations,
     approveConfirmation,
     rejectConfirmation,
@@ -19,19 +25,47 @@
   let verificationUrl = null;
   let pollingInterval = null;
 
+  // WHOOP Integration State
+  let whoopConnected = false;
+  let whoopStatus = null;
+  let whoopAuthInProgress = false;
+  let whoopSettingsExpanded = false;
+  let whoopSettings = {
+    sleep_notifications_enabled: true,
+    workout_notifications_enabled: true,
+    check_frequency_minutes: 30,
+    quiet_hours_enabled: false,
+    quiet_hours_start: "22:00",
+    quiet_hours_end: "07:00"
+  };
+  let whoopStatusCheckInterval = null;
+
+  // M365 settings panel state
+  let m365SettingsExpanded = false;
+  let proactiveSettingsComponent;
+
   let pendingConfirmations = [];
   let confirmationsLoading = false;
 
   onMount(async () => {
     await checkM365Status();
+    await checkWhoopStatus();
+    if (whoopConnected) {
+      await loadWhoopSettings();
+    }
     await loadPendingConfirmations();
 
     // Poll for confirmations every 10 seconds
     const confirmationInterval = setInterval(loadPendingConfirmations, 10000);
 
+    // Listen for WHOOP OAuth completion messages
+    window.addEventListener('message', handleWhoopAuthMessage);
+
     return () => {
       if (pollingInterval) clearInterval(pollingInterval);
+      if (whoopStatusCheckInterval) clearInterval(whoopStatusCheckInterval);
       clearInterval(confirmationInterval);
+      window.removeEventListener('message', handleWhoopAuthMessage);
     };
   });
 
@@ -116,6 +150,158 @@
     deviceCode = null;
     userCode = null;
     verificationUrl = null;
+  }
+
+  // =============================
+  // WHOOP Functions
+  // =============================
+
+  async function checkWhoopStatus() {
+    try {
+      whoopStatus = await getWhoopStatus();
+      whoopConnected = whoopStatus.connected && whoopStatus.is_valid !== false;
+
+      // Clear polling interval if connected (cleanup in case interval is still running)
+      if (whoopConnected && whoopStatusCheckInterval) {
+        clearInterval(whoopStatusCheckInterval);
+        whoopStatusCheckInterval = null;
+      }
+    } catch (err) {
+      console.error("Failed to check WHOOP status:", err);
+      whoopConnected = false;
+    }
+  }
+
+  async function loadWhoopSettings() {
+    try {
+      whoopSettings = await getWhoopSettings();
+    } catch (err) {
+      console.error("Failed to load WHOOP settings:", err);
+    }
+  }
+
+  async function handleConnectWhoop() {
+    try {
+      whoopAuthInProgress = true;
+      const result = await startWhoopAuth();
+
+      if (result.error) {
+        alert(`Failed to start WHOOP auth: ${result.error}`);
+        whoopAuthInProgress = false;
+        return;
+      }
+
+      // Open OAuth URL in popup
+      const popup = window.open(
+        result.authorization_url,
+        "WHOOP Authorization",
+        "width=600,height=700,scrollbars=yes"
+      );
+
+      if (!popup) {
+        alert("Please allow popups for this site to connect WHOOP");
+        whoopAuthInProgress = false;
+        return;
+      }
+
+      // Start polling for status (fallback if message doesn't arrive)
+      // Poll every 2 seconds during OAuth for responsive UX
+      whoopStatusCheckInterval = setInterval(async () => {
+        await checkWhoopStatus();
+        if (whoopConnected) {
+          clearInterval(whoopStatusCheckInterval);
+          whoopStatusCheckInterval = null;
+          whoopAuthInProgress = false;
+          await loadWhoopSettings();
+          if (popup && !popup.closed) {
+            popup.close();
+          }
+        }
+      }, 2000);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => {
+        if (whoopStatusCheckInterval) {
+          clearInterval(whoopStatusCheckInterval);
+          whoopStatusCheckInterval = null;
+          whoopAuthInProgress = false;
+        }
+      }, 300000);
+
+    } catch (err) {
+      console.error("Failed to connect WHOOP:", err);
+      alert(`Failed to connect WHOOP: ${err.message}`);
+      whoopAuthInProgress = false;
+    }
+  }
+
+  async function handleWhoopAuthMessage(event) {
+    // Only accept messages from our OAuth callback
+    if (event.data && event.data.type === 'whoop_auth_success') {
+      try {
+        // Complete auth by storing credentials
+        await completeWhoopAuth(event.data.credentials);
+
+        // Update status
+        await checkWhoopStatus();
+        await loadWhoopSettings();
+
+        // Stop polling
+        if (whoopStatusCheckInterval) {
+          clearInterval(whoopStatusCheckInterval);
+          whoopStatusCheckInterval = null;
+        }
+
+        whoopAuthInProgress = false;
+
+      } catch (err) {
+        console.error("Failed to complete WHOOP auth:", err);
+        alert(`Failed to complete WHOOP auth: ${err.message}`);
+        whoopAuthInProgress = false;
+      }
+    } else if (event.data && event.data.type === 'whoop_auth_error') {
+      alert(`WHOOP authorization failed: ${event.data.error}`);
+      whoopAuthInProgress = false;
+      if (whoopStatusCheckInterval) {
+        clearInterval(whoopStatusCheckInterval);
+        whoopStatusCheckInterval = null;
+      }
+    }
+  }
+
+  async function handleDisconnectWhoop() {
+    if (!confirm("Are you sure you want to disconnect WHOOP? This will stop all health notifications.")) {
+      return;
+    }
+
+    try {
+      await disconnectWhoop();
+      whoopConnected = false;
+      whoopStatus = null;
+      whoopSettingsExpanded = false;
+      // Refresh status to confirm disconnection
+      await checkWhoopStatus();
+    } catch (err) {
+      console.error("Failed to disconnect WHOOP:", err);
+      alert(`Failed to disconnect WHOOP: ${err.message}`);
+    }
+  }
+
+  function cancelWhoopAuth() {
+    if (whoopStatusCheckInterval) {
+      clearInterval(whoopStatusCheckInterval);
+      whoopStatusCheckInterval = null;
+    }
+    whoopAuthInProgress = false;
+  }
+
+  async function saveWhoopSettings() {
+    try {
+      await updateWhoopSettings(whoopSettings);
+    } catch (err) {
+      console.error("Failed to save WHOOP settings:", err);
+      alert(`Failed to save settings: ${err.message}`);
+    }
   }
 
   async function loadPendingConfirmations() {
@@ -203,6 +389,27 @@
           Disconnect
         </button>
       </div>
+
+      <!-- M365 Proactive Notifications Panel -->
+      {#if m365SettingsExpanded}
+        <div class="whoop-settings-panel">
+          <h4>Proactive Notifications</h4>
+          <ProactiveSettings bind:this={proactiveSettingsComponent} hideActions={true} />
+          <button class="btn-primary" on:click={async () => {
+            if (proactiveSettingsComponent) {
+              await proactiveSettingsComponent.saveSettings();
+            }
+            m365SettingsExpanded = false;
+          }}>
+            Save and Close
+          </button>
+        </div>
+      {:else}
+        <button class="btn-primary whoop-configure-btn" on:click={() => m365SettingsExpanded = true}>
+          Configure Notifications
+        </button>
+      {/if}
+
     {:else if authInProgress}
       <div class="auth-flow">
         <div class="auth-instructions">
@@ -246,13 +453,135 @@
     {/if}
   </div>
 
-  <!-- Proactive Notifications Section -->
-  {#if m365Connected}
-    <div class="section">
-      <h3>Proactive Notifications</h3>
-      <ProactiveSettings />
-    </div>
-  {/if}
+  <!-- WHOOP Integration Section -->
+  <div class="section">
+    <h3>WHOOP Integration</h3>
+
+    {#if whoopConnected}
+      <div class="status-card status-card--success connection-status">
+        <span class="status-card__icon">✓</span>
+        <div class="status-info">
+          <div class="status-card__title">Connected to WHOOP</div>
+          {#if whoopStatus?.whoop_user_id}
+            <div class="status-card__text">
+              User ID: {whoopStatus.whoop_user_id}
+            </div>
+          {/if}
+          {#if whoopStatus?.expires_at}
+            <div class="status-card__text">
+              Token expires: {new Date(whoopStatus.expires_at).toLocaleString()}
+            </div>
+          {/if}
+        </div>
+        <button class="btn-danger" on:click={handleDisconnectWhoop}>
+          Disconnect
+        </button>
+      </div>
+
+      <!-- WHOOP Settings Panel -->
+      {#if whoopSettingsExpanded}
+        <div class="whoop-settings-panel">
+          <h4>Notification Settings</h4>
+
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              bind:checked={whoopSettings.sleep_notifications_enabled}
+              on:change={saveWhoopSettings}
+            />
+            <span>Enable post-sleep summaries</span>
+          </label>
+
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              bind:checked={whoopSettings.workout_notifications_enabled}
+              on:change={saveWhoopSettings}
+            />
+            <span>Enable post-workout summaries</span>
+          </label>
+
+          <div class="form-group">
+            <label for="whoop-check-frequency">Check frequency (minutes):</label>
+            <input
+              id="whoop-check-frequency"
+              type="number"
+              min="15"
+              max="120"
+              bind:value={whoopSettings.check_frequency_minutes}
+              on:change={saveWhoopSettings}
+            />
+          </div>
+
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              bind:checked={whoopSettings.quiet_hours_enabled}
+              on:change={saveWhoopSettings}
+            />
+            <span>Enable quiet hours</span>
+          </label>
+
+          {#if whoopSettings.quiet_hours_enabled}
+            <div class="quiet-hours-group">
+              <div class="form-group">
+                <label for="whoop-quiet-start">Start:</label>
+                <input
+                  id="whoop-quiet-start"
+                  type="time"
+                  bind:value={whoopSettings.quiet_hours_start}
+                  on:change={saveWhoopSettings}
+                />
+              </div>
+              <div class="form-group">
+                <label for="whoop-quiet-end">End:</label>
+                <input
+                  id="whoop-quiet-end"
+                  type="time"
+                  bind:value={whoopSettings.quiet_hours_end}
+                  on:change={saveWhoopSettings}
+                />
+              </div>
+            </div>
+          {/if}
+
+          <button class="btn-primary" on:click={() => whoopSettingsExpanded = false}>
+            Close Settings
+          </button>
+        </div>
+      {:else}
+        <button class="btn-primary whoop-configure-btn" on:click={() => whoopSettingsExpanded = true}>
+          Configure Notifications
+        </button>
+      {/if}
+
+    {:else if whoopAuthInProgress}
+      <div class="auth-flow">
+        <div class="auth-instructions">
+          <h4>Connecting to WHOOP</h4>
+          <p>Please complete the authorization in the popup window.</p>
+          <p class="auth-waiting">Waiting for authorization...</p>
+        </div>
+        <button class="btn-secondary" on:click={cancelWhoopAuth}>Cancel</button>
+      </div>
+
+    {:else}
+      <div class="connection-status disconnected">
+        <span class="status-icon">○</span>
+        <div class="status-info">
+          <div class="status-label">Not connected</div>
+          <div class="status-detail">
+            Connect your WHOOP account to receive personalized sleep and workout insights.
+            <br />
+            <small class="mode-notice">Available in Personal Mode only</small>
+          </div>
+        </div>
+        <button class="btn-info" on:click={handleConnectWhoop}>
+          Connect WHOOP
+        </button>
+      </div>
+    {/if}
+  </div>
 
   <!-- Pending Actions Section -->
   {#if m365Connected}
@@ -392,6 +721,81 @@
 
   .confirmation-actions button {
     flex: 1;
+  }
+
+  /* WHOOP-specific styles */
+  .whoop-settings-panel {
+    margin-top: 1rem;
+    padding: 1.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+  }
+
+  .whoop-settings-panel h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    color: var(--text-primary);
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .checkbox-label span {
+    user-select: none;
+  }
+
+  .form-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .form-group input[type="number"],
+  .form-group input[type="time"] {
+    width: 100%;
+    max-width: 200px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-secondary);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .quiet-hours-group {
+    margin-left: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .mode-notice {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  .whoop-configure-btn {
+    margin-top: 1rem;
   }
 
   /* All other styles now imported from global CSS:

@@ -437,6 +437,58 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # WHOOP Credentials
+    # =============================
+    whoop_credentials = Table(
+        "whoop_credentials",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False, unique=True),
+        Column("access_token", Text, nullable=False),
+        Column("refresh_token", Text, nullable=False),
+        Column("token_type", String, default="Bearer"),
+        Column("expires_at", DateTime, nullable=False),
+        Column("whoop_user_id", String, nullable=False),
+        Column("is_valid", Boolean, default=True),
+        Column("last_refreshed_at", DateTime, nullable=True),
+        Column("last_error", Text, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # WHOOP Settings
+    # =============================
+    whoop_settings = Table(
+        "whoop_settings",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False, unique=True),
+        Column("sleep_notifications_enabled", Boolean, default=True),
+        Column("workout_notifications_enabled", Boolean, default=True),
+        Column("check_frequency_minutes", Integer, default=30),
+        Column("quiet_hours_enabled", Boolean, default=False),
+        Column("quiet_hours_start", String, nullable=True),
+        Column("quiet_hours_end", String, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # WHOOP Data Tracking
+    # =============================
+    whoop_data_tracking = Table(
+        "whoop_data_tracking",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False),
+        Column("data_type", String, nullable=False),
+        Column("whoop_id", String, nullable=False, unique=True),
+        Column("notified_at", DateTime, nullable=False),
+        Column("created_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
     # Feature Providers
     # =============================
     feature_providers = Table(
@@ -531,6 +583,9 @@ def create_schema(meta: MetaData):
         "actions": actions,
         "action_confirmations": action_confirmations,
         "m365_credentials": m365_credentials,
+        "whoop_credentials": whoop_credentials,
+        "whoop_settings": whoop_settings,
+        "whoop_data_tracking": whoop_data_tracking,
         "calendar_events_cache": calendar_events_cache,
         "classification_audit": classification_audit,
         "feature_providers": feature_providers,
