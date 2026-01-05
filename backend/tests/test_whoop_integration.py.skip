@@ -15,11 +15,11 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
 
 # Import modules to test
-from backend.auth.whoop_oauth import WHOOPOAuthHandler
-from backend.services.whoop_client import WHOOPClient, WHOOPClientFactory
-from backend.core.proactive.whoop_sleep_service import WHOOPSleepService
-from backend.core.proactive.whoop_workout_service import WHOOPWorkoutService
-from backend.core.proactive.whoop_stress_service import WHOOPStressService
+from auth.whoop_oauth import WHOOPOAuthHandler
+from services.whoop_client import WHOOPClient, WHOOPClientFactory
+from core.proactive.whoop_sleep_service import WHOOPSleepService
+from core.proactive.whoop_workout_service import WHOOPWorkoutService
+from core.proactive.whoop_stress_service import WHOOPStressService
 
 
 class TestWHOOPOAuth:
