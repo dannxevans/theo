@@ -3,7 +3,22 @@
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
   import Login from "./components/Login.svelte";
-  import { getSessions, deleteSessionApi, verifySession, logout, getUserMode, setUserMode, getWorkSubtabConfig } from "./lib/api.js";
+  import {
+    getSessions,
+    deleteSessionApi,
+    verifySession,
+    logout,
+    getUserMode,
+    setUserMode,
+    getWorkSubtabConfig,
+    getFolders,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    updateFolderCollapsed,
+    moveSessionToFolder,
+    archiveSession
+  } from "./lib/api.js";
 
   let isAuthenticated = false;
   let currentUser = null;
@@ -195,6 +210,15 @@
 
   let sessionQuery = "";
 
+  // Folder state
+  let folders = [];
+  let showArchive = false;
+  let newFolderName = "";
+  let showNewFolderInput = false;
+  let editingFolderId = null;
+  let editingFolderName = "";
+  let draggedSessionId = null;
+
   // Reactive filtered sessions based on mode filter and search query
   $: filteredSessions = sessions
     .filter(s => (s.title && s.title.trim()) || (s.summary && s.summary.trim())) // hasContent
@@ -217,6 +241,158 @@
       const bTime = b.updated_at ? new Date(b.updated_at).getTime() : Infinity;
       return bTime - aTime; // Descending order (newest/NULL first)
     });
+
+  // Group sessions by folder
+  $: sessionsByFolder = (() => {
+    const result = {
+      archive: [],
+      unfiled: [],
+      folders: {}
+    };
+
+    // Get archive folder
+    const archiveFolder = folders.find(f => f.is_system && f.name === "Archive");
+
+    // Initialize folder buckets
+    folders.forEach(folder => {
+      if (!folder.is_system) {
+        result.folders[folder.id] = {
+          folder: folder,
+          sessions: []
+        };
+      }
+    });
+
+    // Categorize sessions
+    filteredSessions.forEach(session => {
+      if (!session.folder_id) {
+        result.unfiled.push(session);
+      } else if (archiveFolder && session.folder_id === archiveFolder.id) {
+        result.archive.push(session);
+      } else if (result.folders[session.folder_id]) {
+        result.folders[session.folder_id].sessions.push(session);
+      } else {
+        // Folder not found, treat as unfiled
+        result.unfiled.push(session);
+      }
+    });
+
+    return result;
+  })();
+
+  async function loadFolders() {
+    try {
+      folders = await getFolders();
+      // Load collapsed states from localStorage
+      const savedStates = localStorage.getItem('folderCollapsedStates');
+      if (savedStates) {
+        const states = JSON.parse(savedStates);
+        folders = folders.map(f => ({
+          ...f,
+          collapsed: states[f.id] !== undefined ? states[f.id] : f.collapsed
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load folders", err);
+      folders = [];
+    }
+  }
+
+  async function handleCreateFolder() {
+    if (!newFolderName.trim()) return;
+
+    try {
+      await createFolder(newFolderName.trim());
+      newFolderName = "";
+      showNewFolderInput = false;
+      await loadFolders();
+    } catch (err) {
+      console.error("Failed to create folder", err);
+      alert("Failed to create folder: " + err.message);
+    }
+  }
+
+  async function handleRenameFolder(folderId) {
+    if (!editingFolderName.trim()) return;
+
+    try {
+      await renameFolder(folderId, editingFolderName.trim());
+      editingFolderId = null;
+      editingFolderName = "";
+      await loadFolders();
+    } catch (err) {
+      console.error("Failed to rename folder", err);
+      alert("Failed to rename folder: " + err.message);
+    }
+  }
+
+  async function handleDeleteFolder(folderId) {
+    if (!confirm("Delete this folder? Sessions will be moved to Unfiled.")) return;
+
+    try {
+      await deleteFolder(folderId);
+      await loadFolders();
+    } catch (err) {
+      console.error("Failed to delete folder", err);
+      alert("Failed to delete folder: " + err.message);
+    }
+  }
+
+  async function toggleFolderCollapse(folderId) {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+
+    const newCollapsed = !folder.collapsed;
+
+    try {
+      await updateFolderCollapsed(folderId, newCollapsed);
+      // Update local state
+      folders = folders.map(f =>
+        f.id === folderId ? { ...f, collapsed: newCollapsed } : f
+      );
+      // Save to localStorage
+      const states = {};
+      folders.forEach(f => states[f.id] = f.collapsed);
+      localStorage.setItem('folderCollapsedStates', JSON.stringify(states));
+    } catch (err) {
+      console.error("Failed to toggle folder collapse", err);
+    }
+  }
+
+  function handleDragStart(event, sessionId) {
+    draggedSessionId = sessionId;
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  async function handleDrop(event, targetFolderId) {
+    event.preventDefault();
+
+    if (!draggedSessionId) return;
+
+    try {
+      await moveSessionToFolder(draggedSessionId, targetFolderId);
+      await loadSessions();
+      draggedSessionId = null;
+    } catch (err) {
+      console.error("Failed to move session", err);
+      alert("Failed to move session: " + err.message);
+    }
+  }
+
+  async function handleArchiveSession(sessionId) {
+    try {
+      await archiveSession(sessionId);
+      await loadSessions();
+    } catch (err) {
+      console.error("Failed to archive session", err);
+      alert("Failed to archive session: " + err.message);
+    }
+  }
 
   function generateUUID() {
     if (crypto && typeof crypto.randomUUID === "function") {
@@ -241,6 +417,7 @@ onMount(async () => {
       isAuthenticated = true;
       currentUser = result.user;
       await loadSessions();
+      await loadFolders();
       await loadUserMode();
     }
   } catch (err) {
@@ -575,12 +752,20 @@ async function handleLogout() {
       </div>
 
       {#if !sidebarCollapsed}
-        <button class="btn-pill new-session" on:click={newSession}>
-          + New chat
-        </button>
+        <div class="sidebar-content">
+          <button class="btn-pill new-session" on:click={newSession}>
+            + New chat
+          </button>
 
-        <!-- Mode Filter Toggle -->
-        <div class="mode-filter">
+          <!-- Mode Filter Toggle -->
+          <div class="mode-filter">
+          <button
+            class="mode-filter-btn"
+            class:active={sessionModeFilter === "all"}
+            on:click={() => toggleSessionModeFilter("all")}
+          >
+            All
+          </button>
           <button
             class="mode-filter-btn"
             class:active={sessionModeFilter === "personal"}
@@ -595,13 +780,6 @@ async function handleLogout() {
           >
             Work
           </button>
-          <button
-            class="mode-filter-btn"
-            class:active={sessionModeFilter === "all"}
-            on:click={() => toggleSessionModeFilter("all")}
-          >
-            All
-          </button>
         </div>
 
         <input
@@ -611,43 +789,287 @@ async function handleLogout() {
           bind:value={sessionQuery}
         />
 
-      {#each ["Today", "Yesterday", "Earlier"] as group}
-        {#if filteredSessions.some(s => dayGroup(s.updated_at) === group)}
-          <div class="session-group">{group}</div>
-        {/if}
+      <!-- Chats (Unfiled Sessions) -->
+      {#if sessionsByFolder.unfiled.length > 0}
+        <div class="folder-section">
+          {#each ["Today", "Yesterday", "Earlier"] as group}
+            {#if sessionsByFolder.unfiled.some(s => dayGroup(s.updated_at) === group)}
+              <div class="session-group">{group}</div>
+            {/if}
 
-        {#each filteredSessions
-          .filter(s => dayGroup(s.updated_at) === group)
-          .slice(0, MAX_SESSIONS) as s}
+            {#each sessionsByFolder.unfiled
+              .filter(s => dayGroup(s.updated_at) === group && sessionMatches(s) && sessionModeMatches(s))
+              .slice(0, MAX_SESSIONS) as s}
 
-          <div class="session-row" class:active={s.id === activeSessionId}>
-            <button
-              class="session-item"
-              on:click={() => selectSession(s.id)}
-            >
-              <div class="session-label">
-                <span class="session-mode">{sessionModePrefix(s)}</span> {sessionLabel(s)}
+              <div
+                class="session-row"
+                class:active={s.id === activeSessionId}
+                draggable="true"
+                on:dragstart={(e) => handleDragStart(e, s.id)}
+              >
+                <button
+                  class="session-item"
+                  on:click={() => selectSession(s.id)}
+                >
+                  <div class="session-label">
+                    <span class="session-mode">{sessionModePrefix(s)}</span> {sessionLabel(s)}
+                  </div>
+                  <div class="session-time">{formatSessionTime(s.updated_at)}</div>
+                </button>
+
+                {#if confirmDeleteId === s.id}
+                  <div class="confirm">
+                    <button class="danger" on:click={() => deleteSession(s.id)}>Delete</button>
+                    <button on:click={() => confirmDeleteId = null}>Cancel</button>
+                  </div>
+                {:else}
+                  <div class="session-actions">
+                    <button
+                      class="action-btn archive-btn"
+                      title="Archive chat"
+                      on:click={() => handleArchiveSession(s.id)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="21 8 21 21 3 21 3 8"/>
+                        <rect x="1" y="3" width="22" height="5"/>
+                        <line x1="10" y1="12" x2="14" y2="12"/>
+                      </svg>
+                    </button>
+                    <button
+                      class="action-btn delete-btn"
+                      title="Delete chat"
+                      on:click={() => confirmDeleteId = s.id}
+                    >
+                      ×
+                    </button>
+                  </div>
+                {/if}
               </div>
-              <div class="session-time">{formatSessionTime(s.updated_at)}</div>
-            </button>
+            {/each}
+          {/each}
+        </div>
+      {/if}
 
-            {#if confirmDeleteId === s.id}
-              <div class="confirm">
-                <button class="danger" on:click={() => deleteSession(s.id)}>Delete</button>
-                <button on:click={() => confirmDeleteId = null}>Cancel</button>
+      <!-- Custom Folders -->
+      {#each folders.filter(f => !f.is_system) as folder}
+        <div class="folder-section">
+          <button
+            class="folder-header"
+            on:click={() => toggleFolderCollapse(folder.id)}
+            on:dragover={handleDragOver}
+            on:drop={(e) => handleDrop(e, folder.id)}
+          >
+            <span class="folder-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                {#if folder.collapsed}
+                  <polyline points="9 18 15 12 9 6"/>
+                {:else}
+                  <polyline points="6 9 12 15 18 9"/>
+                {/if}
+              </svg>
+            </span>
+            {#if editingFolderId === folder.id}
+              <input
+                class="folder-name-input"
+                type="text"
+                bind:value={editingFolderName}
+                on:blur={() => handleRenameFolder(folder.id)}
+                on:keydown={(e) => e.key === 'Enter' && handleRenameFolder(folder.id)}
+                on:click|stopPropagation
+                autofocus
+              />
+            {:else}
+              <span class="folder-name">{folder.name}</span>
+            {/if}
+            <div class="folder-actions">
+              <button
+                class="folder-action-btn"
+                title="Rename folder"
+                on:click|stopPropagation={() => {
+                  editingFolderId = folder.id;
+                  editingFolderName = folder.name;
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button
+                class="folder-action-btn"
+                title="Delete folder"
+                on:click|stopPropagation={() => handleDeleteFolder(folder.id)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
+            </div>
+          </button>
+
+          {#if !folder.collapsed && sessionsByFolder.folders[folder.id]?.sessions.length > 0}
+            {#each ["Today", "Yesterday", "Earlier"] as group}
+              {#if sessionsByFolder.folders[folder.id].sessions.some(s => dayGroup(s.updated_at) === group)}
+                <div class="session-group">{group}</div>
+              {/if}
+
+              {#each sessionsByFolder.folders[folder.id].sessions
+                .filter(s => dayGroup(s.updated_at) === group && sessionMatches(s) && sessionModeMatches(s))
+                .slice(0, MAX_SESSIONS) as s}
+
+                <div
+                  class="session-row"
+                  class:active={s.id === activeSessionId}
+                  draggable="true"
+                  on:dragstart={(e) => handleDragStart(e, s.id)}
+                >
+                  <button
+                    class="session-item"
+                    on:click={() => selectSession(s.id)}
+                  >
+                    <div class="session-label">
+                      <span class="session-mode">{sessionModePrefix(s)}</span> {sessionLabel(s)}
+                    </div>
+                    <div class="session-time">{formatSessionTime(s.updated_at)}</div>
+                  </button>
+
+                  {#if confirmDeleteId === s.id}
+                    <div class="confirm">
+                      <button class="danger" on:click={() => deleteSession(s.id)}>Delete</button>
+                      <button on:click={() => confirmDeleteId = null}>Cancel</button>
+                    </div>
+                  {:else}
+                    <div class="session-actions">
+                      <button
+                        class="action-btn archive-btn"
+                        title="Archive chat"
+                        on:click={() => handleArchiveSession(s.id)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="21 8 21 21 3 21 3 8"/>
+                          <rect x="1" y="3" width="22" height="5"/>
+                          <line x1="10" y1="12" x2="14" y2="12"/>
+                        </svg>
+                      </button>
+                      <button
+                        class="action-btn delete-btn"
+                        title="Delete chat"
+                        on:click={() => confirmDeleteId = s.id}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            {/each}
+          {/if}
+        </div>
+      {/each}
+
+      <!-- Archive Folder -->
+      <div class="folder-section">
+        <button
+          class="folder-header"
+          on:click={() => showArchive = !showArchive}
+          on:dragover={handleDragOver}
+          on:drop={(e) => handleDrop(e, folders.find(f => f.is_system)?.id)}
+        >
+          <span class="folder-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              {#if showArchive}
+                <polyline points="6 9 12 15 18 9"/>
+              {:else}
+                <polyline points="9 18 15 12 9 6"/>
+              {/if}
+            </svg>
+          </span>
+          <span class="folder-name">Archive</span>
+        </button>
+
+        {#if showArchive && sessionsByFolder.archive.length > 0}
+          {#each ["Today", "Yesterday", "Earlier"] as group}
+            {#if sessionsByFolder.archive.some(s => dayGroup(s.updated_at) === group)}
+              <div class="session-group">{group}</div>
+            {/if}
+
+            {#each sessionsByFolder.archive
+              .filter(s => dayGroup(s.updated_at) === group && sessionMatches(s) && sessionModeMatches(s))
+              .slice(0, MAX_SESSIONS) as s}
+
+              <div
+                class="session-row"
+                class:active={s.id === activeSessionId}
+                draggable="true"
+                on:dragstart={(e) => handleDragStart(e, s.id)}
+              >
+                <button
+                  class="session-item"
+                  on:click={() => selectSession(s.id)}
+                >
+                  <div class="session-label">
+                    <span class="session-mode">{sessionModePrefix(s)}</span> {sessionLabel(s)}
+                  </div>
+                  <div class="session-time">{formatSessionTime(s.updated_at)}</div>
+                </button>
+
+                {#if confirmDeleteId === s.id}
+                  <div class="confirm">
+                    <button class="danger" on:click={() => deleteSession(s.id)}>Delete</button>
+                    <button on:click={() => confirmDeleteId = null}>Cancel</button>
+                  </div>
+                {:else}
+                  <button
+                    class="delete-btn"
+                    title="Delete chat"
+                    on:click={() => confirmDeleteId = s.id}
+                  >
+                    ×
+                  </button>
+                {/if}
+              </div>
+            {/each}
+          {/each}
+        {/if}
+      </div>
+        </div>
+
+        <!-- New Folder Button (Pinned to bottom) -->
+        <div class="sidebar-footer">
+          <div class="new-folder-section">
+            {#if showNewFolderInput}
+              <div class="new-folder-input-wrapper">
+                <input
+                  class="new-folder-input"
+                  type="text"
+                  placeholder="Folder name..."
+                  bind:value={newFolderName}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter') handleCreateFolder();
+                    if (e.key === 'Escape') { showNewFolderInput = false; newFolderName = ""; }
+                  }}
+                  autofocus
+                />
+                <button
+                  class="btn-pill"
+                  on:mousedown={(e) => { e.preventDefault(); handleCreateFolder(); }}
+                >
+                  Create
+                </button>
               </div>
             {:else}
               <button
-                class="delete-btn"
-                title="Delete chat"
-                on:click={() => confirmDeleteId = s.id}
+                class="btn-pill new-folder-btn"
+                on:click={() => showNewFolderInput = true}
               >
-                ×
+                + New folder
               </button>
             {/if}
           </div>
-        {/each}
-      {/each}
+        </div>
       {/if}
 
       <!-- Resize Handle -->

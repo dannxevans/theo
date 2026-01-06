@@ -137,12 +137,15 @@ class SessionOperations(BaseMemoryOperations):
                     self.sessions.c.id,
                     self.sessions.c.title,
                     self.sessions.c.mode,
+                    self.sessions.c.folder_id,
+                    self.session_folders.c.name.label("folder_name"),
                     self.sessions.c.created_at,
                     self.sessions.c.updated_at,
                     latest_turn_subq.c.turn_count,
                     latest_turn_subq.c.latest_turn_created_at,
                 )
                 .outerjoin(latest_turn_subq, self.sessions.c.id == latest_turn_subq.c.session_id)
+                .outerjoin(self.session_folders, self.sessions.c.folder_id == self.session_folders.c.id)
             )
 
             # Apply filters
@@ -172,6 +175,8 @@ class SessionOperations(BaseMemoryOperations):
                     "id": r.id,
                     "title": r.title,
                     "mode": r.mode or "personal",  # Default to personal if NULL
+                    "folder_id": r.folder_id,
+                    "folder_name": r.folder_name,
                     "summary": summary_row.content if summary_row else "",
                     "has_messages": (r.turn_count or 0) > 0,
                     "updated_at": r.latest_turn_created_at or r.created_at,

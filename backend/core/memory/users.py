@@ -44,7 +44,26 @@ class UserOperations(BaseMemoryOperations):
                     updated_at=datetime.utcnow(),
                 )
             )
-            return result.lastrowid
+            user_id = result.lastrowid
+
+            # Create Archive folder for new user
+            try:
+                conn.execute(
+                    insert(self.session_folders).values(
+                        name="Archive",
+                        user_id=user_id,
+                        is_system=True,
+                        sort_order=-1,
+                        collapsed=False,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+            except Exception as e:
+                # Archive folder might already exist (e.g., from migration)
+                print(f"Note: Could not create Archive folder for user {user_id}: {e}")
+
+            return user_id
 
     def get_user_by_username(self, username):
         """

@@ -274,6 +274,147 @@ export async function regenerateMessage(sessionId, turnId) {
 }
 
 // =============================
+// Folder Management API
+// =============================
+
+export async function getFolders() {
+  try {
+    const response = await fetch(`${API_BASE}/api/folders`, {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      console.error("Failed to load folders:", response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error loading folders:", err);
+    return [];
+  }
+}
+
+export async function createFolder(name) {
+  const response = await fetch(`${API_BASE}/api/folders`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to create folder");
+  }
+
+  return response.json();
+}
+
+export async function renameFolder(folderId, newName) {
+  const response = await fetch(`${API_BASE}/api/folders/${folderId}`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name: newName })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to rename folder");
+  }
+
+  return response.json();
+}
+
+export async function deleteFolder(folderId) {
+  const response = await fetch(`${API_BASE}/api/folders/${folderId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete folder");
+  }
+
+  return response.json();
+}
+
+export async function updateFolderCollapsed(folderId, collapsed) {
+  const response = await fetch(`${API_BASE}/api/folders/${folderId}`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ collapsed })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to update folder state");
+  }
+
+  return response.json();
+}
+
+export async function moveSessionToFolder(sessionId, folderId) {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/move`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ folder_id: folderId })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to move session");
+  }
+
+  return response.json();
+}
+
+export async function archiveSession(sessionId) {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/archive`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to archive session");
+  }
+
+  return response.json();
+}
+
+export async function reorderFolders(folderOrder) {
+  const response = await fetch(`${API_BASE}/api/folders/reorder`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ folder_order: folderOrder })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to reorder folders");
+  }
+
+  return response.json();
+}
+
+// =============================
 // Intent Management API
 // =============================
 
