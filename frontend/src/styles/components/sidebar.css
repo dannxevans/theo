@@ -13,13 +13,28 @@
   display: flex;
   flex-direction: column;
   padding: 0;
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
   transition: width 0.3s ease;
 }
 
 .sidebar.collapsed {
   overflow: hidden;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  padding: 0.75rem;
 }
 
 .sidebar-header {
@@ -286,4 +301,187 @@
   .hamburger-btn {
     display: none !important;
   }
+}
+
+/* ============================
+   Folder Styles
+   ============================ */
+
+.folder-section {
+  margin: 0.5rem 0;
+}
+
+.folder-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  gap: 0.5rem;
+  margin: 0 0.75rem;
+}
+
+.folder-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.folder-header:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-primary);
+}
+
+.folder-header:hover .folder-actions {
+  opacity: 1;
+}
+
+.unfiled-header {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.folder-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.folder-icon svg {
+  display: block;
+}
+
+.folder-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: normal;
+  margin-left: 0.5rem;
+}
+
+.folder-name-input {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--theo-indigo);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.folder-action-btn {
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.folder-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--theo-indigo);
+}
+
+.folder-action-btn svg {
+  display: block;
+}
+
+.new-folder-section {
+  margin: 0;
+}
+
+.new-folder-btn {
+  width: 100%;
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-primary);
+}
+
+.new-folder-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--theo-indigo);
+}
+
+.new-folder-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.new-folder-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.new-folder-input:focus {
+  outline: none;
+  border-color: var(--theo-indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Drag and Drop States */
+.folder-header[on\:dragover],
+.unfiled-header[on\:dragover] {
+  background: var(--bg-hover);
+  border: 2px dashed var(--theo-indigo);
+}
+
+.session-row[draggable="true"] {
+  cursor: grab;
+}
+
+.session-row[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.5;
 }
