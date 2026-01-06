@@ -257,15 +257,9 @@
   display: flex;
   gap: 0.25rem;
   align-items: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
 }
 
-.session-row:hover .session-actions {
-  opacity: 1;
-}
-
-/* Action buttons (archive, delete) */
+/* Action buttons (archive, delete) - hide until hover */
 .action-btn {
   background: transparent;
   border: none;
@@ -273,7 +267,12 @@
   cursor: pointer;
   font-size: 0.9rem;
   padding: 0 0.25rem;
+  opacity: 0;
   transition: all 0.2s ease;
+}
+
+.session-row:hover .action-btn {
+  opacity: 1;
 }
 
 .action-btn.archive-btn:hover {
