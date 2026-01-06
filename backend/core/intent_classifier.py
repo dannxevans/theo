@@ -86,7 +86,8 @@ class IntentClassifier:
 
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
-            "read_calendar", "compose_email", "read_email", "weather", "routing", "planning"
+            "read_calendar", "compose_email", "read_email", "weather", "routing", "planning",
+            "read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -260,6 +261,83 @@ class IntentClassifier:
         email_action_pattern = r'\b(show|read|open|display)\b.{0,50}\bemail\b'
         if re.search(email_action_pattern, text_l):
             return "read_email", 0.80
+
+        # Task exclusion patterns (prevent false positives)
+        # Check these FIRST before matching task keywords
+        TASK_EXCLUSIONS = [
+            r'\btasked\s+with\b',       # "I was tasked with"
+            r'\btask\s+manager\b',       # "Windows Task Manager"
+            r'\bmultitask',              # "multitasking"
+            r'\btask\s+force\b',         # "task force"
+            r'\bundertaking\s+.*\s+task\b',  # "undertaking a task"
+        ]
+
+        # Check exclusions
+        task_excluded = any(re.search(pattern, text_l) for pattern in TASK_EXCLUSIONS)
+
+        # Only proceed with task matching if not excluded
+        if not task_excluded:
+            # CREATE TASK patterns (high confidence for exact phrases)
+            CREATE_TASK_STRONG_PATTERNS = [
+                r'\badd\s+a\s+task\b',              # "add a task"
+                r'\bcreate\s+(a\s+)?task\b',        # "create task" or "create a task"
+                r'\bnew\s+task\b',                  # "new task"
+                r'\bmake\s+(a\s+)?task\b',          # "make task" or "make a task"
+            ]
+
+            for pattern in CREATE_TASK_STRONG_PATTERNS:
+                if re.search(pattern, text_l):
+                    return "create_task", 0.90
+
+            # READ TASKS - TODAY patterns
+            READ_TASKS_TODAY_PATTERNS = [
+                r'\btoday\'?s\s+tasks?\b',                    # "today's tasks"
+                r'\btasks?\s+(for\s+)?today\b',               # "tasks for today" or "tasks today"
+                r'\bwhat\s+tasks?\s+.*\btoday\b',             # "what tasks do I have today"
+                r'\bshow\s+(me\s+)?(my\s+)?tasks?\s+.*today', # "show my tasks today"
+                r'\btoday.*\btasks?\b',                       # "today tasks"
+            ]
+
+            for pattern in READ_TASKS_TODAY_PATTERNS:
+                if re.search(pattern, text_l):
+                    return "read_tasks_today", 0.90
+
+            # READ TASKS - THIS WEEK patterns
+            READ_TASKS_WEEK_PATTERNS = [
+                r'\bthis\s+week\'?s\s+tasks?\b',              # "this week's tasks"
+                r'\btasks?\s+(for\s+)?this\s+week\b',         # "tasks for this week"
+                r'\bwhat\s+tasks?\s+.*\bthis\s+week\b',       # "what tasks this week"
+                r'\bshow\s+(me\s+)?(my\s+)?tasks?\s+.*this\s+week',  # "show my tasks this week"
+                r'\bthis\s+week.*\btasks?\b',                 # "this week tasks"
+            ]
+
+            for pattern in READ_TASKS_WEEK_PATTERNS:
+                if re.search(pattern, text_l):
+                    return "read_tasks_week", 0.90
+
+            # READ TASKS - GENERIC patterns (lower confidence)
+            READ_TASKS_GENERIC_PATTERNS = [
+                r'\b(what|show|list|get|display)\s+(my\s+)?tasks?\b',  # "what are my tasks", "show tasks"
+                r'\bmy\s+tasks?\b',                                     # "my tasks"
+                r'\btask\s+list\b',                                     # "task list"
+                r'\bshow\s+(me\s+)?all\s+tasks?\b',                     # "show all tasks"
+            ]
+
+            for pattern in READ_TASKS_GENERIC_PATTERNS:
+                if re.search(pattern, text_l):
+                    return "read_tasks", 0.80
+
+            # COMPLETE TASK patterns
+            COMPLETE_TASK_PATTERNS = [
+                r'\b(mark|set|flag)\s+.*\b(complete|completed|done)\b.*task',  # "mark task as complete"
+                r'\bcomplete\s+(the\s+)?task\b',                                # "complete the task"
+                r'\btask.*\b(complete|done|finished)\b',                        # "task complete"
+                r'\bfinish\s+(the\s+)?task\b',                                  # "finish the task"
+            ]
+
+            for pattern in COMPLETE_TASK_PATTERNS:
+                if re.search(pattern, text_l):
+                    return "complete_task", 0.85
 
         # Weather keywords
         weather_keywords = [

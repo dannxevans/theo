@@ -30,11 +30,12 @@ class M365OAuth:
     2. Environment variables (.env) - FALLBACK
     """
 
-    # OAuth scopes required for calendar and email access
+    # OAuth scopes required for calendar, email, and tasks access
     SCOPES = [
         "https://graph.microsoft.com/Calendars.ReadWrite",
         "https://graph.microsoft.com/Mail.ReadWrite",
         "https://graph.microsoft.com/Mail.Send",
+        "https://graph.microsoft.com/Tasks.ReadWrite",
         "https://graph.microsoft.com/User.Read",
         "offline_access"  # Required for refresh tokens
     ]
@@ -370,6 +371,7 @@ To configure Microsoft 365 integration:
      * Calendars.ReadWrite
      * Mail.ReadWrite
      * Mail.Send
+     * Tasks.ReadWrite
      * User.Read
      * offline_access
    - Click "Grant admin consent" (if you're an admin)
