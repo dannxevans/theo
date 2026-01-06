@@ -792,15 +792,6 @@ async function handleLogout() {
       <!-- Chats (Unfiled Sessions) -->
       {#if sessionsByFolder.unfiled.length > 0}
         <div class="folder-section">
-          <div
-            class="folder-header unfiled-header"
-            on:dragover={handleDragOver}
-            on:drop={(e) => handleDrop(e, null)}
-          >
-            <span class="folder-name">Chats</span>
-            <span class="folder-count">({sessionsByFolder.unfiled.length})</span>
-          </div>
-
           {#each ["Today", "Yesterday", "Earlier"] as group}
             {#if sessionsByFolder.unfiled.some(s => dayGroup(s.updated_at) === group)}
               <div class="session-group">{group}</div>
@@ -917,7 +908,6 @@ async function handleLogout() {
                 </svg>
               </button>
             </div>
-            <span class="folder-count">({sessionsByFolder.folders[folder.id]?.sessions.length || 0})</span>
           </button>
 
           {#if !folder.collapsed && sessionsByFolder.folders[folder.id]?.sessions.length > 0}
@@ -998,7 +988,6 @@ async function handleLogout() {
             </svg>
           </span>
           <span class="folder-name">Archive</span>
-          <span class="folder-count">({sessionsByFolder.archive.length})</span>
         </button>
 
         {#if showArchive && sessionsByFolder.archive.length > 0}
