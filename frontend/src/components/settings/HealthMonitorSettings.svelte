@@ -5,6 +5,7 @@
   export let healthData = {
     ai_providers: [],
     m365_integration: { connected: false },
+    whoop_integration: { connected: false },
     service_providers: [],
     feature_providers: []
   };
@@ -377,12 +378,14 @@
     </div>
   {/if}
 
-  <!-- Section 3: Microsoft 365 Integration -->
+  <!-- Section 3: Integrations -->
   <div class="section">
-    <h3>Microsoft 365 Integration</h3>
-    <p class="hint">Connection status and token health for Microsoft Graph API</p>
+    <h3>Integrations</h3>
+    <p class="hint">External service integrations for calendar, email, and fitness tracking</p>
 
-    <div class="health-card m365-card">
+    <div class="health-grid">
+      <!-- Microsoft 365 Card -->
+      <div class="health-card m365-card">
       <div class="health-card-header">
         <h4>Microsoft 365</h4>
         <span class="health-badge"
@@ -471,6 +474,74 @@
         </div>
       {/if}
     </div>
+
+    <!-- WHOOP Card -->
+    <div class="health-card">
+      <div class="health-card-header">
+        <h4>WHOOP</h4>
+        <span class="health-badge"
+          class:badge-healthy={healthData.whoop_integration?.connected && healthData.whoop_integration?.token_valid && healthData.whoop_integration?.hours_until_expiry > 24}
+          class:badge-degraded={healthData.whoop_integration?.connected && healthData.whoop_integration?.hours_until_expiry <= 24 && healthData.whoop_integration?.hours_until_expiry > 0}
+          class:badge-unhealthy={!healthData.whoop_integration?.connected || !healthData.whoop_integration?.token_valid || healthData.whoop_integration?.hours_until_expiry <= 0}
+          class:badge-unknown={!healthData.whoop_integration?.connected}>
+          {#if !healthData.whoop_integration?.connected}
+            Not Configured
+          {:else if !healthData.whoop_integration.token_valid || healthData.whoop_integration.hours_until_expiry <= 0}
+            Disconnected
+          {:else if healthData.whoop_integration.hours_until_expiry <= 24}
+            Token Expiring Soon
+          {:else}
+            Connected
+          {/if}
+        </span>
+      </div>
+
+      {#if healthData.whoop_integration?.connected}
+        <div class="health-card-body">
+          <p><strong>WHOOP User ID:</strong> {healthData.whoop_integration.whoop_user_id || 'Unknown'}</p>
+          <p><strong>Token Status:</strong>
+            <span class:error-text={!healthData.whoop_integration.token_valid}>
+              {healthData.whoop_integration.token_valid ? 'Valid' : 'Invalid/Expired'}
+            </span>
+          </p>
+
+          {#if healthData.whoop_integration.hours_until_expiry !== null}
+            <p><strong>Token Expires:</strong>
+              <span class:warning-text={healthData.whoop_integration.hours_until_expiry <= 24}
+                class:error-text={healthData.whoop_integration.hours_until_expiry <= 0}>
+                {#if healthData.whoop_integration.hours_until_expiry > 0}
+                  in {healthData.whoop_integration.hours_until_expiry} hours
+                {:else}
+                  Expired
+                {/if}
+              </span>
+            </p>
+          {/if}
+
+          {#if healthData.whoop_integration.last_refreshed_at}
+            <p class="metric-small">Last Refreshed: {formatRelativeTime(healthData.whoop_integration.last_refreshed_at)}</p>
+          {/if}
+
+          {#if healthData.whoop_integration.last_error}
+            <p class="error-text metric-small">Last Error: {healthData.whoop_integration.last_error}</p>
+          {/if}
+
+          <div class="capabilities">
+            <p><strong>Capabilities:</strong></p>
+            <ul class="capability-list">
+              <li>✓ Sleep Data Access</li>
+              <li>✓ Recovery Metrics</li>
+              <li>✓ Workout Data</li>
+            </ul>
+          </div>
+        </div>
+      {:else}
+        <div class="health-card-body">
+          <p class="empty-state">WHOOP account not connected. Connect in the Integrations section.</p>
+        </div>
+      {/if}
+    </div>
+  </div>
   </div>
 
   <!-- Section 4: Service Providers -->
