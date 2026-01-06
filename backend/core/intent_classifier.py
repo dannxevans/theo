@@ -384,6 +384,22 @@ class IntentClassifier:
                 if any(ind in text_l for ind in route_indicators):
                     return "routing", 0.85
 
+        # WHOOP fitness tracker keywords
+        whoop_keywords = [
+            "whoop", "sleep data", "sleep last night", "last night's sleep",
+            "last night sleep", "recovery score", "recovery data", "hrv",
+            "heart rate variability", "workout data", "workout yesterday",
+            "workout today", "strain score", "resting heart rate",
+            "sleep performance", "sleep efficiency", "how did i sleep",
+            "how well did i sleep", "my sleep", "my recovery", "my workout",
+            "fitness data", "training data", "exercise data", "sleep quality",
+            "recovery metrics", "workout summary", "last workout"
+        ]
+
+        for keyword in whoop_keywords:
+            if keyword in text_l:
+                return "whoop", 0.90
+
         # Planning keywords - require explicit planning request language
         # Only trigger when user explicitly asks for help planning/scheduling
         explicit_planning_patterns = [

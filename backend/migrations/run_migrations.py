@@ -72,7 +72,9 @@ def run_all_migrations():
         "022_add_whoop_integration.py",  # Add WHOOP integration tables (credentials, settings, tracking)
         "023_add_whoop_stress_notifications.py",  # Add stress notifications to WHOOP settings
         "024_add_stress_notification_time.py",  # Add stress notification time to WHOOP settings
-        "025_add_oauth_config_to_feature_providers.py"  # Add OAuth config storage to feature providers
+        "025_add_oauth_config_to_feature_providers.py",  # Add OAuth config storage to feature providers
+        "026_add_session_folders.py",  # Add session folders for organization and archiving
+        "027_add_whoop_intent.py"  # Add WHOOP intent for fitness tracking queries
     ]
 
     # Filter to only existing files

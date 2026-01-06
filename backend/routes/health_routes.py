@@ -148,6 +148,28 @@ def get_health_overview():
             "scopes": scopes
         }
 
+    # Get WHOOP integration status
+    whoop_integration = {"connected": False}
+    whoop_creds = memory.get_whoop_credentials(user["id"])
+
+    if whoop_creds:
+        # Calculate hours until expiry
+        expires_at = whoop_creds.get("expires_at")
+        hours_until_expiry = None
+        if expires_at:
+            delta = expires_at - datetime.utcnow()
+            hours_until_expiry = round(delta.total_seconds() / 3600, 1)
+
+        whoop_integration = {
+            "connected": True,
+            "whoop_user_id": whoop_creds.get("whoop_user_id"),
+            "token_valid": whoop_creds.get("is_valid", False),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "hours_until_expiry": hours_until_expiry,
+            "last_refreshed_at": whoop_creds.get("last_refreshed_at").isoformat() if whoop_creds.get("last_refreshed_at") else None,
+            "last_error": whoop_creds.get("last_error")
+        }
+
     # Get service providers
     service_providers_list = memory.get_service_providers(user["id"])
     service_providers = []
@@ -252,6 +274,7 @@ def get_health_overview():
     return jsonify({
         "ai_providers": ai_providers,
         "m365_integration": m365_integration,
+        "whoop_integration": whoop_integration,
         "service_providers": service_providers,
         "feature_providers": feature_providers
     })
