@@ -41,7 +41,8 @@ class WHOOPOAuth:
         "read:recovery",
         "read:sleep",
         "read:workout",
-        "read:cycles"
+        "read:cycles",
+        "offline"  # Required to receive refresh tokens
     ]
 
     # WHOOP OAuth endpoints
@@ -294,7 +295,8 @@ class WHOOPOAuth:
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
             "client_id": config['client_id'],
-            "client_secret": config['client_secret']
+            "client_secret": config['client_secret'],
+            "scope": "offline"  # Required by WHOOP API for token refresh
         }
 
         logger.info("[WHOOP_OAUTH] Refreshing access token...")
