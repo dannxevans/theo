@@ -12,7 +12,7 @@ This is distinct from the LLM router (router.py):
 from typing import Dict, Any
 import logging
 
-from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers, WHOOPHandlers
+from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers, WHOOPHandlers, TaskHandlers
 
 
 class ActionRouter:
@@ -59,6 +59,11 @@ class ActionRouter:
             memory_store,
             confirmation_manager
         )
+        self.task_handlers = TaskHandlers(
+            action_registry,
+            memory_store,
+            confirmation_manager
+        )
         self.confirmation_handlers = ConfirmationHandlers(
             action_registry,
             memory_store,
@@ -90,6 +95,8 @@ class ActionRouter:
             self.calendar_handlers.confirmation_manager = value
         if hasattr(self, 'email_handlers'):
             self.email_handlers.confirmation_manager = value
+        if hasattr(self, 'task_handlers'):
+            self.task_handlers.confirmation_manager = value
         if hasattr(self, 'confirmation_handlers'):
             self.confirmation_handlers.confirmation_manager = value
         if hasattr(self, 'whoop_handlers'):
@@ -145,6 +152,13 @@ class ActionRouter:
             "compose_email": self.email_handlers.handle_compose_email,
             "email_reply": self.email_handlers.handle_email_reply,
             "send_email": self.email_handlers.handle_email_send,
+
+            # Task actions
+            "read_tasks": self.task_handlers.handle_read_tasks,
+            "read_tasks_today": self.task_handlers.handle_read_tasks_today,
+            "read_tasks_week": self.task_handlers.handle_read_tasks_week,
+            "create_task": self.task_handlers.handle_create_task,
+            "complete_task": self.task_handlers.handle_complete_task,
 
             # WHOOP actions
             "whoop": self.whoop_handlers.handle_whoop,

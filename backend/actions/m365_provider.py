@@ -1,7 +1,7 @@
 """
 Microsoft 365 (Graph API) action provider.
 
-Handles calendar and email operations using Microsoft Graph API.
+Handles calendar, email, and tasks operations using Microsoft Graph API.
 Requires OAuth 2.0 credentials (access token + refresh token).
 
 Supported capabilities:
@@ -13,6 +13,11 @@ Supported capabilities:
 - send_email: Send emails
 - reply_email: Reply to emails
 - draft_email: Create email drafts
+- read_tasks: Fetch tasks
+- create_task: Create new tasks
+- update_task: Update existing tasks
+- complete_task: Mark tasks as complete
+- delete_task: Delete tasks
 """
 
 import requests
@@ -32,7 +37,7 @@ class M365Provider(ActionProvider):
     """
     Microsoft 365 (Graph API) action provider.
 
-    Handles calendar and email operations through Microsoft Graph API.
+    Handles calendar, email, and tasks operations through Microsoft Graph API.
     """
 
     name = "m365"
@@ -47,6 +52,11 @@ class M365Provider(ActionProvider):
         "draft_email",
         "send_draft_email",
         "delete_draft_email",
+        "read_tasks",
+        "create_task",
+        "update_task",
+        "complete_task",
+        "delete_task",
     ]
 
     GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
@@ -129,6 +139,11 @@ class M365Provider(ActionProvider):
             "draft_email": self._validate_draft_email,
             "send_draft_email": self._validate_send_draft_email,
             "delete_draft_email": self._validate_delete_draft_email,
+            "read_tasks": self._validate_read_tasks,
+            "create_task": self._validate_create_task,
+            "update_task": self._validate_update_task,
+            "complete_task": self._validate_complete_task,
+            "delete_task": self._validate_delete_task,
         }
 
         validator = validators.get(action_type)
@@ -693,6 +708,315 @@ class M365Provider(ActionProvider):
             raise ActionExecutionError(f"Failed to fetch email body: {e}")
 
     # =============================
+    # Tasks Operations
+    # =============================
+
+    def read_tasks(self, list_id: str = None, filter_query: str = None) -> List[Dict]:
+        """
+        Read tasks from Microsoft To Do.
+
+        Args:
+            list_id: Optional list ID. If None, uses default "tasks" list
+            filter_query: Optional OData filter (e.g., "status eq 'notStarted'")
+
+        Returns:
+            List of task dictionaries in THEO normalized format
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If API call fails
+        """
+        self._ensure_token_valid()
+        headers = self._get_headers()
+
+        # First, get the task list ID if not provided
+        if list_id is None:
+            lists_url = f"{self.GRAPH_API_BASE}/me/todo/lists"
+            try:
+                lists_response = requests.get(lists_url, headers=headers, timeout=15)
+                lists_response.raise_for_status()
+
+                lists = lists_response.json().get("value", [])
+                # Get the default "Tasks" list
+                default_list = next((l for l in lists if l.get("wellknownListName") == "defaultList"), None)
+
+                if not default_list:
+                    # If no default, use first list
+                    default_list = lists[0] if lists else None
+
+                if not default_list:
+                    return []  # No lists available
+
+                list_id = default_list["id"]
+
+            except requests.HTTPError as e:
+                logging.error(f"[M365] Failed to fetch task lists: {e}")
+                raise ActionExecutionError(f"Failed to fetch task lists: {e}")
+
+        # Now fetch tasks from the list
+        tasks_url = f"{self.GRAPH_API_BASE}/me/todo/lists/{list_id}/tasks"
+        # Note: Microsoft To Do API doesn't support $select parameter like Calendar/Email APIs
+        params = {
+            "$top": 100
+        }
+
+        if filter_query:
+            params["$filter"] = filter_query
+
+        try:
+            response = requests.get(tasks_url, headers=headers, params=params, timeout=15)
+            response.raise_for_status()
+
+            tasks = response.json().get("value", [])
+            logging.info(f"[M365] Fetched {len(tasks)} tasks")
+
+            return [self._normalize_task(task) for task in tasks]
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Failed to read tasks: {e}")
+            raise ActionExecutionError(f"Failed to read tasks: {e}")
+
+    def create_task(
+        self,
+        title: str,
+        description: str = None,
+        due_date: datetime = None,
+        importance: str = "normal",
+        list_id: str = None
+    ) -> Dict:
+        """
+        Create a new task in Microsoft To Do.
+
+        Args:
+            title: Task title (required)
+            description: Task description
+            due_date: Due date (datetime object)
+            importance: Priority ("low", "normal", "high")
+            list_id: Target list ID (defaults to "Tasks")
+
+        Returns:
+            Created task in THEO normalized format
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If creation fails
+        """
+        self._ensure_token_valid()
+        headers = self._get_headers()
+
+        # Get default list if not provided
+        if list_id is None:
+            lists_url = f"{self.GRAPH_API_BASE}/me/todo/lists"
+            try:
+                lists_response = requests.get(lists_url, headers=headers, timeout=15)
+                lists_response.raise_for_status()
+
+                lists = lists_response.json().get("value", [])
+                default_list = next((l for l in lists if l.get("wellknownListName") == "defaultList"), None)
+
+                if not default_list and lists:
+                    default_list = lists[0]
+
+                if not default_list:
+                    raise ActionExecutionError("No task lists available")
+
+                list_id = default_list["id"]
+
+            except requests.HTTPError as e:
+                logging.error(f"[M365] Failed to fetch task lists: {e}")
+                raise ActionExecutionError(f"Failed to fetch task lists: {e}")
+
+        # Build task payload
+        task_data = {
+            "title": title,
+            "importance": importance,
+        }
+
+        if description:
+            task_data["body"] = {
+                "content": description,
+                "contentType": "text"
+            }
+
+        if due_date:
+            task_data["dueDateTime"] = {
+                "dateTime": due_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                "timeZone": "UTC"
+            }
+
+        # Create task
+        create_url = f"{self.GRAPH_API_BASE}/me/todo/lists/{list_id}/tasks"
+        try:
+            response = requests.post(create_url, headers=headers, json=task_data, timeout=15)
+            response.raise_for_status()
+
+            created_task = response.json()
+            logging.info(f"[M365] Created task: {created_task.get('id')}")
+
+            return self._normalize_task(created_task)
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Task creation failed: {e}")
+            raise ActionExecutionError(f"Failed to create task: {e}")
+
+    def update_task(self, task_id: str, list_id: str = None, updates: Dict = None) -> Dict:
+        """
+        Update an existing task.
+
+        Args:
+            task_id: Task ID to update
+            list_id: List containing the task
+            updates: Dictionary of fields to update
+                - title: str
+                - description: str
+                - status: str
+                - importance: str
+                - due_date: datetime
+
+        Returns:
+            Updated task in THEO normalized format
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If update fails
+        """
+        self._ensure_token_valid()
+        headers = self._get_headers()
+
+        if updates is None:
+            updates = {}
+
+        if list_id is None:
+            # Need to find which list contains this task
+            # For simplicity, use default list
+            lists_url = f"{self.GRAPH_API_BASE}/me/todo/lists"
+            try:
+                lists_response = requests.get(lists_url, headers=headers, timeout=15)
+                lists_response.raise_for_status()
+
+                lists = lists_response.json().get("value", [])
+                default_list = next((l for l in lists if l.get("wellknownListName") == "defaultList"), None)
+
+                if not default_list and lists:
+                    default_list = lists[0]
+
+                if not default_list:
+                    raise ActionExecutionError("No task lists available")
+
+                list_id = default_list["id"]
+
+            except requests.HTTPError as e:
+                logging.error(f"[M365] Failed to fetch task lists: {e}")
+                raise ActionExecutionError(f"Failed to fetch task lists: {e}")
+
+        # Build update payload
+        update_data = {}
+
+        if "title" in updates:
+            update_data["title"] = updates["title"]
+
+        if "description" in updates:
+            update_data["body"] = {
+                "content": updates["description"],
+                "contentType": "text"
+            }
+
+        if "status" in updates:
+            update_data["status"] = updates["status"]
+
+        if "importance" in updates:
+            update_data["importance"] = updates["importance"]
+
+        if "due_date" in updates and updates["due_date"]:
+            update_data["dueDateTime"] = {
+                "dateTime": updates["due_date"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "timeZone": "UTC"
+            }
+
+        # Update task
+        update_url = f"{self.GRAPH_API_BASE}/me/todo/lists/{list_id}/tasks/{task_id}"
+        try:
+            response = requests.patch(update_url, headers=headers, json=update_data, timeout=15)
+            response.raise_for_status()
+
+            updated_task = response.json()
+            logging.info(f"[M365] Updated task: {task_id}")
+
+            return self._normalize_task(updated_task)
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Task update failed: {e}")
+            raise ActionExecutionError(f"Failed to update task: {e}")
+
+    def complete_task(self, task_id: str, list_id: str = None) -> Dict:
+        """
+        Mark a task as completed.
+
+        Args:
+            task_id: Task ID to complete
+            list_id: List containing the task
+
+        Returns:
+            Updated task in THEO normalized format
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If completion fails
+        """
+        return self.update_task(task_id, list_id, {"status": "completed"})
+
+    def delete_task(self, task_id: str, list_id: str = None) -> bool:
+        """
+        Delete a task.
+
+        Args:
+            task_id: Task ID to delete
+            list_id: List containing the task
+
+        Returns:
+            True if successful
+
+        Raises:
+            ActionAuthenticationError: If token is invalid
+            ActionExecutionError: If deletion fails
+        """
+        self._ensure_token_valid()
+        headers = self._get_headers()
+
+        if list_id is None:
+            lists_url = f"{self.GRAPH_API_BASE}/me/todo/lists"
+            try:
+                lists_response = requests.get(lists_url, headers=headers, timeout=15)
+                lists_response.raise_for_status()
+
+                lists = lists_response.json().get("value", [])
+                default_list = next((l for l in lists if l.get("wellknownListName") == "defaultList"), None)
+
+                if not default_list and lists:
+                    default_list = lists[0]
+
+                if not default_list:
+                    raise ActionExecutionError("No task lists available")
+
+                list_id = default_list["id"]
+
+            except requests.HTTPError as e:
+                logging.error(f"[M365] Failed to fetch task lists: {e}")
+                raise ActionExecutionError(f"Failed to fetch task lists: {e}")
+
+        delete_url = f"{self.GRAPH_API_BASE}/me/todo/lists/{list_id}/tasks/{task_id}"
+        try:
+            response = requests.delete(delete_url, headers=headers, timeout=15)
+            response.raise_for_status()
+
+            logging.info(f"[M365] Deleted task: {task_id}")
+            return True
+
+        except requests.HTTPError as e:
+            logging.error(f"[M365] Task deletion failed: {e}")
+            raise ActionExecutionError(f"Failed to delete task: {e}")
+
+    # =============================
     # Helper Methods
     # =============================
 
@@ -862,6 +1186,20 @@ class M365Provider(ActionProvider):
             "importance": email.get("importance"),
         }
 
+    def _normalize_task(self, task: Dict) -> Dict:
+        """Normalize Microsoft Graph task to THEO format."""
+        return {
+            "id": task.get("id"),
+            "title": task.get("title"),
+            "description": task.get("body", {}).get("content", ""),
+            "status": task.get("status"),  # "notStarted", "inProgress", "completed", "waitingOnOthers", "deferred"
+            "importance": task.get("importance"),  # "low", "normal", "high"
+            "created_at": task.get("createdDateTime"),
+            "modified_at": task.get("lastModifiedDateTime"),
+            "due_date": task.get("dueDateTime", {}).get("dateTime") if task.get("dueDateTime") else None,
+            "completed_at": task.get("completedDateTime", {}).get("dateTime") if task.get("completedDateTime") else None,
+        }
+
     # =============================
     # Validation Methods
     # =============================
@@ -982,4 +1320,64 @@ class M365Provider(ActionProvider):
         """Validate delete_draft_email parameters."""
         if not params.get("draft_id"):
             return False, "draft_id must be provided"
+        return True, None
+
+    def _validate_read_tasks(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate read_tasks parameters."""
+        # All parameters are optional
+        return True, None
+
+    def _validate_create_task(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate create_task parameters."""
+        if not params.get("title"):
+            return False, "Missing required field: title"
+
+        # Validate importance if provided
+        if "importance" in params:
+            valid_importance = ["low", "normal", "high"]
+            if params["importance"] not in valid_importance:
+                return False, f"importance must be one of: {', '.join(valid_importance)}"
+
+        # Validate due_date is datetime if provided
+        if "due_date" in params and params["due_date"] is not None:
+            if not isinstance(params["due_date"], datetime):
+                return False, "due_date must be a datetime object"
+
+        return True, None
+
+    def _validate_update_task(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate update_task parameters."""
+        if not params.get("task_id"):
+            return False, "Missing required field: task_id"
+
+        if "updates" not in params:
+            return False, "Missing required field: updates"
+
+        if not isinstance(params["updates"], dict):
+            return False, "updates must be a dictionary"
+
+        # Validate status if being updated
+        if "status" in params["updates"]:
+            valid_statuses = ["notStarted", "inProgress", "completed", "waitingOnOthers", "deferred"]
+            if params["updates"]["status"] not in valid_statuses:
+                return False, f"status must be one of: {', '.join(valid_statuses)}"
+
+        # Validate importance if being updated
+        if "importance" in params["updates"]:
+            valid_importance = ["low", "normal", "high"]
+            if params["updates"]["importance"] not in valid_importance:
+                return False, f"importance must be one of: {', '.join(valid_importance)}"
+
+        return True, None
+
+    def _validate_complete_task(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate complete_task parameters."""
+        if not params.get("task_id"):
+            return False, "Missing required field: task_id"
+        return True, None
+
+    def _validate_delete_task(self, params: Dict) -> Tuple[bool, Optional[str]]:
+        """Validate delete_task parameters."""
+        if not params.get("task_id"):
+            return False, "Missing required field: task_id"
         return True, None

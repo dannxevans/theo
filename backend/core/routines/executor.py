@@ -155,6 +155,12 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         "compose_email": "compose_email",
         "email_reply": "email_reply",
         "send_email": "send_email",
+        # Task actions
+        "tasks_read": "read_tasks",
+        "tasks_today": "read_tasks_today",
+        "tasks_week": "read_tasks_week",
+        "create_task": "create_task",
+        "complete_task": "complete_task",
         # Weather and routing
         "weather": "weather",
         "route": "routing",
@@ -220,6 +226,58 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
             "mode": mode,
             "filter": filter_type,
             "exclude_important": exclude_important
+        }
+
+    elif action_type == "tasks_read":
+        # Read all tasks
+        action_context = {
+            "text": "Show me my tasks",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "tasks_today":
+        # Read today's tasks
+        action_context = {
+            "text": "Today's tasks",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "tasks_week":
+        # Read this week's tasks
+        action_context = {
+            "text": "This week's tasks",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "create_task":
+        # Create a new task
+        action_context = {
+            "text": params.get("text", "Create a task"),
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode,
+            **params
+        }
+
+    elif action_type == "complete_task":
+        # Complete a task
+        action_context = {
+            "text": params.get("text", "Complete task"),
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode,
+            **params
         }
 
     elif action_type == "weather":

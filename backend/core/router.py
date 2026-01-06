@@ -1318,19 +1318,27 @@ def route_request(context: dict, stream: bool = False):
     # Get action intents from database (configurable per user)
     user_id = normalize_user_id(context.get("user_id"))
     action_intents = memory.get_action_intents(user_id) if memory else []
-    logging.info(f"[ROUTER] user_id={user_id}, intent={intent}, action_intents={action_intents}, in_list={intent in action_intents}")
 
-    if intent in action_intents:
+    # Add hardcoded task intents that should always route to ActionRouter
+    # These are not yet in the database migration but need to work
+    TASK_INTENTS = ["read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task", "update_task", "delete_task"]
+
+    # Combine database intents with hardcoded task intents
+    all_action_intents = action_intents + TASK_INTENTS
+
+    logging.info(f"[ROUTER] user_id={user_id}, intent={intent}, action_intents={action_intents}, in_list={intent in all_action_intents}")
+
+    if intent in all_action_intents:
         _debug(memory, f"Routing to ActionRouter for intent: {intent}")
 
-        # Block personal actions (M365 calendar/email) in work mode
-        PERSONAL_ACTIONS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "read_email", "compose_email"]
+        # Block personal actions (M365 calendar/email/tasks) in work mode
+        PERSONAL_ACTIONS = ["read_calendar", "book_appointment", "update_appointment", "cancel_appointment", "read_email", "compose_email", "read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task"]
         current_mode = context.get("mode", "personal")
 
         if current_mode == "work" and intent in PERSONAL_ACTIONS:
             _debug(memory, f"Blocked personal action '{intent}' in work mode")
             return {
-                "text": "Calendar and email actions are not available in Work mode. These are personal actions. Please switch to Personal mode to use these features.",
+                "text": "Calendar, email, and task actions are not available in Work mode. These are personal actions. Please switch to Personal mode to use these features.",
                 "provider": "error",
                 "model": None,
                 "task_type": intent,
