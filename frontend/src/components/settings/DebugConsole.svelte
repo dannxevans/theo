@@ -21,8 +21,7 @@
   let loggerFilters = {
     sqlalchemy: false,
     werkzeug: false,
-    urllib3: false,
-    botocore: false
+    urllib3: false
   };
 
   // Component tags (extracted from logs)
@@ -178,8 +177,7 @@
         loggerFilters = {
           sqlalchemy: false,
           werkzeug: false,
-          urllib3: false,
-          botocore: false
+          urllib3: false
         };
       }
     } catch (e) {
@@ -368,14 +366,6 @@
                   on:change={(e) => handleFilterChange('urllib3', e.target.checked)}
                 />
                 urllib3
-              </label>
-              <label class="checkbox-label" title="AWS SDK (botocore) logs">
-                <input
-                  type="checkbox"
-                  checked={loggerFilters.botocore}
-                  on:change={(e) => handleFilterChange('botocore', e.target.checked)}
-                />
-                Botocore/S3
               </label>
             </div>
             <small style="color: #888; margin-top: 4px; display: block;">

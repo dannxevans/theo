@@ -59,10 +59,29 @@ class DatabaseLogHandler(logging.Handler):
         self._dropped_logs = 0
         self._last_drop_warning = 0
 
-        # Background thread for batch processing
-        self._running = True
-        self._flush_thread = threading.Thread(target=self._flush_worker, daemon=True)
-        self._flush_thread.start()
+        # Background thread for batch processing (lazy-started on first log)
+        self._running = False
+        self._flush_thread = None
+        self._thread_started = False
+        self._thread_lock = threading.Lock()
+
+    def _ensure_thread_started(self):
+        """
+        Lazy-start the background flush thread.
+        Only starts when debug logging is actually enabled and a log is emitted.
+        """
+        if self._thread_started:
+            return
+
+        with self._thread_lock:
+            # Double-check after acquiring lock
+            if self._thread_started:
+                return
+
+            self._running = True
+            self._flush_thread = threading.Thread(target=self._flush_worker, daemon=True)
+            self._flush_thread.start()
+            self._thread_started = True
 
     def _is_debug_enabled(self) -> bool:
         """
@@ -90,7 +109,6 @@ class DatabaseLogHandler(logging.Handler):
                     'debug_filter_sqlalchemy': str(prefs.get("debug_filter_sqlalchemy", "false")).lower() == "true",
                     'debug_filter_werkzeug': str(prefs.get("debug_filter_werkzeug", "false")).lower() == "true",
                     'debug_filter_urllib3': str(prefs.get("debug_filter_urllib3", "false")).lower() == "true",
-                    'debug_filter_botocore': str(prefs.get("debug_filter_botocore", "false")).lower() == "true",
                 }
 
                 return enabled
@@ -161,8 +179,6 @@ class DatabaseLogHandler(logging.Handler):
             'sqlalchemy.orm': 'debug_filter_sqlalchemy',
             'werkzeug': 'debug_filter_werkzeug',
             'urllib3': 'debug_filter_urllib3',
-            'botocore': 'debug_filter_botocore',
-            's3transfer': 'debug_filter_botocore',
         }
 
         for logger_prefix, filter_key in logger_filter_map.items():
@@ -174,6 +190,9 @@ class DatabaseLogHandler(logging.Handler):
         # Skip if debug mode is not enabled
         if not self._is_debug_enabled():
             return
+
+        # Lazy-start the background thread on first log when debug is enabled
+        self._ensure_thread_started()
 
         try:
             # Extract log information
@@ -314,6 +333,6 @@ class DatabaseLogHandler(logging.Handler):
         Clean shutdown of the log handler.
         """
         self._running = False
-        if self._flush_thread.is_alive():
+        if self._flush_thread and self._flush_thread.is_alive():
             self._flush_thread.join(timeout=5.0)
         super().close()

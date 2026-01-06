@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
-# Wrap app with ProxyFix to correctly handle X-Forwarded headers from ALB (Application Load Balancer)
+# Wrap app with ProxyFix to correctly handle X-Forwarded headers from reverse proxy (Nginx/Traefik)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 app.config["PREFERRED_URL_SCHEME"] = "https"
 app.config["SESSION_COOKIE_SECURE"] = True
@@ -34,18 +34,15 @@ ALLOWED_ORIGINS = [
     "http://192.168.10.25:5173",
     "https://dev.theoai.uk",
 
-    # Primary CloudFront domains
+    # Primary domains
     "https://theoai.uk",
     "https://www.theoai.uk",
     "https://app.theoai.uk",
 
-    # Secondary CloudFront domain
+    # Secondary domain
     "https://duckyfuzz.uk",
     "https://app.duckyfuzz.uk",
-    "https://ai.duckyfuzz.uk",
-
-    # (Optional but useful for debugging)
-    "http://theo-alb-306035510.eu-west-2.elb.amazonaws.com"
+    "https://ai.duckyfuzz.uk"
 ]
 
 CORS(
@@ -57,9 +54,10 @@ CORS(
 )
 
 
-# Initialize database backup/restore (before creating MemoryStore)
+# Initialize database migrations (before creating MemoryStore)
+# Note: S3 backup functionality removed - now using Unraid native backups
 from db_backup import init_database_backup
-backup_manager = init_database_backup()
+init_database_backup()  # Runs migrations only, no longer returns backup manager
 
 memory = MemoryStore(Config.DATABASE_URL)
 context_manager = ContextManager(memory)
