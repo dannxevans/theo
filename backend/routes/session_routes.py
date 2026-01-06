@@ -70,6 +70,8 @@ def list_sessions():
             "id": s["id"],
             "title": s.get("title"),
             "mode": s.get("mode", "personal"),
+            "folder_id": s.get("folder_id"),
+            "folder_name": s.get("folder_name"),
             "summary": s.get("summary"),
             "updated_at": s.get("updated_at").isoformat() if s.get("updated_at") else None,
         })

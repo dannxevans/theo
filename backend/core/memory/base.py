@@ -50,6 +50,7 @@ class BaseMemoryOperations:
         self.request_logs = tables["request_logs"]
         self.voice_usage_logs = tables["voice_usage_logs"]
         self.providers = tables["providers"]
+        self.session_folders = tables["session_folders"]
         self.sessions = tables["sessions"]
         self.summaries = tables["summaries"]
         self.turns = tables["turns"]

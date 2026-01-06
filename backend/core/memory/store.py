@@ -13,6 +13,7 @@ from .schema import create_schema
 from .memories import MemoryOperations
 from .intents import IntentOperations
 from .sessions import SessionOperations
+from .folders import FolderOperations
 from .providers import ProviderOperations
 from .users import UserOperations
 from .modes import ModeOperations
@@ -106,6 +107,7 @@ class MemoryStore:
         self._memory_ops = MemoryOperations(tables, self.Session, self.engine)
         self._intent_ops = IntentOperations(tables, self.Session, self.engine)
         self._session_ops = SessionOperations(tables, self.Session, self.engine)
+        self._folder_ops = FolderOperations(tables, self.Session, self.engine)
         self._provider_ops = ProviderOperations(tables, self.Session, self.engine)
         self._user_ops = UserOperations(tables, self.Session, self.engine)
         self._mode_ops = ModeOperations(tables, self.Session, self.engine)
@@ -279,6 +281,50 @@ class MemoryStore:
     def delete_turn(self, turn_id):
         """Delete a specific turn by ID."""
         return self._session_ops.delete_turn(turn_id)
+
+    # =============================
+    # Folder Operations (delegated)
+    # =============================
+
+    def create_folder(self, user_id, name):
+        """Create a new folder for organizing sessions."""
+        return self._folder_ops.create_folder(user_id, name)
+
+    def get_folders(self, user_id):
+        """Get all folders for a user (Archive always first)."""
+        return self._folder_ops.get_folders(user_id)
+
+    def get_folder_by_id(self, folder_id, user_id):
+        """Get a specific folder by ID."""
+        return self._folder_ops.get_folder_by_id(folder_id, user_id)
+
+    def rename_folder(self, folder_id, user_id, new_name):
+        """Rename a folder (system folders protected)."""
+        return self._folder_ops.rename_folder(folder_id, user_id, new_name)
+
+    def delete_folder(self, folder_id, user_id):
+        """Delete a folder (sessions become unfiled)."""
+        return self._folder_ops.delete_folder(folder_id, user_id)
+
+    def update_folder_collapsed(self, folder_id, user_id, collapsed):
+        """Toggle folder expand/collapse state."""
+        return self._folder_ops.update_folder_collapsed(folder_id, user_id, collapsed)
+
+    def reorder_folders(self, user_id, folder_order):
+        """Update sort order for multiple folders."""
+        return self._folder_ops.reorder_folders(user_id, folder_order)
+
+    def move_session_to_folder(self, session_id, folder_id, user_id):
+        """Move session to folder (or unfiled if folder_id=None)."""
+        return self._folder_ops.move_session_to_folder(session_id, folder_id, user_id)
+
+    def archive_session(self, session_id, user_id):
+        """Move session to Archive folder."""
+        return self._folder_ops.archive_session(session_id, user_id)
+
+    def get_archive_folder_id(self, user_id):
+        """Get the Archive folder ID for a user."""
+        return self._folder_ops.get_archive_folder_id(user_id)
 
     # =============================
     # Provider Operations (delegated)

@@ -275,6 +275,23 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Session Folders
+    # =============================
+    session_folders = Table(
+        "session_folders",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("name", String(100), nullable=False),
+        Column("user_id", Integer, nullable=False),
+        Column("is_system", Boolean, default=False),
+        Column("sort_order", Integer, default=0),
+        Column("collapsed", Boolean, default=False),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+        UniqueConstraint("user_id", "name", name="uq_user_folder_name"),
+    )
+
+    # =============================
     # Sessions
     # =============================
     sessions = Table(
@@ -285,6 +302,7 @@ def create_schema(meta: MetaData):
         Column("mode", String, default="personal"),  # "work" or "personal"
         Column("classification", String, default="OFFICIAL"),  # UK Government classification
         Column("user_id", Integer, nullable=True),  # For filtering sessions by user
+        Column("folder_id", Integer, nullable=True),  # For folder organization
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )
@@ -578,6 +596,7 @@ def create_schema(meta: MetaData):
         "voice_usage_logs": voice_usage_logs,
         "feature_provider_usage_logs": feature_provider_usage_logs,
         "providers": providers,
+        "session_folders": session_folders,
         "sessions": sessions,
         "summaries": summaries,
         "turns": turns,
