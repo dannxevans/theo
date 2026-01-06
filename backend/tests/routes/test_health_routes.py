@@ -50,6 +50,16 @@ def test_health_overview_success(client, memory, auth_headers, test_user, sample
         upn="test@example.com"
     )
 
+    # Create WHOOP credentials
+    whoop_expires_at = datetime.utcnow() + timedelta(hours=2)
+    memory.store_whoop_credentials(
+        user_id=test_user["id"],
+        access_token="whoop-token",
+        refresh_token="whoop-refresh",
+        expires_at=whoop_expires_at,
+        whoop_user_id=12345
+    )
+
     # Create service provider
     memory.store_service_provider(
         user_id=test_user["id"],
@@ -66,6 +76,7 @@ def test_health_overview_success(client, memory, auth_headers, test_user, sample
     # Check structure
     assert "ai_providers" in data
     assert "m365_integration" in data
+    assert "whoop_integration" in data
     assert "service_providers" in data
 
     # Check AI providers
@@ -80,6 +91,13 @@ def test_health_overview_success(client, memory, auth_headers, test_user, sample
     assert m365["connected"] is True
     assert m365["account"] == "test@example.com"
 
+    # Check WHOOP integration
+    whoop = data["whoop_integration"]
+    assert whoop["connected"] is True
+    assert whoop["whoop_user_id"] == "12345"  # Stored as string in DB
+    assert whoop["token_valid"] is True
+    assert whoop["hours_until_expiry"] is not None
+
     # Check service providers
     assert len(data["service_providers"]) > 0
 
@@ -93,6 +111,10 @@ def test_health_overview_no_m365(client, auth_headers, sample_provider):
 
     m365 = data["m365_integration"]
     assert m365["connected"] is False
+
+    # WHOOP should also be not connected
+    whoop = data["whoop_integration"]
+    assert whoop["connected"] is False
 
 
 def test_health_overview_expired_session(client, memory, test_user):
