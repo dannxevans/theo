@@ -355,7 +355,7 @@ class WHOOPClientFactory:
             logger.info(f"[WHOOP_FACTORY] Token expired for user {user_id}, refreshing...")
             # Refresh token
             try:
-                new_token = self.oauth.refresh_access_token(creds['refresh_token'])
+                new_token = self.oauth.refresh_access_token(creds['refresh_token'], user_id, self.memory)
                 if not new_token:
                     logger.error(f"[WHOOP_FACTORY] Token refresh failed for user {user_id}")
                     self.memory.invalidate_whoop_credentials(user_id, "Token refresh failed")
@@ -365,7 +365,8 @@ class WHOOPClientFactory:
                 self.memory.update_whoop_token(
                     user_id,
                     new_token['access_token'],
-                    new_token['expires_at']
+                    new_token['expires_at'],
+                    new_token.get('refresh_token')  # Update refresh token if rotated
                 )
 
                 logger.info(f"[WHOOP_FACTORY] Token refreshed successfully for user {user_id}")
