@@ -418,6 +418,11 @@ class ConfirmationManager:
             if "end_time" in params and isinstance(params["end_time"], str):
                 params["end_time"] = datetime.fromisoformat(params["end_time"])
 
+        # Deserialize datetime strings to datetime objects for task operations
+        if action_type in ["create_task", "update_task"]:
+            if "due_date" in params and isinstance(params["due_date"], str):
+                params["due_date"] = datetime.fromisoformat(params["due_date"])
+
         # Validate parameters
         valid, error = provider.validate_params(action_type, params)
         if not valid:
@@ -440,6 +445,14 @@ class ConfirmationManager:
             result = provider.send_draft_email(**params)
         elif action_type == "delete_draft_email":
             result = provider.delete_draft_email(**params)
+        elif action_type == "create_task":
+            result = provider.create_task(**params)
+        elif action_type == "update_task":
+            result = provider.update_task(**params)
+        elif action_type == "complete_task":
+            result = provider.complete_task(**params)
+        elif action_type == "delete_task":
+            result = provider.delete_task(**params)
         else:
             raise Exception(f"Unsupported action type: {action_type}")
 
@@ -453,12 +466,14 @@ class ConfirmationManager:
             action_type: Action type (e.g., "create_calendar_event")
 
         Returns:
-            Category string (e.g., "calendar", "email")
+            Category string (e.g., "calendar", "email", "task")
         """
         if "calendar" in action_type:
             return "calendar"
         elif "email" in action_type:
             return "email"
+        elif "task" in action_type:
+            return "task"
         elif "appointment" in action_type or "booking" in action_type:
             return "booking"
         else:

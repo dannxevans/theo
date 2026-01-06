@@ -83,6 +83,37 @@
       description: "Send an email message",
       defaultParams: {},
     },
+    // Task actions
+    {
+      type: "tasks_read",
+      label: "Read All Tasks",
+      description: "Show all tasks",
+      defaultParams: {},
+    },
+    {
+      type: "tasks_today",
+      label: "Today's Tasks",
+      description: "Show tasks due today",
+      defaultParams: {},
+    },
+    {
+      type: "tasks_week",
+      label: "This Week's Tasks",
+      description: "Show tasks due this week",
+      defaultParams: {},
+    },
+    {
+      type: "create_task",
+      label: "Create Task",
+      description: "Create a new task",
+      defaultParams: {},
+    },
+    {
+      type: "complete_task",
+      label: "Complete Task",
+      description: "Mark a task as complete",
+      defaultParams: {},
+    },
     // Weather actions
     {
       type: "weather",
