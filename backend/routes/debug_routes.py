@@ -448,7 +448,6 @@ def get_debug_status():
             "sqlalchemy": str(prefs.get("debug_filter_sqlalchemy", "false")).lower() == "true",
             "werkzeug": str(prefs.get("debug_filter_werkzeug", "false")).lower() == "true",
             "urllib3": str(prefs.get("debug_filter_urllib3", "false")).lower() == "true",
-            "botocore": str(prefs.get("debug_filter_botocore", "false")).lower() == "true",
         }
 
         return jsonify({
@@ -509,8 +508,7 @@ def toggle_debug():
             verbose_filters = [
                 "debug_filter_sqlalchemy",
                 "debug_filter_werkzeug",
-                "debug_filter_urllib3",
-                "debug_filter_botocore"
+                "debug_filter_urllib3"
             ]
             for filter_key in verbose_filters:
                 memory.remember(
@@ -574,7 +572,6 @@ def update_filters():
         "sqlalchemy": "debug_filter_sqlalchemy",
         "werkzeug": "debug_filter_werkzeug",
         "urllib3": "debug_filter_urllib3",
-        "botocore": "debug_filter_botocore",
     }
 
     updated_filters = {}
