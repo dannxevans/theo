@@ -166,8 +166,8 @@ class WHOOPOAuth:
         authorization_url = f"{cls.AUTHORIZATION_URL}?{query_string}"
 
         logger.info("[WHOOP_OAUTH] Generated authorization URL")
+        logger.info(f"[WHOOP_OAUTH] Requesting scopes: {', '.join(cls.SCOPES)}")
         logger.debug(f"[WHOOP_OAUTH] Redirect URI: {config['redirect_uri']}")
-        logger.debug(f"[WHOOP_OAUTH] Scopes: {', '.join(cls.SCOPES)}")
 
         return {
             "authorization_url": authorization_url,
@@ -231,6 +231,9 @@ class WHOOPOAuth:
                 data = response.json()
 
                 logger.info("[WHOOP_OAUTH] ✓ Token exchange successful!")
+                logger.info(f"[WHOOP_OAUTH] Token expires in {data['expires_in']} seconds ({data['expires_in']/3600:.1f} hours)")
+                logger.info(f"[WHOOP_OAUTH] Refresh token received: {bool(data.get('refresh_token'))}")
+                logger.info(f"[WHOOP_OAUTH] Scopes: {data.get('scope', 'not provided')}")
 
                 return {
                     "access_token": data["access_token"],
@@ -313,6 +316,8 @@ class WHOOPOAuth:
                 data = response.json()
 
                 logger.info("[WHOOP_OAUTH] ✓ Token refreshed successfully")
+                logger.info(f"[WHOOP_OAUTH] New token expires in {data['expires_in']} seconds ({data['expires_in']/3600:.1f} hours)")
+                logger.info(f"[WHOOP_OAUTH] New refresh token received: {bool(data.get('refresh_token'))}")
 
                 return {
                     "access_token": data["access_token"],
@@ -328,6 +333,8 @@ class WHOOPOAuth:
 
                 logger.error(f"[WHOOP_OAUTH] Token refresh failed: {error}")
                 logger.error(f"[WHOOP_OAUTH] Error description: {error_description}")
+                logger.error(f"[WHOOP_OAUTH] Status code: {response.status_code}")
+                logger.error(f"[WHOOP_OAUTH] Full response: {response.text}")
 
                 return None
 
