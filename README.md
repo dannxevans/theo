@@ -177,9 +177,9 @@ Provider: anthropic-sonnet
 ```bash
 ENV=prod                                    # prod | dev
 DATABASE_URL=sqlite:///data/theo.db         # Database path
-THEO_S3_BACKUP_BUCKET=your-bucket           # S3 backup bucket
-THEO_S3_BACKUP_KEY=theo/theo.db            # S3 object key
 ```
+
+> **Note:** AWS S3 backup functionality has been removed. The application now runs on Unraid with native backup solutions.
 
 ---
 

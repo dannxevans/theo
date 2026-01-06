@@ -1,18 +1,23 @@
 """
-Database backup and restore utilities for S3
-Automatically backs up SQLite database to S3 and restores on startup
+Database migrations and utilities.
+
+DEPRECATED: S3 backup functionality has been removed (2026-01-06).
+The application now runs on Unraid with native backup solutions.
+This module is retained only for the migration runner (run_migrations).
 """
 import os
 import shutil
 import logging
 from pathlib import Path
-import boto3
-from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseBackupManager:
+    """
+    DEPRECATED: S3 backup manager is no longer used.
+    Kept for backwards compatibility but will not be instantiated.
+    """
     def __init__(self, db_path: str, s3_bucket: str = None, s3_key: str = "theo/theo.db"):
         """
         Initialize database backup manager
@@ -198,46 +203,33 @@ def run_migrations(db_path: str):
 
 
 def init_database_backup():
-    """Initialize database backup/restore on application startup"""
+    """
+    Initialize database migrations on application startup.
+
+    Note: S3 backup functionality has been removed as the application
+    now runs exclusively on Unraid with native backup solutions.
+    """
     from config import Config
 
     # Get configuration
     db_url = Config.DATABASE_URL
-    s3_bucket = os.getenv("THEO_S3_BACKUP_BUCKET")
-    s3_key = os.getenv("THEO_S3_BACKUP_KEY", "theo/theo.db")
-    env = os.getenv("ENV", "dev")
-    auto_restore = os.getenv("AUTO_RESTORE_S3", "false").lower() == "true"
 
     # Extract database path from SQLite URL
     # Format: sqlite:///path/to/db.db
     if not db_url.startswith("sqlite:///"):
-        logger.info("Not using SQLite, database backups not applicable")
+        logger.info("Not using SQLite, database migrations not applicable")
         return None
 
     db_path = db_url.replace("sqlite:///", "")
 
-    # Initialize backup manager
-    manager = DatabaseBackupManager(db_path, s3_bucket, s3_key)
+    logger.info("AWS S3 backups disabled - using Unraid native backup solutions")
 
-    # Only auto-restore from S3 on startup if explicitly enabled
-    # AWS/Unraid with AUTO_RESTORE_S3=true: Restores on every container/process start
-    # Local dev with AUTO_RESTORE_S3=false: No auto-restore (delete theo.db manually to force restore)
-    if auto_restore and s3_bucket:
-        logger.info("AUTO_RESTORE_S3=true, restoring database from S3 on startup...")
-        restored = manager.restore_from_s3()
-    else:
-        logger.info(f"AUTO_RESTORE_S3={auto_restore}, skipping automatic S3 restore")
-
-    # Run migrations after restore (or on fresh database)
+    # Run migrations on fresh database or after restore
     # This ensures the database schema is up-to-date before the app starts using it
     if os.path.exists(db_path):
         logger.info("Running database migrations")
         run_migrations(db_path)
-
-    # Setup automatic backups every 5 minutes (only in production)
-    if env == "prod" and s3_bucket:
-        manager.setup_auto_backup(interval_seconds=300)
     else:
-        logger.info(f"S3 automatic backups disabled in {env} environment")
+        logger.info(f"Database not found at {db_path}, will be created on first use")
 
-    return manager
+    return None
