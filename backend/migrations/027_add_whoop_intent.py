@@ -58,12 +58,10 @@ def run_migration():
             print(f"[MIGRATION 027] ERROR: intents table does not exist")
             return False
 
-        # Check if whoop intent already exists for any user
+        # Check if WHOOP intent already exists (since id is PRIMARY KEY, it can only exist once)
         cursor.execute("SELECT COUNT(*) FROM intents WHERE id = 'whoop'")
-        existing_count = cursor.fetchone()[0]
-
-        if existing_count > 0:
-            print(f"[MIGRATION 027] WHOOP intent already exists for {existing_count} user(s), skipping")
+        if cursor.fetchone()[0] > 0:
+            print(f"[MIGRATION 027] WHOOP intent already exists, skipping")
             return True
 
         # Get all user IDs
@@ -74,24 +72,34 @@ def run_migration():
             print(f"[MIGRATION 027] WARNING: No users found, skipping intent creation")
             return True
 
-        # Insert WHOOP intent for each user
-        inserted_count = 0
-        for (user_id,) in users:
-            cursor.execute("""
-                INSERT INTO intents (id, user_id, name, keywords, is_action, enabled, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-            """, (
-                'whoop',
-                user_id,
-                'WHOOP Fitness Data',
-                'whoop,sleep,recovery,workout,hrv,strain',
-                1,  # is_action=1 (routes to action handler)
-                1   # enabled=1
-            ))
-            inserted_count += 1
+        # Since id is PRIMARY KEY, we can only insert one WHOOP intent
+        # Use the first user's ID
+        first_user_id = users[0][0]
+
+        # Insert WHOOP intent for first user (other users will share the same intent)
+        cursor.execute("""
+            INSERT INTO intents (id, user_id, name, keywords, is_action, enabled, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        """, (
+            'whoop',
+            first_user_id,
+            'WHOOP Fitness Data',
+            'whoop,sleep,recovery,workout,hrv,strain',
+            1,  # is_action=1 (routes to action handler)
+            1   # enabled=1
+        ))
+        inserted_count = 1
+        skipped_count = 0
 
         conn.commit()
-        print(f"[MIGRATION 027] Successfully added WHOOP intent for {inserted_count} user(s)")
+
+        if inserted_count > 0:
+            print(f"[MIGRATION 027] Successfully added WHOOP intent for {inserted_count} user(s)")
+        if skipped_count > 0:
+            print(f"[MIGRATION 027] Skipped {skipped_count} user(s) who already have WHOOP intent")
+        if inserted_count == 0 and skipped_count == 0:
+            print(f"[MIGRATION 027] No users found, nothing to do")
+
         print(f"[MIGRATION 027] Migration completed successfully")
         return True
 
