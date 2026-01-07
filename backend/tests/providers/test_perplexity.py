@@ -474,6 +474,101 @@ class TestPerplexityTokenTracking:
         assert provider._last_usage["output_tokens"] == 0
 
 
+class TestPerplexityMessageAlternation:
+    """Test message alternation handling for Perplexity API requirements."""
+
+    @patch('providers.perplexity.requests.post')
+    def test_consecutive_user_messages_merged(self, mock_post):
+        """Test consecutive user messages are merged for proper alternation."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "Response"}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "citations": []
+        }
+        mock_post.return_value = mock_response
+
+        provider = PerplexityProvider(api_key="pplx-test-key")
+        provider.chat(messages=[
+            {"role": "user", "content": "First message"},
+            {"role": "user", "content": "Second message"},  # Consecutive user message
+            {"role": "assistant", "content": "Assistant response"},
+            {"role": "user", "content": "Third message"},
+        ])
+
+        # Verify the API was called
+        assert mock_post.called
+        payload = mock_post.call_args[1]['json']
+        messages = payload['messages']
+
+        # Should have 3 messages: merged user, assistant, user
+        assert len(messages) == 3
+        assert messages[0]['role'] == 'user'
+        assert "First message" in messages[0]['content']
+        assert "Second message" in messages[0]['content']
+        assert messages[1]['role'] == 'assistant'
+        assert messages[2]['role'] == 'user'
+
+    @patch('providers.perplexity.requests.post')
+    def test_leading_assistant_messages_removed(self, mock_post):
+        """Test leading assistant messages are removed (must start with user)."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "Response"}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "citations": []
+        }
+        mock_post.return_value = mock_response
+
+        provider = PerplexityProvider(api_key="pplx-test-key")
+        provider.chat(messages=[
+            {"role": "assistant", "content": "Leading assistant message"},
+            {"role": "user", "content": "User message"},
+        ])
+
+        # Verify the API was called
+        assert mock_post.called
+        payload = mock_post.call_args[1]['json']
+        messages = payload['messages']
+
+        # Should start with user message
+        assert len(messages) == 1
+        assert messages[0]['role'] == 'user'
+
+    @patch('providers.perplexity.requests.post')
+    def test_system_messages_filtered_out(self, mock_post):
+        """Test system messages are filtered out of conversation."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "Response"}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "citations": []
+        }
+        mock_post.return_value = mock_response
+
+        provider = PerplexityProvider(api_key="pplx-test-key")
+        provider.chat(messages=[
+            {"role": "system", "content": "System instructions"},
+            {"role": "user", "content": "User message"},
+            {"role": "system", "content": "Another system message"},
+            {"role": "assistant", "content": "Assistant response"},
+        ])
+
+        # Verify the API was called
+        assert mock_post.called
+        payload = mock_post.call_args[1]['json']
+        messages = payload['messages']
+
+        # Should only have user and assistant messages
+        assert len(messages) == 2
+        assert messages[0]['role'] == 'user'
+        assert messages[1]['role'] == 'assistant'
+        assert all(m['role'] != 'system' for m in messages)
+
+
 class TestPerplexityHeadersAndAuth:
     """Test API headers and authentication."""
 

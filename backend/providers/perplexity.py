@@ -90,45 +90,48 @@ class PerplexityProvider:
             if search_domain_filter:
                 payload["search_domain_filter"] = search_domain_filter
 
-        # Build conversation messages, injecting system context
+        # Build conversation messages with proper alternation
+        # Perplexity requires strict user/assistant message alternation
+        filtered_messages = []
         num_messages = len(messages)
+
         for idx, m in enumerate(messages):
             if not m.get("content"):
                 continue
             if m.get("role") == "system":
                 continue
 
-            # For search mode, keep queries clean and unbiased
-            # Only inject minimal context if absolutely necessary
-            if (
-                system
-                and m.get("role") == "user"
-                and idx == num_messages - 1
-            ):
-                # In search mode, we want objective, unbiased results
-                # Only include system context if it's not search-mode or if essential
-                if self.search_mode:
-                    # For search: keep it simple, let Perplexity search objectively
-                    # UK regional bias is set via country parameter in payload
-                    payload["messages"].append({
-                        "role": m["role"],
-                        "content": m["content"],
-                    })
-                else:
+            role = m.get("role")
+            content = m.get("content")
+
+            # Apply context injection for last user message if needed
+            if system and role == "user" and idx == num_messages - 1:
+                if not self.search_mode:
                     # For non-search mode: include context (standard chat behavior)
-                    payload["messages"].append({
-                        "role": m["role"],
-                        "content": (
-                            "Context:\n"
-                            f"{system}\n\n"
-                            f"Query: {m['content']}"
-                        ),
-                    })
+                    content = (
+                        "Context:\n"
+                        f"{system}\n\n"
+                        f"Query: {content}"
+                    )
+                # For search mode: keep it clean, no context injection
+
+            # Ensure message alternation: merge consecutive messages with same role
+            if filtered_messages and filtered_messages[-1]["role"] == role:
+                # Merge with previous message
+                filtered_messages[-1]["content"] += "\n\n" + content
             else:
-                payload["messages"].append({
-                    "role": m["role"],
-                    "content": m["content"],
+                filtered_messages.append({
+                    "role": role,
+                    "content": content,
                 })
+
+        # Ensure we start with user message (Perplexity requirement)
+        if filtered_messages and filtered_messages[0]["role"] != "user":
+            # Remove leading assistant messages
+            while filtered_messages and filtered_messages[0]["role"] == "assistant":
+                filtered_messages.pop(0)
+
+        payload["messages"] = filtered_messages
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -212,44 +215,51 @@ class PerplexityProvider:
             if search_domain_filter:
                 payload["search_domain_filter"] = search_domain_filter
 
-        # Build conversation messages
+        # Build conversation messages with proper alternation
+        # Perplexity requires strict user/assistant message alternation
+        filtered_messages = []
         num_messages = len(messages)
+
         for idx, m in enumerate(messages):
             if not m.get("content"):
                 continue
             if m.get("role") == "system":
                 continue
 
-            # For search mode, keep queries clean and unbiased
-            if (
-                system
-                and m.get("role") == "user"
-                and idx == num_messages - 1
-            ):
-                # In search mode, we want objective, unbiased results
+            role = m.get("role")
+            content = m.get("content")
+
+            # Apply context injection for last user message if needed
+            if system and role == "user" and idx == num_messages - 1:
                 if self.search_mode:
                     # For search: add UK location bias for relevant results
-                    # Prepend location context to get UK-focused search results
                     uk_context = "Search from UK perspective: "
-                    payload["messages"].append({
-                        "role": m["role"],
-                        "content": uk_context + m["content"],
-                    })
+                    content = uk_context + content
                 else:
                     # For non-search mode: include context (standard chat behavior)
-                    payload["messages"].append({
-                        "role": m["role"],
-                        "content": (
-                            "Context:\n"
-                            f"{system}\n\n"
-                            f"Query: {m['content']}"
-                        ),
-                    })
+                    content = (
+                        "Context:\n"
+                        f"{system}\n\n"
+                        f"Query: {content}"
+                    )
+
+            # Ensure message alternation: merge consecutive messages with same role
+            if filtered_messages and filtered_messages[-1]["role"] == role:
+                # Merge with previous message
+                filtered_messages[-1]["content"] += "\n\n" + content
             else:
-                payload["messages"].append({
-                    "role": m["role"],
-                    "content": m["content"],
+                filtered_messages.append({
+                    "role": role,
+                    "content": content,
                 })
+
+        # Ensure we start with user message (Perplexity requirement)
+        if filtered_messages and filtered_messages[0]["role"] != "user":
+            # Remove leading assistant messages
+            while filtered_messages and filtered_messages[0]["role"] == "assistant":
+                filtered_messages.pop(0)
+
+        payload["messages"] = filtered_messages
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
