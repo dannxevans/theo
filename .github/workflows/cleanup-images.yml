@@ -25,6 +25,7 @@ jobs:
     steps:
       - name: Delete old images for ${{ matrix.image }}
         uses: actions/delete-package-versions@v5
+        continue-on-error: true  # Don't fail if package metadata becomes unavailable after cleanup
         with:
           package-name: ${{ matrix.image }}
           package-type: 'container'
