@@ -400,3 +400,130 @@ def test_reset_provider_health_preserves_cooldown(memory):
     assert metadata["total_requests"] == 0
     assert metadata["failed_requests"] == 0
     assert metadata["circuit_breaker_open"] is False
+
+# ====================
+# Perplexity Provider Tests
+# ====================
+
+def test_perplexity_provider_create(memory):
+    """Test create Perplexity provider."""
+    provider = {
+        "id": "perplexity-search",
+        "name": "Perplexity Search",
+        "type": "perplexity",
+        "model": "llama-3.1-sonar-small-128k-online",
+        "api_key": "pplx-test-key",
+        "enabled": True
+    }
+
+    memory.upsert_provider(provider)
+
+    retrieved = memory.get_provider("perplexity-search")
+    assert retrieved is not None
+    assert retrieved["name"] == "Perplexity Search"
+    assert retrieved["type"] == "perplexity"
+    assert retrieved["model"] == "llama-3.1-sonar-small-128k-online"
+
+
+def test_perplexity_provider_metadata(memory):
+    """Test Perplexity provider metadata initialization."""
+    memory.upsert_provider({
+        "id": "perplexity-small",
+        "name": "Perplexity Small",
+        "type": "perplexity",
+        "enabled": True
+    })
+
+    # Initialize with Perplexity Small pricing (200 micro-dollars per 1K tokens)
+    memory.init_provider_metadata(
+        "perplexity-small",
+        cost_per_1k_input=200,
+        cost_per_1k_output=200
+    )
+
+    metadata = memory.get_provider_metadata("perplexity-small")
+    assert metadata["cost_per_1k_input_tokens"] == 200
+    assert metadata["cost_per_1k_output_tokens"] == 200
+
+
+def test_perplexity_provider_with_search_mode(memory):
+    """Test Perplexity provider with search_mode flag."""
+    provider = {
+        "id": "perplexity-web",
+        "name": "Perplexity Web Search",
+        "type": "perplexity",
+        "model": "llama-3.1-sonar-large-128k-online",
+        "api_key": "pplx-test-key",
+        "enabled": True,
+        "search_mode": True
+    }
+
+    memory.upsert_provider(provider)
+
+    retrieved = memory.get_provider("perplexity-web")
+    # Note: search_mode is a provider-specific config, not persisted in base schema
+    # It's used during instantiation from router
+    assert retrieved["type"] == "perplexity"
+    assert retrieved["enabled"] is True
+
+
+def test_perplexity_cost_tracking(memory):
+    """Test cost tracking for Perplexity requests."""
+    memory.upsert_provider({
+        "id": "perplexity-cost",
+        "name": "Perplexity Cost Test",
+        "type": "perplexity",
+        "enabled": True
+    })
+
+    # Perplexity Large: 1000 micro-dollars per 1K tokens
+    memory.init_provider_metadata(
+        "perplexity-cost",
+        cost_per_1k_input=1000,
+        cost_per_1k_output=1000
+    )
+
+    # Simulate search request with 500 input, 300 output tokens
+    cost = memory.estimate_cost("perplexity-cost", input_tokens=500, output_tokens=300)
+
+    # Expected: (500/1000 * 1000) + (300/1000 * 1000) = 500 + 300 = 800 micro-dollars
+    assert cost == 800
+
+
+def test_perplexity_multiple_models(memory):
+    """Test multiple Perplexity providers with different models."""
+    providers = [
+        {
+            "id": "perplexity-small",
+            "name": "Perplexity Small",
+            "type": "perplexity",
+            "model": "llama-3.1-sonar-small-128k-online",
+            "enabled": True
+        },
+        {
+            "id": "perplexity-large",
+            "name": "Perplexity Large",
+            "type": "perplexity",
+            "model": "llama-3.1-sonar-large-128k-online",
+            "enabled": True
+        },
+        {
+            "id": "perplexity-huge",
+            "name": "Perplexity Huge",
+            "type": "perplexity",
+            "model": "llama-3.1-sonar-huge-128k-online",
+            "enabled": True
+        }
+    ]
+
+    for provider in providers:
+        memory.upsert_provider(provider)
+
+    all_providers = memory.list_providers()
+    perplexity_providers = [p for p in all_providers if p["type"] == "perplexity"]
+
+    assert len(perplexity_providers) == 3
+    models = [p["model"] for p in perplexity_providers]
+    assert "llama-3.1-sonar-small-128k-online" in models
+    assert "llama-3.1-sonar-large-128k-online" in models
+    assert "llama-3.1-sonar-huge-128k-online" in models

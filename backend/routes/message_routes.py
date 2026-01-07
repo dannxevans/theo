@@ -329,6 +329,7 @@ def stream_chat_sse(session_id):
                         "task_type": result.get("task_type"),
                         "fallback_reason": result.get("fallback_reason"),
                         "routing": result.get("routing"),
+                        "metadata": result.get("metadata", {}),
                     }
 
                     # Include debug instruction if present
@@ -384,6 +385,7 @@ def stream_chat_sse(session_id):
                             "fallback_reason": result_metadata.get("fallback_reason") if result_metadata else None,
                             "routing": result_metadata.get("routing") if result_metadata else None,
                             "full_request_context": result_metadata.get("full_request_context") if result_metadata else None,
+                            "metadata": result_metadata.get("metadata") if result_metadata else {},
                         }
                     else:
                         # Non-streaming fallback: route_request returned a dict
@@ -406,6 +408,7 @@ def stream_chat_sse(session_id):
                         "task_type": result.get("task_type"),
                         "fallback_reason": result.get("fallback_reason"),
                         "routing": result.get("routing"),
+                        "metadata": result.get("metadata", {}),
                     }
 
                     yield "event: end\n"
@@ -434,6 +437,7 @@ def stream_chat_sse(session_id):
                     "task_type": result.get("task_type"),
                     "fallback_reason": result.get("fallback_reason"),
                     "routing": result.get("routing"),
+                    "metadata": result.get("metadata", {}),
                 }
 
                 if result.get("debug_instruction"):
