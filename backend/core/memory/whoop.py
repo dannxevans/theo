@@ -13,6 +13,23 @@ from .base import BaseMemoryOperations
 class WHOOPOperations(BaseMemoryOperations):
     """WHOOP integration management operations."""
 
+    def _get_user_preferences(self, user_id):
+        """
+        Get all user preferences (for OAuth config lookup).
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            dict: User preferences
+        """
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.preferences)
+                .where(self.preferences.c.user_id == str(user_id))
+            ).fetchall()
+            return {row.key: row.value for row in rows} if rows else {}
+
     def store_whoop_credentials(self, user_id, access_token, refresh_token,
                                  expires_at, whoop_user_id, token_type="Bearer"):
         """
@@ -177,10 +194,19 @@ class WHOOPOperations(BaseMemoryOperations):
 
         logger.info(f"[WHOOP_MEMORY] Refreshing expired token for user {user_id}")
 
-        # Attempt token refresh (passing user_id for config lookup)
-        # Note: self._memory_store would be needed here, but WHOOPOperations doesn't have direct access
-        # The refresh will fallback to env vars for now until we refactor the dependency structure
-        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token, user_id, None)
+        # Create a minimal wrapper that provides get_all() method for OAuth config lookup
+        class PreferenceWrapper:
+            def __init__(self, prefs):
+                self._prefs = prefs
+            def get_all(self, user_id):
+                return self._prefs
+
+        # Get user preferences for OAuth config
+        prefs = self._get_user_preferences(user_id)
+        wrapper = PreferenceWrapper(prefs)
+
+        # Attempt token refresh
+        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token, user_id, wrapper)
         if not new_tokens:
             logger.error(f"[WHOOP_MEMORY] Token refresh failed for user {user_id}")
             self.invalidate_whoop_credentials(user_id, "Token refresh failed")
