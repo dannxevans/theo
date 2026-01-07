@@ -62,6 +62,7 @@ class ProactiveScheduler:
 
             # Schedule WHOOP jobs
             self._schedule_whoop_jobs()
+            self._schedule_whoop_token_refresh_job()
 
             # Start the scheduler
             self.scheduler.start()
@@ -371,6 +372,36 @@ class ProactiveScheduler:
 
         except Exception as e:
             logger.error(f"[SCHEDULER] Failed to schedule WHOOP jobs: {e}")
+
+    def _schedule_whoop_token_refresh_job(self):
+        """
+        Schedule proactive WHOOP token refresh job.
+
+        This job runs every 45 minutes to refresh WHOOP OAuth tokens before they expire.
+        WHOOP access tokens expire after 1 hour, so 45-minute intervals ensure tokens
+        are refreshed with a 15-minute safety margin.
+
+        This job runs independently of user notification settings and user activity,
+        ensuring tokens remain valid even if the user has disabled all notifications
+        or hasn't queried WHOOP data in a while.
+        """
+        # Import here to avoid circular imports
+        from core.proactive.whoop_token_refresh_service import refresh_all_whoop_tokens
+
+        try:
+            # Schedule token refresh every 45 minutes
+            self.scheduler.add_job(
+                func=refresh_all_whoop_tokens,
+                trigger=IntervalTrigger(minutes=45),
+                id='whoop_token_refresh',
+                name='WHOOP Token Refresh',
+                args=[self.memory],
+                replace_existing=True
+            )
+            logger.info("[SCHEDULER] WHOOP token refresh job scheduled (every 45 minutes)")
+
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Failed to schedule WHOOP token refresh job: {e}")
 
 
 # Global scheduler instance
