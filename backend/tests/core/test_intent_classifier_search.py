@@ -252,6 +252,30 @@ class TestSearchPriority:
         intent2, _ = classifier.classify("send email to John")
         assert intent2 != "search"
 
+    def test_which_is_in_casual_conversation_not_search(self):
+        """Test 'which is' in casual conversation doesn't trigger search."""
+        classifier = IntentClassifier()
+
+        # False positive case from issue: "which is good" in casual context
+        intent1, confidence1 = classifier.classify(
+            "Snacks will be sweets and no ad-breaks which is good BBC doesnt have them "
+            "like other commercial channels which is good. I am going to go and have a "
+            "shower now as I have the stench of the day on me from being in the office."
+        )
+        assert intent1 != "search", f"Should not trigger search, got {intent1} with confidence {confidence1}"
+
+        # Other casual uses of "which is"
+        intent2, _ = classifier.classify("That's the option which is better for me")
+        assert intent2 != "search"
+
+        intent3, _ = classifier.classify("The movie which is playing tonight sounds fun")
+        assert intent3 != "search"
+
+        # But actual questions at sentence start should still work
+        intent4, confidence4 = classifier.classify("What is the capital of France?")
+        assert intent4 == "search"
+        assert confidence4 >= 0.70
+
         # But explicit search should work
         intent3, _ = classifier.classify("search for calendar apps")
         assert intent3 == "search"

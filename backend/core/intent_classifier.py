@@ -450,8 +450,10 @@ class IntentClassifier:
             return "search", 0.90
 
         # Question patterns that often benefit from search
+        # NOTE: Must be at start of sentence or after punctuation to avoid false positives
+        # like "which is good" in casual conversation
         search_question_patterns = [
-            r'\b(what|who|where|when|which|how many)\s+(is|are|was|were|will be)\s+',  # "what is X", "who is Y"
+            r'(?:^|\. |\? |! )(what|who|where|when|how many)\s+(is|are|was|were|will be)\s+',  # "what is X", "who is Y"
             r'\bwhat\s+happened\s+(to|with|in)\b',      # "what happened to X"
             r'\bwho\s+won\b',                           # "who won X"
             r'\bwhen\s+did\b',                          # "when did X happen"
