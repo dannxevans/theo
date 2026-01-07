@@ -132,10 +132,12 @@ class IntentClassifier:
             if len(text) > 200 and technical_count >= 1:
                 return "coding", 0.90
 
-        # If in Work Mode > Email
-        if mode == "work" and subtab == "email":
+        # If in Work Mode > Email OR if user explicitly asks to "reword" something
+        # Issue #302: Prevent "schedule" keyword from triggering calendar in work contexts
+        if mode == "work" and (subtab == "email" or "reword" in text_l):
             # In work mode, Email tab is for LLM-assisted email composition/rewriting
             # NOT for M365 email actions (which are personal actions)
+            # Also applies when user explicitly asks to "reword" something
             # Calendar actions still explicitly require "add to calendar" etc.
             calendar_explicit = [
                 "add to my calendar", "add to calendar", "add this to my calendar",
@@ -144,9 +146,18 @@ class IntentClassifier:
             ]
             has_explicit_calendar = any(phrase in text_l for phrase in calendar_explicit)
 
+            # Check for weak calendar keywords without explicit action context
+            # These should NOT trigger calendar intents in email rewriting context
+            weak_calendar_keywords = ["schedule", "book", "arrange"]
+            has_weak_calendar = any(keyword in text_l for keyword in weak_calendar_keywords)
+
             if has_explicit_calendar:
                 # User explicitly requested calendar action
                 return None  # Fall through to keyword matching
+            elif has_weak_calendar and not has_explicit_calendar:
+                # Weak keyword without explicit action - treat as general email assistance
+                # This prevents "schedule" in email content from triggering calendar actions
+                return "general", 0.95
             else:
                 # Work mode Email tab = LLM assistance with professional emails
                 # Return "general" so it goes to LLM, not M365 email actions
@@ -209,10 +220,14 @@ class IntentClassifier:
                 # Weak signal + context
                 base_confidence = 0.60
 
-                # Reduce confidence if in technical mode
+                # Reduce confidence if in technical/email mode
                 if mode == "work" and subtab == "code":
                     # "schedule" in ServiceNow context is likely NOT a calendar action
                     base_confidence = 0.30
+                elif mode == "work" and subtab == "email":
+                    # "schedule" in email rewriting context is likely NOT a calendar action
+                    # This is a safety net - most cases caught by _check_context_overrides
+                    base_confidence = 0.20
 
                 return "book_appointment", base_confidence
 
