@@ -62,6 +62,18 @@
       return null;
     }
 
+    // If provider_name is available in metadata, use it directly (this is the configured name)
+    if (metadata?.provider_name && metadata?.provider_type) {
+      const routing = taskType
+        ? taskType.charAt(0).toUpperCase() + taskType.slice(1).replace(/_/g, " ")
+        : "General";
+
+      // Capitalize provider type
+      const formattedType = metadata.provider_type.charAt(0).toUpperCase() + metadata.provider_type.slice(1);
+
+      return `${metadata.provider_name} · ${formattedType} · ${routing}`;
+    }
+
     // Action router responses - check task_type for special handling
     if (provider === "action_router") {
       if (taskType === "whoop") {
@@ -163,6 +175,13 @@
       else if (model.includes("gemini-2.0-flash")) modelName = "Gemini 2.0 Flash";
       else if (model.includes("gemini-1.5-pro")) modelName = "Gemini 1.5 Pro";
       else if (model.includes("gemini-1.5-flash")) modelName = "Gemini 1.5 Flash";
+      else modelName = model;
+    } else if (model && (model.includes("sonar") || model.includes("llama-3.1-sonar"))) {
+      providerType = "Perplexity";
+      if (model.includes("sonar-huge")) modelName = "Sonar-Huge";
+      else if (model.includes("sonar-large")) modelName = "Sonar-Large";
+      else if (model.includes("sonar-small")) modelName = "Sonar-Small";
+      else if (model.includes("sonar-medium")) modelName = "Sonar-Medium";
       else modelName = model;
     } else {
       // Fallback - try to determine from provider field
@@ -412,7 +431,7 @@
     scrollToBottom();
   });
 
-  function renderMarkdown(text) {
+  function renderMarkdown(text, messageId = null, citations = []) {
     if (!text) return "";
 
     // Auto-linkify plain URLs that aren't already in markdown link format
@@ -438,18 +457,68 @@
         "a","span","br"
       ],
       ALLOWED_ATTR: {
-        "a": ["href", "title", "target", "rel"],
+        "a": ["href", "title", "target", "rel", "class"],
         "span": ["class"],
         "code": ["class"]
       }
     });
 
-    // Add target="_blank" and rel to all links
+    // Add target="_blank" and rel to all links (except citation refs)
     const links = tempDiv.querySelectorAll('a');
     links.forEach(link => {
-      link.setAttribute('target', '_blank');
-      link.setAttribute('rel', 'noopener noreferrer');
+      if (!link.classList.contains('citation-ref')) {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+      }
     });
+
+    // Replace citation numbers with clickable source titles (do this AFTER markdown parsing)
+    if (citations && citations.length > 0) {
+      const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null);
+      const textNodes = [];
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
+
+      textNodes.forEach(node => {
+        const text = node.textContent;
+        // Match [1], [2], etc.
+        if (/\[\d+\]/.test(text)) {
+          const span = document.createElement('span');
+          let lastIndex = 0;
+          let html = '';
+
+          text.replace(/\[(\d+)\]/g, (match, num, offset) => {
+            const index = parseInt(num) - 1;
+            // Add text before citation
+            html += document.createTextNode(text.substring(lastIndex, offset)).textContent;
+
+            if (index >= 0 && index < citations.length) {
+              const url = citations[index];
+              try {
+                const urlObj = new URL(url);
+                const domain = urlObj.hostname.replace('www.', '');
+                const title = domain.split('.')[0];
+                // Create citation link
+                html += `<a href="${url}" target="_blank" rel="noopener noreferrer" class="citation-ref" title="${domain}">${title}</a>`;
+              } catch (e) {
+                html += match;
+              }
+            } else {
+              html += match;
+            }
+
+            lastIndex = offset + match.length;
+            return match;
+          });
+
+          // Add remaining text
+          html += text.substring(lastIndex);
+          span.innerHTML = html;
+          node.parentNode.replaceChild(span, node);
+        }
+      });
+    }
 
     return tempDiv.innerHTML;
   }
@@ -1034,9 +1103,33 @@
                 </div>
 
                 {#if m.role === "assistant"}
+                  {@const citations = m.metadata && m.metadata.citations ? m.metadata.citations : []}
                   <div class="markdown">
-                    {@html renderMarkdown(m.text)}
+                    {@html renderMarkdown(m.text, m.id, citations)}
                   </div>
+
+                  {#if m.metadata && m.metadata.citations && m.metadata.citations.length > 0}
+                    <details class="citations-section">
+                      <summary class="citations-summary">
+                        <span class="citations-icon">🔗</span>
+                        Sources ({m.metadata.citations.length})
+                      </summary>
+                      <div class="citations-list">
+                        {#each m.metadata.citations as citation, idx}
+                          {@const urlObj = new URL(citation)}
+                          {@const domain = urlObj.hostname.replace('www.', '')}
+                          {@const title = domain.split('.')[0].toUpperCase()}
+                          <div class="citation-item" id="citation-{m.id}-{idx + 1}">
+                            <span class="citation-number">[{idx + 1}]</span>
+                            <a href={citation} target="_blank" rel="noopener noreferrer" class="citation-link">
+                              <span class="citation-title">{title}</span>
+                              <span class="citation-domain">{domain}</span>
+                            </a>
+                          </div>
+                        {/each}
+                      </div>
+                    </details>
+                  {/if}
 
                   {#if m.metadata && m.metadata.requires_confirmation}
                     <div class="confirmation-widget {m.metadata.approved ? 'approved' : ''} {m.metadata.rejected ? 'rejected' : ''}">
@@ -1130,6 +1223,7 @@
                     {@const isError = m.provider === 'error'}
                     {@const isWeather = m.provider === 'weather'}
                     {@const isRouting = m.provider === 'routing'}
+                    {@const isSearch = m.task_type === 'search' || (m.provider && m.provider.includes('perplexity'))}
                     {@const formattedAction = m.task_type
                       ? m.task_type.charAt(0).toUpperCase() + m.task_type.slice(1).replace(/_/g, " ")
                       : "Action"}
@@ -1142,6 +1236,10 @@
                         {:else if isRouting}
                           <span class="provider-badge provider-badge-routing">
                             via HERE · Routing
+                          </span>
+                        {:else if isSearch}
+                          <span class="provider-badge provider-badge-search">
+                            via {formattedModel}
                           </span>
                         {:else if formattedModel}
                           <span class="provider-badge provider-badge-ai">
@@ -1599,6 +1697,117 @@
   .provider-badge-routing {
     background: #f3e8ff;
     color: #7c3aed;
+  }
+
+  /* Search responses - washed out green */
+  .provider-badge-search {
+    background: #d1fae5;
+    color: #047857;
+  }
+
+  /* Citations Section */
+  .citations-section {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.875rem;
+  }
+
+  .citations-summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #374151;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .citations-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .citations-icon {
+    font-size: 1rem;
+  }
+
+  .citations-list {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .citation-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border-radius: 4px;
+    scroll-margin-top: 4rem;
+  }
+
+  .citation-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .citation-number {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: #047857;
+    font-size: 0.875rem;
+  }
+
+  .citation-link {
+    flex: 1;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .citation-link:hover {
+    text-decoration: underline;
+  }
+
+  .citation-title {
+    font-weight: 600;
+    color: #047857;
+    font-size: 0.875rem;
+  }
+
+  .citation-domain {
+    color: #6b7280;
+    font-size: 0.75rem;
+  }
+
+  /* Citation references in text - badge style */
+  :global(.markdown .citation-ref),
+  :global(.citation-ref) {
+    display: inline-block !important;
+    padding: 2px 6px !important;
+    margin: 0 2px !important;
+    background: #e5e7eb !important;
+    color: #374151 !important;
+    text-decoration: none !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-size: 0.85em !important;
+    font-weight: 500 !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: background 0.2s ease !important;
+  }
+
+  :global(.markdown .citation-ref:hover),
+  :global(.citation-ref:hover) {
+    background: #d1d5db !important;
+    color: #374151 !important;
+    text-decoration: none !important;
   }
 
   .bubble-footer-container {

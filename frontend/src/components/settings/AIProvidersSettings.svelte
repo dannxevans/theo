@@ -100,6 +100,13 @@
         notes: 'Routes requests through multiple providers. Data location and processing varies by model selected.',
         recommendation: 'Not recommended for OFFICIAL data. Use direct provider connections for better control.'
       },
+      'perplexity': {
+        dataLocation: 'United States',
+        riskLevel: 'MEDIUM',
+        suitableForOfficial: true,
+        notes: 'Data processed in US data centers. Perplexity provides real-time web search with citations. Data leaves UK jurisdiction.',
+        recommendation: 'Suitable for OFFICIAL. Search queries and responses processed through US servers. Review data protection policies for sensitive searches.'
+      },
       'mock': {
         dataLocation: 'Local (no external API)',
         riskLevel: 'LOW',
@@ -332,6 +339,7 @@
           <option value="xai">xAI</option>
           <option value="mistral">Mistral</option>
           <option value="google">Google</option>
+          <option value="perplexity">Perplexity</option>
           <option value="openrouter">OpenRouter</option>
           <option value="mock">Mock (for testing)</option>
         </select>
@@ -401,6 +409,7 @@
                   <option value="xai">xAI</option>
                   <option value="mistral">Mistral</option>
                   <option value="google">Google</option>
+                  <option value="perplexity">Perplexity</option>
                   <option value="openrouter">OpenRouter</option>
                   <option value="mock">Mock (for testing)</option>
                 </select>

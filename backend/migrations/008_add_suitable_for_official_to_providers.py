@@ -67,6 +67,7 @@ def run_migration():
             'xai',
             'mistral',
             'google',
+            'perplexity',
             'mock',  # for testing only
             'azure_openai'  # RECOMMENDED for OFFICIAL
         ]

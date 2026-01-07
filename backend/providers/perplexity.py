@@ -1,0 +1,322 @@
+import requests
+import json
+
+
+class PerplexityProvider:
+    """
+    Perplexity AI provider adapter for THEO with native search capability.
+
+    Features:
+    - Supports Perplexity Sonar models with real-time web search
+    - Returns web-grounded responses with citations
+    - Compatible with THEO's provider interface
+    - Supports both chat and streaming modes
+
+    Models:
+    - llama-3.1-sonar-small-128k-online: Fast, cost-effective search
+    - llama-3.1-sonar-large-128k-online: Balanced performance and accuracy
+    - llama-3.1-sonar-huge-128k-online: Maximum accuracy and depth
+    """
+
+    name = "perplexity"
+    maxContextTokens = 128000
+    costTier = "medium"
+    supportsStreaming = True
+
+    def __init__(self, api_key=None, base_url=None, model=None, search_mode=True):
+        """
+        Initialize Perplexity provider.
+
+        Args:
+            api_key: Perplexity API key (required)
+            base_url: API endpoint (default: https://api.perplexity.ai)
+            model: Model to use (default: llama-3.1-sonar-small-128k-online)
+            search_mode: Enable web-grounded search (default: True)
+        """
+        self.api_key = api_key
+        self.base_url = base_url or "https://api.perplexity.ai"
+        self.model = model or "llama-3.1-sonar-small-128k-online"
+        self.search_mode = search_mode
+
+        if not self.api_key:
+            raise ValueError("PerplexityProvider requires an api_key")
+
+    def chat(self, **kwargs):
+        """
+        Execute a chat completion with Perplexity.
+
+        Parameters:
+        - model: string (model identifier)
+        - system: system prompt string
+        - messages: list of {role, content}
+        - temperature: float (default: 0.2)
+        - search_domain_filter: list of domains to restrict search (optional)
+        - return_citations: bool (default: True for search mode)
+
+        Returns:
+        - str (assistant response text)
+
+        Note:
+        - Citations are stored in metadata but not included in text response
+        - Use search_mode=True for web-grounded responses
+        """
+
+        model = kwargs.get("model") or getattr(self, "model", None) or "llama-3.1-sonar-small-128k-online"
+        system = kwargs.get("system_prompt") or kwargs.get("system")
+        messages = kwargs.get("messages") or []
+        temperature = kwargs.get("temperature", 0.2)
+        search_domain_filter = kwargs.get("search_domain_filter", [])
+        return_citations = kwargs.get("return_citations", self.search_mode)
+
+        if kwargs.get("debug"):
+            print("[DEBUG][Perplexity] model =", model)
+            print("[DEBUG][Perplexity] search_mode =", self.search_mode)
+            print("[DEBUG][Perplexity] system injected =", bool(system))
+            if system:
+                print("[DEBUG][Perplexity] system preview =", system[:200])
+
+        url = f"{self.base_url}/chat/completions"
+
+        payload = {
+            "model": model,
+            "temperature": temperature,
+            "messages": [],
+        }
+
+        # Add search configuration if enabled
+        if self.search_mode:
+            payload["return_citations"] = return_citations
+            payload["country"] = "GB"  # UK country code for regional search results
+            if search_domain_filter:
+                payload["search_domain_filter"] = search_domain_filter
+
+        # Build conversation messages, injecting system context
+        num_messages = len(messages)
+        for idx, m in enumerate(messages):
+            if not m.get("content"):
+                continue
+            if m.get("role") == "system":
+                continue
+
+            # For search mode, keep queries clean and unbiased
+            # Only inject minimal context if absolutely necessary
+            if (
+                system
+                and m.get("role") == "user"
+                and idx == num_messages - 1
+            ):
+                # In search mode, we want objective, unbiased results
+                # Only include system context if it's not search-mode or if essential
+                if self.search_mode:
+                    # For search: keep it simple, let Perplexity search objectively
+                    # UK regional bias is set via country parameter in payload
+                    payload["messages"].append({
+                        "role": m["role"],
+                        "content": m["content"],
+                    })
+                else:
+                    # For non-search mode: include context (standard chat behavior)
+                    payload["messages"].append({
+                        "role": m["role"],
+                        "content": (
+                            "Context:\n"
+                            f"{system}\n\n"
+                            f"Query: {m['content']}"
+                        ),
+                    })
+            else:
+                payload["messages"].append({
+                    "role": m["role"],
+                    "content": m["content"],
+                })
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"Perplexity API error {resp.status_code}: {resp.text}"
+                )
+
+            data = resp.json()
+
+            try:
+                text = data["choices"][0]["message"]["content"]
+                usage = data.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+
+                # Extract citations if available
+                citations = data.get("citations", [])
+
+            except (KeyError, IndexError) as e:
+                raise RuntimeError(f"Unexpected Perplexity response: {data}")
+
+            # Store usage data and citations for router to access
+            self._last_usage = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "citations": citations,
+                "web_grounded": self.search_mode
+            }
+
+            return text
+
+        except requests.exceptions.Timeout:
+            raise RuntimeError("Perplexity API request timed out (30s)")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Perplexity API request failed: {str(e)}")
+
+    def stream_chat(self, **kwargs):
+        """
+        Execute a streaming chat completion with Perplexity.
+
+        Yields:
+        - str (text chunks as they arrive)
+
+        Note:
+        - Same parameters as chat() method
+        - Citations available at end of stream
+        """
+
+        model = kwargs.get("model") or getattr(self, "model", None) or "llama-3.1-sonar-small-128k-online"
+        system = kwargs.get("system_prompt") or kwargs.get("system")
+        messages = kwargs.get("messages") or []
+        temperature = kwargs.get("temperature", 0.2)
+        search_domain_filter = kwargs.get("search_domain_filter", [])
+        return_citations = kwargs.get("return_citations", self.search_mode)
+
+        if kwargs.get("debug"):
+            print("[DEBUG][Perplexity] Streaming mode")
+            print("[DEBUG][Perplexity] model =", model)
+            print("[DEBUG][Perplexity] search_mode =", self.search_mode)
+
+        url = f"{self.base_url}/chat/completions"
+
+        payload = {
+            "model": model,
+            "temperature": temperature,
+            "stream": True,
+            "messages": [],
+        }
+
+        # Add search configuration if enabled
+        if self.search_mode:
+            payload["return_citations"] = return_citations
+            payload["country"] = "GB"  # UK country code for regional search results
+            if search_domain_filter:
+                payload["search_domain_filter"] = search_domain_filter
+
+        # Build conversation messages
+        num_messages = len(messages)
+        for idx, m in enumerate(messages):
+            if not m.get("content"):
+                continue
+            if m.get("role") == "system":
+                continue
+
+            # For search mode, keep queries clean and unbiased
+            if (
+                system
+                and m.get("role") == "user"
+                and idx == num_messages - 1
+            ):
+                # In search mode, we want objective, unbiased results
+                if self.search_mode:
+                    # For search: add UK location bias for relevant results
+                    # Prepend location context to get UK-focused search results
+                    uk_context = "Search from UK perspective: "
+                    payload["messages"].append({
+                        "role": m["role"],
+                        "content": uk_context + m["content"],
+                    })
+                else:
+                    # For non-search mode: include context (standard chat behavior)
+                    payload["messages"].append({
+                        "role": m["role"],
+                        "content": (
+                            "Context:\n"
+                            f"{system}\n\n"
+                            f"Query: {m['content']}"
+                        ),
+                    })
+            else:
+                payload["messages"].append({
+                    "role": m["role"],
+                    "content": m["content"],
+                })
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            resp = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=30,
+            )
+
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"Perplexity API error {resp.status_code}: {resp.text}"
+                )
+
+            # Track citations and usage from streaming response
+            citations = []
+            input_tokens = 0
+            output_tokens = 0
+
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+
+                decoded = line.decode("utf-8")
+
+                if decoded.startswith("data: "):
+                    data = decoded[len("data: "):]
+
+                    if data.strip() == "[DONE]":
+                        break
+
+                    try:
+                        chunk = json.loads(data)
+
+                        # Extract citations if present in this chunk
+                        if "citations" in chunk:
+                            citations = chunk["citations"]
+
+                        # Extract usage if present
+                        if "usage" in chunk:
+                            usage = chunk["usage"]
+                            input_tokens = usage.get("prompt_tokens", 0)
+                            output_tokens = usage.get("completion_tokens", 0)
+
+                        # Yield content
+                        delta = chunk["choices"][0]["delta"]
+                        content = delta.get("content")
+                        if content:
+                            yield content
+                    except Exception:
+                        continue
+
+            # Store usage data and citations for router to access
+            self._last_usage = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "citations": citations,
+                "web_grounded": self.search_mode
+            }
+
+        except requests.exceptions.Timeout:
+            raise RuntimeError("Perplexity API streaming request timed out (30s)")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Perplexity API streaming request failed: {str(e)}")

@@ -430,6 +430,46 @@ class IntentClassifier:
             if re.search(pattern, text_l):
                 return "planning", 0.90
 
+        # Search keywords - explicit search requests for web-grounded information
+        search_strong_keywords = [
+            "search for", "search the web for", "search online for",
+            "look up", "look this up", "look that up", "find information about",
+            "find information on", "latest news about", "latest news on",
+            "recent news about", "recent news on", "current information about",
+            "current information on", "up to date information about",
+            "up to date information on", "real-time information about",
+            "real-time information on"
+        ]
+
+        for keyword in search_strong_keywords:
+            if keyword in text_l:
+                return "search", 0.90
+
+        # Check for "search:" or "search " at the beginning (common user pattern)
+        if text_l.startswith("search:") or text_l.startswith("search "):
+            return "search", 0.90
+
+        # Question patterns that often benefit from search
+        search_question_patterns = [
+            r'\b(what|who|where|when|which|how many)\s+(is|are|was|were|will be)\s+',  # "what is X", "who is Y"
+            r'\bwhat\s+happened\s+(to|with|in)\b',      # "what happened to X"
+            r'\bwho\s+won\b',                           # "who won X"
+            r'\bwhen\s+did\b',                          # "when did X happen"
+            r'\bhow\s+many\s+.*\s+(are|were)\s+there', # "how many X are there"
+        ]
+
+        # Check if it's a factual question pattern
+        for pattern in search_question_patterns:
+            if re.search(pattern, text_l):
+                # Additional context: check if asking about recent/current events
+                recency_indicators = ["latest", "recent", "current", "now", "today", "this week", "this month", "2026", "2025"]
+                if any(indicator in text_l for indicator in recency_indicators):
+                    return "search", 0.85
+                # Or check if asking about specific facts
+                fact_indicators = ["capital", "population", "president", "ceo", "founded", "headquartered"]
+                if any(indicator in text_l for indicator in fact_indicators):
+                    return "search", 0.80
+
         # Check user-defined intents (if memory available)
         if self.memory:
             # Use actual user_id, default to "local" only if user_id is None
