@@ -299,7 +299,7 @@ class WHOOPOAuth:
             "refresh_token": refresh_token,
             "client_id": config['client_id'],
             "client_secret": config['client_secret'],
-            "scope": "offline"  # Required by WHOOP API for token refresh
+            "scope": " ".join(cls.SCOPES)  # Must include all original scopes per WHOOP API spec
         }
 
         logger.info("[WHOOP_OAUTH] Refreshing access token...")
