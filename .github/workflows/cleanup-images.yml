@@ -21,6 +21,7 @@ jobs:
     strategy:
       matrix:
         image: [theo-backend, theo-frontend]
+      fail-fast: false  # Continue cleanup for other images even if one fails
 
     steps:
       - name: Delete old images for ${{ matrix.image }}
@@ -29,6 +30,6 @@ jobs:
         with:
           package-name: ${{ matrix.image }}
           package-type: 'container'
-          min-versions-to-keep: 10
+          min-versions-to-keep: 3
           delete-only-untagged-versions: false
-          ignore-versions: '^(latest|v.*)$'  # Keep 'latest' and version tags like 'v1.0.0'
+          ignore-versions: '^(latest|dev)$'  # Only keep 'latest' and 'dev' tags permanently
