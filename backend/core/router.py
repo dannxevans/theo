@@ -7,6 +7,7 @@ from providers.openai import OpenAIProvider
 from providers.grok import XAIProvider
 from providers.mistral import MistralProvider
 from providers.gemini import GoogleProvider
+from providers.perplexity import PerplexityProvider
 from core.provider_registry import ProviderRegistry
 from core.action_router import ActionRouter
 from actions.action_registry import ActionProviderRegistry
@@ -34,6 +35,7 @@ INTENT_TO_PROVIDER_TYPE = {
     "planning": "openai",
     "reasoning": "anthropic",
     "creative": "openai",
+    "search": "perplexity",
 }
 
 PROVIDER_CAPABILITIES = {
@@ -42,6 +44,7 @@ PROVIDER_CAPABILITIES = {
     "xai": {"general", "coding", "reasoning", "planning", "creative"},
     "mistral": {"general", "coding", "reasoning", "planning", "creative"},
     "google": {"general", "coding", "reasoning", "planning", "creative"},
+    "perplexity": {"general", "search", "reasoning", "planning"},
     "mock": {"general", "coding", "reasoning", "planning", "creative"},
 }
 
@@ -865,6 +868,13 @@ def instantiate_provider(provider_cfg):
             base_url=provider_cfg.get("base_url"),
             model=provider_cfg.get("model"),
         )
+    if ptype == "perplexity":
+        return PerplexityProvider(
+            api_key=provider_cfg["api_key"],
+            base_url=provider_cfg.get("base_url"),
+            model=provider_cfg.get("model"),
+            search_mode=provider_cfg.get("search_mode", True),
+        )
     return MockProvider()
 
 
@@ -1435,9 +1445,14 @@ def route_request(context: dict, stream: bool = False):
     _debug(memory, f"Selected provider: {provider_cfg['id']}")
 
 
+    # Get actual model from provider instance (falls back to config if not available)
+    actual_model = getattr(provider, 'model', None) or provider_cfg.get("model")
+
     meta = {
         "provider": provider_cfg["id"],
-        "model": provider_cfg["model"],
+        "provider_name": provider_cfg.get("name"),
+        "provider_type": provider_cfg.get("type"),
+        "model": actual_model,
         "task_type": intent,
         "fallback_reason": fallback_reason,
         "routing": routing_decision,
@@ -1629,7 +1644,7 @@ def route_request(context: dict, stream: bool = False):
             full_request_context = [{"role": "system", "content": system_prompt}] + messages
 
             # ⬇️ THIS IS THE IMPORTANT PART ⬇️
-            yield {
+            end_event = {
                 "event": "end",
                 "provider": meta["provider"],
                 "model": meta["model"],
@@ -1637,7 +1652,22 @@ def route_request(context: dict, stream: bool = False):
                 "fallback_reason": meta["fallback_reason"],
                 "routing": meta["routing"],
                 "full_request_context": full_request_context,
+                "metadata": {
+                    "provider_name": meta.get("provider_name"),
+                    "provider_type": meta.get("provider_type"),
+                }
             }
+
+            # Include citations and other provider-specific metadata if available
+            if hasattr(provider, '_last_usage'):
+                citations = provider._last_usage.get("citations", [])
+                web_grounded = provider._last_usage.get("web_grounded", False)
+                if citations:
+                    end_event["metadata"]["citations"] = citations
+                if web_grounded:
+                    end_event["metadata"]["web_grounded"] = web_grounded
+
+            yield end_event
 
         return stream_generator()
 
@@ -1673,7 +1703,20 @@ def route_request(context: dict, stream: bool = False):
         "fallback_reason": meta["fallback_reason"],
         "routing": meta["routing"],
         "full_request_context": full_request_context,
+        "metadata": {
+            "provider_name": meta.get("provider_name"),
+            "provider_type": meta.get("provider_type"),
+        }
     }
+
+    # Include citations and other provider-specific metadata if available
+    if hasattr(provider, '_last_usage'):
+        citations = provider._last_usage.get("citations", [])
+        web_grounded = provider._last_usage.get("web_grounded", False)
+        if citations:
+            result["metadata"]["citations"] = citations
+        if web_grounded:
+            result["metadata"]["web_grounded"] = web_grounded
 
     if debug_instruction:
         result["debug_instruction"] = debug_instruction
