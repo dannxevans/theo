@@ -240,20 +240,28 @@ def cleanup_test_users_silent(db_path):
         for user_id, username in test_users:
             logger.info(f"[CLEANUP] Deleting test user: {username}")
 
-            # Delete user's related data
-            cursor.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM api_keys WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM preferences WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM intents WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM routing_preferences WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM feature_providers WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM debug_settings WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM system_prompt_config WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM mode_config WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM proactive_settings WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM user_routines WHERE user_id = ?", (user_id,))
+            # Helper function to safely delete from a table
+            def safe_delete(table_name):
+                try:
+                    cursor.execute(f"DELETE FROM {table_name} WHERE user_id = ?", (user_id,))
+                except sqlite3.OperationalError as e:
+                    if "no such table" not in str(e):
+                        raise
+
+            # Delete user's related data (safely ignore missing tables)
+            safe_delete("auth_sessions")
+            safe_delete("api_keys")
+            safe_delete("memories")
+            safe_delete("sessions")
+            safe_delete("preferences")
+            safe_delete("intents")
+            safe_delete("routing_preferences")
+            safe_delete("feature_providers")
+            safe_delete("debug_settings")
+            safe_delete("system_prompt_config")
+            safe_delete("mode_config")
+            safe_delete("proactive_settings")
+            safe_delete("user_routines")
 
             # Finally, delete the user
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
