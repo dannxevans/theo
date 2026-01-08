@@ -10,31 +10,12 @@ from routes.voice_routes import voice_bp
 
 
 @pytest.fixture
-def app():
-    """Create Flask app for testing."""
-    app = Flask(__name__)
-    app.config['TESTING'] = True
-    app.register_blueprint(voice_bp, url_prefix='/api/voice')
-    return app
-
-
-@pytest.fixture
-def client(app):
-    """Create test client."""
-    return app.test_client()
-
-
-@pytest.fixture
-def test_user(app):
+def test_user(memory):
     """Create a test user."""
-    from core.memory import MemoryStore
-    from config import Config
     from auth.password import hash_password
-    memory = MemoryStore(Config.DATABASE_URL)
 
     password_hash = hash_password("test_password")
-    import uuid
-    username = f"testuser_{uuid.uuid4().hex[:8]}"
+    username = "voicetest_user"
     memory.create_user(username, password_hash, is_admin=False)
     user = memory.get_user_by_username(username)
 
@@ -46,14 +27,10 @@ def test_user(app):
 
 
 @pytest.fixture
-def auth_token(app, test_user):
+def auth_token(memory, test_user):
     """Create an authentication token for the test user."""
-    from core.memory import MemoryStore
-    from config import Config
     from datetime import datetime, timedelta
     from auth.password import generate_session_token
-
-    memory = MemoryStore(Config.DATABASE_URL)
 
     token = generate_session_token()
     expires_at = datetime.utcnow() + timedelta(hours=1)
@@ -68,6 +45,32 @@ def auth_headers(auth_token):
         "Authorization": f"Bearer {auth_token}",
         "Content-Type": "application/json"
     }
+
+
+@pytest.fixture
+def app(memory):
+    """Create Flask app for testing."""
+    # Patch Config.DATABASE_URL to use the test database
+    from config import Config
+    original_db_url = Config.DATABASE_URL
+    Config.DATABASE_URL = memory.db_url
+
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+    app.register_blueprint(voice_bp, url_prefix='/api/voice')
+
+    yield app
+
+    # Restore original URL
+    Config.DATABASE_URL = original_db_url
+
+
+@pytest.fixture
+def client(app):
+    """Create test client."""
+    return app.test_client()
+
+
 
 
 @pytest.fixture
@@ -233,7 +236,7 @@ class TestVoiceRoutes:
                 '/api/voice/stt',
                 data=data,
                 content_type='multipart/form-data',
-            headers=auth_headers
+                headers=auth_headers
             )
 
             assert response.status_code == 500
@@ -301,7 +304,7 @@ class TestProviderHelpers:
 
     @patch('routes.voice_routes.OpenAITTSProvider')
     @patch('app.provider_registry')
-    def test_get_tts_provider_success(self, mock_registry, mock_provider_class, auth_headers):
+    def test_get_tts_provider_success(self, mock_registry, mock_provider_class):
         """Test successful TTS provider initialization."""
         from routes.voice_routes import get_tts_provider
 
@@ -324,7 +327,7 @@ class TestProviderHelpers:
         )
 
     @patch('app.provider_registry')
-    def test_get_tts_provider_no_api_key(self, mock_registry, auth_headers):
+    def test_get_tts_provider_no_api_key(self, mock_registry):
         """Test TTS provider when API key is not configured."""
         from routes.voice_routes import get_tts_provider
 
@@ -337,7 +340,7 @@ class TestProviderHelpers:
 
     @patch('routes.voice_routes.OpenAIWhisperProvider')
     @patch('app.provider_registry')
-    def test_get_stt_provider_success(self, mock_registry, mock_provider_class, auth_headers):
+    def test_get_stt_provider_success(self, mock_registry, mock_provider_class):
         """Test successful STT provider initialization."""
         from routes.voice_routes import get_stt_provider
 
