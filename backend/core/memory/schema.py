@@ -38,6 +38,8 @@ def create_schema(meta: MetaData):
         Column("id", Integer, primary_key=True, autoincrement=True),
         Column("username", String, nullable=False, unique=True),
         Column("password_hash", String, nullable=False),
+        Column("name", String, nullable=True),
+        Column("email", String, nullable=True),
         Column("is_admin", Boolean, default=False),
         Column("is_enabled", Boolean, default=True),
         Column("created_at", DateTime, default=datetime.utcnow),

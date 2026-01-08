@@ -7,6 +7,7 @@ Provides login, logout, session verification, and password management endpoints.
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from auth import verify_password, hash_password, generate_session_token
+from auth.password_utils import validate_password_strength
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -182,9 +183,10 @@ def change_password():
     if not verify_password(current_password, user["password_hash"]):
         return jsonify({"error": "Current password incorrect"}), 401
 
-    # Validate new password
-    if len(new_password) < 4:
-        return jsonify({"error": "New password must be at least 4 characters"}), 400
+    # Validate new password strength
+    is_valid, error_msg = validate_password_strength(new_password)
+    if not is_valid:
+        return jsonify({"error": error_msg}), 400
 
     # Update password
     new_hash = hash_password(new_password)
