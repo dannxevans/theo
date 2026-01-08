@@ -156,7 +156,8 @@ def run_migrations(db_path: str):
         "025_add_oauth_config_to_feature_providers.py",  # Add OAuth config storage to feature providers
         "026_add_session_folders.py",  # Add session folders for organization and archiving
         "027_add_whoop_intent.py",  # Add WHOOP intent for fitness tracking queries
-        "028_fix_good_night_routine_timeframe.py"  # Fix Good Night routine calendar timeframe (issue #328)
+        "028_fix_good_night_routine_timeframe.py",  # Fix Good Night routine calendar timeframe (issue #328)
+        "029_add_user_name_email.py"  # Add name and email columns to users table for user management
     ]
 
     # Filter to only existing files
