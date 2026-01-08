@@ -21,7 +21,7 @@ class UserOperations(BaseMemoryOperations):
     # User Management
     # =============================
 
-    def create_user(self, username, password_hash, is_admin=False):
+    def create_user(self, username, password_hash, is_admin=False, name=None, email=None):
         """
         Create a new user.
 
@@ -29,6 +29,8 @@ class UserOperations(BaseMemoryOperations):
             username: Unique username
             password_hash: Hashed password
             is_admin: Whether user has admin privileges
+            name: Optional full name
+            email: Optional email address
 
         Returns:
             Created user ID
@@ -38,6 +40,8 @@ class UserOperations(BaseMemoryOperations):
                 insert(self.users).values(
                     username=username,
                     password_hash=password_hash,
+                    name=name,
+                    email=email,
                     is_admin=is_admin,
                     is_enabled=True,
                     created_at=datetime.utcnow(),
@@ -142,6 +146,193 @@ class UserOperations(BaseMemoryOperations):
                     updated_at=datetime.utcnow(),
                 )
             )
+
+    def list_all_users(self, include_disabled=False):
+        """
+        Get all users ordered by username.
+
+        Args:
+            include_disabled: Include disabled users (default: False)
+
+        Returns:
+            List of user dictionaries
+        """
+        with self._get_connection() as conn:
+            query = select(self.users)
+            if not include_disabled:
+                query = query.where(self.users.c.is_enabled == True)
+            query = query.order_by(self.users.c.username)
+
+            rows = conn.execute(query).fetchall()
+            return [dict(row._mapping) for row in rows]
+
+    def update_user(self, user_id, updates):
+        """
+        Update user fields.
+
+        Args:
+            user_id: User ID to update
+            updates: Dict with optional keys: username, name, email, is_admin, is_enabled
+
+        Returns:
+            Updated user dictionary
+
+        Raises:
+            ValueError: If user not found or username conflict
+        """
+        user_id = normalize_user_id(user_id)
+
+        # Check user exists
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        # Validate updates
+        allowed_fields = {'username', 'name', 'email', 'is_admin', 'is_enabled'}
+        invalid_fields = set(updates.keys()) - allowed_fields
+        if invalid_fields:
+            raise ValueError(f"Invalid fields: {invalid_fields}")
+
+        # Check username uniqueness if changing
+        if 'username' in updates and updates['username'] != user['username']:
+            existing = self.get_user_by_username(updates['username'])
+            if existing:
+                raise ValueError(f"Username '{updates['username']}' already exists")
+
+        # Build update values
+        update_values = {**updates, 'updated_at': datetime.utcnow()}
+
+        with self._get_connection() as conn:
+            conn.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(**update_values)
+            )
+
+        return self.get_user_by_id(user_id)
+
+    def enable_user(self, user_id):
+        """
+        Enable disabled user account.
+
+        Args:
+            user_id: User ID to enable
+
+        Returns:
+            Updated user dictionary
+        """
+        return self.update_user(user_id, {'is_enabled': True})
+
+    def reset_user_password(self, user_id, new_password_hash):
+        """
+        Admin function to reset user password.
+
+        Invalidates all active sessions for security.
+
+        Args:
+            user_id: User ID
+            new_password_hash: Bcrypt hash of new password
+
+        Returns:
+            Updated user dictionary
+
+        Raises:
+            ValueError: If user not found
+        """
+        user_id = normalize_user_id(user_id)
+
+        # Update password
+        self.update_user_password(user_id, new_password_hash)
+
+        # Invalidate all sessions for this user
+        with self._get_connection() as conn:
+            conn.execute(
+                delete(self.auth_sessions)
+                .where(self.auth_sessions.c.user_id == user_id)
+            )
+
+        return self.get_user_by_id(user_id)
+
+    def get_user_activity_stats(self, user_id):
+        """
+        Get user activity metrics.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dictionary with:
+            - session_count: Active sessions
+            - api_key_count: Active API keys
+            - last_activity: Most recent session activity
+            - memory_count: Conversation memory count
+            - created_at: Account creation date
+        """
+        user_id = normalize_user_id(user_id)
+
+        with self._get_connection() as conn:
+            # Session count (active only)
+            session_count = conn.execute(
+                select(self.auth_sessions)
+                .where(self.auth_sessions.c.user_id == user_id)
+                .where(self.auth_sessions.c.expires_at > datetime.utcnow())
+            ).fetchall()
+
+            # API key count (active only - not revoked and not expired)
+            api_key_rows = conn.execute(
+                select(self.api_keys)
+                .where(self.api_keys.c.user_id == user_id)
+                .where(self.api_keys.c.is_revoked == False)
+            ).fetchall()
+
+            # Filter out expired keys
+            now = datetime.utcnow()
+            active_api_keys = [
+                k for k in api_key_rows
+                if k.expires_at is None or k.expires_at > now
+            ]
+
+            # Last activity (from sessions)
+            last_activity_row = conn.execute(
+                select(self.auth_sessions.c.last_activity_at)
+                .where(self.auth_sessions.c.user_id == user_id)
+                .order_by(self.auth_sessions.c.last_activity_at.desc())
+                .limit(1)
+            ).fetchone()
+
+            # Memory count
+            memory_count_row = conn.execute(
+                select(self.memories)
+                .where(self.memories.c.user_id == user_id)
+            ).fetchall()
+
+            # User creation date
+            user = self.get_user_by_id(user_id)
+
+            return {
+                'session_count': len(session_count),
+                'api_key_count': len(active_api_keys),
+                'last_activity': last_activity_row[0] if last_activity_row else None,
+                'memory_count': len(memory_count_row),
+                'created_at': user['created_at'] if user else None
+            }
+
+    def count_admins(self):
+        """
+        Count total number of enabled admin users.
+
+        Used to prevent demoting the last admin.
+
+        Returns:
+            Number of enabled admin users
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                select(self.users)
+                .where(self.users.c.is_admin == True)
+                .where(self.users.c.is_enabled == True)
+            ).fetchall()
+            return len(rows)
 
     # =============================
     # Authentication Sessions

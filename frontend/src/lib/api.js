@@ -58,6 +58,7 @@ export async function rememberMemory(key, value) {
   const response = await fetch(`${API_BASE}/api/memory/remember`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -78,6 +79,7 @@ export async function forgetMemory(key) {
   const response = await fetch(`${API_BASE}/api/memory/forget`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -716,7 +718,9 @@ export async function getMemories(params = {}) {
   if (params.limit) queryString.append("limit", params.limit);
 
   const url = `${API_BASE}/api/memories${queryString.toString() ? "?" + queryString.toString() : ""}`;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -730,6 +734,7 @@ export async function createMemory({ type, key, value, pinned }) {
   const response = await fetch(`${API_BASE}/api/memories`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -750,7 +755,8 @@ export async function createMemory({ type, key, value, pinned }) {
 
 export async function deleteMemory(memoryId) {
   const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
-    method: "DELETE"
+    method: "DELETE",
+    headers: getAuthHeaders()
   });
 
   if (!response.ok) {
@@ -765,6 +771,7 @@ export async function updateMemory(memoryId, { type, key, value }) {
   const response = await fetch(`${API_BASE}/api/memories/${memoryId}`, {
     method: "PUT",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -786,6 +793,7 @@ export async function pinMemory(memoryId, pinned) {
   const response = await fetch(`${API_BASE}/api/memories/${memoryId}/pin`, {
     method: "POST",
     headers: {
+      ...getAuthHeaders(),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -802,7 +810,9 @@ export async function pinMemory(memoryId, pinned) {
 }
 
 export async function getRelevantMemories(query) {
-  const response = await fetch(`${API_BASE}/api/memories/relevant?q=${encodeURIComponent(query)}`);
+  const response = await fetch(`${API_BASE}/api/memories/relevant?q=${encodeURIComponent(query)}`, {
+    headers: getAuthHeaders()
+  });
 
   if (!response.ok) {
     const err = await response.text();
@@ -1949,6 +1959,104 @@ export async function getAuditStats() {
   if (!response.ok) {
     const err = await response.text();
     throw new Error(err || "Failed to load audit statistics");
+  }
+
+  return response.json();
+}
+
+// ======================
+// User Management
+// ======================
+
+export async function listUsers(includeDisabled = false) {
+  const params = new URLSearchParams({ include_disabled: includeDisabled });
+  const response = await fetch(`${API_BASE}/api/users?${params}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to load users");
+  }
+
+  return response.json();
+}
+
+export async function createUser(username, isAdmin = false, name = null, email = null) {
+  const payload = { username, is_admin: isAdmin };
+  if (name) payload.name = name;
+  if (email) payload.email = email;
+
+  const response = await fetch(`${API_BASE}/api/users`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to create user");
+  }
+
+  return response.json();
+}
+
+export async function getUser(userId) {
+  const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to load user");
+  }
+
+  return response.json();
+}
+
+export async function updateUser(userId, updates) {
+  const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(updates)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update user");
+  }
+
+  return response.json();
+}
+
+export async function resetUserPassword(userId) {
+  const response = await fetch(`${API_BASE}/api/users/${userId}/reset-password`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to reset password");
+  }
+
+  return response.json();
+}
+
+export async function getCurrentUser() {
+  const response = await fetch(`${API_BASE}/api/users/me`, {
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to load current user");
   }
 
   return response.json();

@@ -6,20 +6,20 @@ user memories.
 """
 
 from flask import Blueprint, jsonify, request
-from core.user_utils import DEFAULT_USER_ID
+from auth.password import require_auth
 
 memory_bp = Blueprint('memory', __name__, url_prefix='/api')
 
 
-
 def get_user_id_from_request():
-    """Extract user_id from auth token or use default."""
-    # For now, just use DEFAULT_USER_ID since we don't have auth implemented in routes yet
-    # TODO: Extract from Authorization header when authentication is fully implemented
-    return DEFAULT_USER_ID
+    """Extract user_id from authenticated request."""
+    if hasattr(request, 'current_user') and request.current_user:
+        return request.current_user['id']
+    return None
 
 
 @memory_bp.route("/memory/remember", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def remember():
     """
     Legacy memory endpoint (kept for backwards compatibility).
@@ -31,7 +31,7 @@ def remember():
 
     memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
-    
+
     memory.remember(
         user_id=get_user_id_from_request(),
         key=data["key"],
@@ -41,6 +41,7 @@ def remember():
 
 
 @memory_bp.route("/memory/forget", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def forget():
     """
     Legacy memory endpoint (kept for backwards compatibility).
@@ -52,12 +53,13 @@ def forget():
 
     memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
-    
+
     memory.forget(get_user_id_from_request(), data["key"])
     return jsonify({"status": "ok"})
 
 
 @memory_bp.route("/memories", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def list_memories():
     """
     Get all structured memories for the user.
@@ -78,6 +80,7 @@ def list_memories():
 
 
 @memory_bp.route("/memories", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def create_memory():
     """
     Store a new structured memory.
@@ -89,7 +92,7 @@ def create_memory():
 
     memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
-    
+
     memory.store_memory(
         user_id=get_user_id_from_request(),
         memory_type=data.get("type", "fact"),
@@ -101,6 +104,7 @@ def create_memory():
 
 
 @memory_bp.route("/memories/<int:memory_id>", methods=["DELETE"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def delete_memory_endpoint(memory_id):
     """
     Delete a memory by ID.
@@ -116,6 +120,7 @@ def delete_memory_endpoint(memory_id):
 
 
 @memory_bp.route("/memories/<int:memory_id>", methods=["PUT"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def update_memory_endpoint(memory_id):
     """
     Update a memory by ID.
@@ -139,6 +144,7 @@ def update_memory_endpoint(memory_id):
 
 
 @memory_bp.route("/memories/<int:memory_id>/pin", methods=["POST"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def pin_memory_endpoint(memory_id):
     """
     Pin or unpin a memory.
@@ -151,12 +157,13 @@ def pin_memory_endpoint(memory_id):
     memory = MemoryStore(Config.DATABASE_URL)
     data = request.json
     pinned = data.get("pinned", True)
-    
+
     memory.pin_memory(get_user_id_from_request(), memory_id, pinned)
     return jsonify({"status": "ok", "pinned": pinned})
 
 
 @memory_bp.route("/memories/relevant", methods=["GET"])
+@require_auth(lambda: __import__('core.memory').memory.MemoryStore(__import__('config').Config.DATABASE_URL))
 def get_relevant_memories():
     """
     Get memories relevant to a query.
@@ -168,7 +175,7 @@ def get_relevant_memories():
 
     memory = MemoryStore(Config.DATABASE_URL)
     query = request.args.get("q", "")
-    
+
     if not query:
         return jsonify([])
 

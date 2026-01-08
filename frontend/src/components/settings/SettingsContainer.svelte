@@ -12,6 +12,7 @@
   import PersonalModeSettings from "./PersonalModeSettings.svelte";
   import AccountSettings from "./AccountSettings.svelte";
   import ApiKeysSettings from "./ApiKeysSettings.svelte";
+  import UserManagement from "./UserManagement.svelte";
   import ThemeSettings from "./ThemeSettings.svelte";
   import VoiceSettings from "./VoiceSettings.svelte";
   import FeatureProvidersSettings from "./FeatureProvidersSettings.svelte";
@@ -40,9 +41,18 @@
   let advancedMode = false;
   let loaded = false;
 
+  // Check if user is admin (for User Management tab)
+  let isAdmin = false;
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    isAdmin = user.is_admin || false;
+  } catch (e) {
+    console.error('Failed to parse user from localStorage:', e);
+  }
+
   // Active tab state
-  let activeCategory = "general"; // general, operating-modes, accounts, health
-  let activeTab = "general"; // Changes based on category
+  let activeCategory = "general"; // general, operating-modes, system, health
+  let activeTab = "my-account"; // Changes based on category
   let openDropdown = null; // Track which dropdown is open
 
   // Helper function to switch category and optionally set a specific tab
@@ -56,19 +66,19 @@
       // Set default tab for each category
       switch (category) {
         case "general":
-          activeTab = "general";
+          activeTab = "my-account";
           break;
         case "operating-modes":
           activeTab = "personal";
           break;
-        case "accounts":
-          activeTab = "theo-account";
+        case "system":
+          activeTab = "general";
           break;
         case "health":
           activeTab = "health-monitor";
           break;
         default:
-          activeTab = "general";
+          activeTab = "my-account";
       }
     }
     // Close dropdowns when switching category
@@ -312,14 +322,8 @@
       </button>
       {#if openDropdown === "general"}
         <div class="dropdown-menu">
-          <button class="dropdown-item" class:active={activeTab === "general"} on:click={() => switchCategory("general", "general")}>
-            General Settings
-          </button>
-          <button class="dropdown-item" class:active={activeTab === "intents"} on:click={() => switchCategory("general", "intents")}>
-            Intents
-          </button>
-          <button class="dropdown-item" class:active={activeTab === "routing"} on:click={() => switchCategory("general", "routing")}>
-            Routing
+          <button class="dropdown-item" class:active={activeTab === "my-account"} on:click={() => switchCategory("general", "my-account")}>
+            My Account
           </button>
           <button class="dropdown-item" class:active={activeTab === "memory"} on:click={() => switchCategory("general", "memory")}>
             Memory
@@ -359,41 +363,50 @@
       {/if}
     </div>
 
-    <!-- Accounts Dropdown -->
-    <div class="category-dropdown" class:open={openDropdown === "accounts"}>
+    <!-- System Dropdown (Admin Only) -->
+    {#if isAdmin}
+    <div class="category-dropdown" class:open={openDropdown === "system"}>
       <button
         class="category-tab"
-        class:active={activeCategory === "accounts"}
-        on:click={() => toggleDropdown("accounts")}
+        class:active={activeCategory === "system"}
+        on:click={() => toggleDropdown("system")}
       >
-        Accounts
-        <span class="dropdown-arrow">{openDropdown === "accounts" ? "▲" : "▼"}</span>
+        System
+        <span class="dropdown-arrow">{openDropdown === "system" ? "▲" : "▼"}</span>
       </button>
-      {#if openDropdown === "accounts"}
+      {#if openDropdown === "system"}
         <div class="dropdown-menu">
-          <button class="dropdown-item" class:active={activeTab === "theo-account"} on:click={() => switchCategory("accounts", "theo-account")}>
-            THEO Account
+          <button class="dropdown-item" class:active={activeTab === "general"} on:click={() => switchCategory("system", "general")}>
+            General Settings
           </button>
-          <button class="dropdown-item" class:active={activeTab === "api-keys"} on:click={() => switchCategory("accounts", "api-keys")}>
-            API Keys
+          <button class="dropdown-item" class:active={activeTab === "user-management"} on:click={() => switchCategory("system", "user-management")}>
+            User Management
           </button>
-          <button class="dropdown-item" class:active={activeTab === "ai-providers"} on:click={() => switchCategory("accounts", "ai-providers")}>
+          <button class="dropdown-item" class:active={activeTab === "ai-providers"} on:click={() => switchCategory("system", "ai-providers")}>
             AI Providers
           </button>
-          <button class="dropdown-item" class:active={activeTab === "integrations"} on:click={() => switchCategory("accounts", "integrations")}>
+          <button class="dropdown-item" class:active={activeTab === "intents"} on:click={() => switchCategory("system", "intents")}>
+            LLM Routing Intents
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "routing"} on:click={() => switchCategory("system", "routing")}>
+            Routing Rules
+          </button>
+          <button class="dropdown-item" class:active={activeTab === "integrations"} on:click={() => switchCategory("system", "integrations")}>
             Integrations
           </button>
-          <button class="dropdown-item" class:active={activeTab === "service-providers"} on:click={() => switchCategory("accounts", "service-providers")}>
+          <button class="dropdown-item" class:active={activeTab === "service-providers"} on:click={() => switchCategory("system", "service-providers")}>
             Service Providers
           </button>
-          <button class="dropdown-item" class:active={activeTab === "feature-providers"} on:click={() => switchCategory("accounts", "feature-providers")}>
+          <button class="dropdown-item" class:active={activeTab === "feature-providers"} on:click={() => switchCategory("system", "feature-providers")}>
             Feature Providers
           </button>
         </div>
       {/if}
     </div>
+    {/if}
 
-    <!-- Health Dropdown -->
+    <!-- Health Dropdown (Admin Only) -->
+    {#if isAdmin}
     <div class="category-dropdown" class:open={openDropdown === "health"}>
       <button
         class="category-tab"
@@ -417,16 +430,18 @@
         </div>
       {/if}
     </div>
+    {/if}
   </div>
 
   <!-- Current Page Breadcrumb -->
   <div class="page-breadcrumb">
-    <span class="breadcrumb-category">{activeCategory === "general" ? "General" : activeCategory === "operating-modes" ? "Operating Modes" : activeCategory === "accounts" ? "Accounts" : "Health"}</span>
+    <span class="breadcrumb-category">{activeCategory === "general" ? "General" : activeCategory === "operating-modes" ? "Operating Modes" : activeCategory === "system" ? "System" : "Health"}</span>
     <span class="breadcrumb-separator">›</span>
     <span class="breadcrumb-page">
       {#if activeTab === "general"}General Settings{/if}
-      {#if activeTab === "intents"}Intents{/if}
-      {#if activeTab === "routing"}Routing{/if}
+      {#if activeTab === "my-account"}My Account{/if}
+      {#if activeTab === "intents"}LLM Routing Intents{/if}
+      {#if activeTab === "routing"}Routing Rules{/if}
       {#if activeTab === "memory"}Memory{/if}
       {#if activeTab === "voice"}Voice{/if}
       {#if activeTab === "theme"}Theme{/if}
@@ -434,8 +449,7 @@
       {#if activeTab === "feature-providers"}Feature Providers{/if}
       {#if activeTab === "personal"}Personal Mode{/if}
       {#if activeTab === "work"}Work Mode{/if}
-      {#if activeTab === "theo-account"}THEO Account{/if}
-      {#if activeTab === "api-keys"}API Keys{/if}
+      {#if activeTab === "user-management"}User Management{/if}
       {#if activeTab === "ai-providers"}AI Providers{/if}
       {#if activeTab === "integrations"}Integrations{/if}
       {#if activeTab === "service-providers"}Service Providers{/if}
@@ -523,12 +537,12 @@
       <PersonalModeSettings bind:personalModeSettings {providers} />
     {/if}
 
-    {#if activeTab === "theo-account"}
+    {#if activeTab === "my-account"}
       <AccountSettings />
     {/if}
 
-    {#if activeTab === "api-keys"}
-      <ApiKeysSettings />
+    {#if activeTab === "user-management"}
+      <UserManagement />
     {/if}
 
     {#if activeTab === "integrations"}

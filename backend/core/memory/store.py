@@ -410,9 +410,9 @@ class MemoryStore:
     # User Operations (delegated)
     # =============================
 
-    def create_user(self, username, password_hash, is_admin=False):
+    def create_user(self, username, password_hash, is_admin=False, name=None, email=None):
         """Create a new user."""
-        return self._user_ops.create_user(username, password_hash, is_admin)
+        return self._user_ops.create_user(username, password_hash, is_admin, name, email)
 
     def get_user_by_username(self, username):
         """Get user by username."""
@@ -429,6 +429,30 @@ class MemoryStore:
     def disable_user(self, user_id):
         """Disable a user account."""
         return self._user_ops.disable_user(user_id)
+
+    def list_all_users(self, include_disabled=False):
+        """List all users."""
+        return self._user_ops.list_all_users(include_disabled)
+
+    def update_user(self, user_id, updates):
+        """Update user fields."""
+        return self._user_ops.update_user(user_id, updates)
+
+    def enable_user(self, user_id):
+        """Enable disabled user account."""
+        return self._user_ops.enable_user(user_id)
+
+    def reset_user_password(self, user_id, new_password_hash):
+        """Admin reset user password and invalidate sessions."""
+        return self._user_ops.reset_user_password(user_id, new_password_hash)
+
+    def get_user_activity_stats(self, user_id):
+        """Get user activity metrics."""
+        return self._user_ops.get_user_activity_stats(user_id)
+
+    def count_admins(self):
+        """Count total enabled admin users."""
+        return self._user_ops.count_admins()
 
     def create_auth_session(self, session_id, user_id, expires_at):
         """Create an authentication session."""

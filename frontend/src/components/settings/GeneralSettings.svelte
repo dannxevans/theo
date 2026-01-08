@@ -1,5 +1,5 @@
 <script>
-  import { updateSystemPromptConfig, getAuthHeaders } from "../../lib/api";
+  import { updateSystemPromptConfig, getAuthHeaders, getUserPreference, setUserPreference } from "../../lib/api";
   import { onMount } from "svelte";
 
   export let systemPromptConfig = {
@@ -13,6 +13,10 @@
   let promptSaveStatus = null;
   let visualStreamingDisabled = false;
   let savingVisualStreaming = false;
+
+  let sessionTimeoutHours = 8;
+  let sessionTimeoutStatus = null;
+  let loadingTimeout = true;
 
   onMount(async () => {
     // Load visual streaming preference
@@ -28,6 +32,29 @@
       }
     } catch (e) {
       console.error("Failed to load visual streaming setting:", e);
+    }
+
+    // Load session timeout from backend
+    try {
+      const value = await getUserPreference("session_timeout");
+      if (value) {
+        sessionTimeoutHours = parseInt(value);
+      } else {
+        // Fallback to localStorage for migration
+        const localValue = localStorage.getItem("theo.sessionTimeout");
+        if (localValue) {
+          sessionTimeoutHours = parseInt(localValue);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load session timeout from backend:", err);
+      // Fallback to localStorage
+      const localValue = localStorage.getItem("theo.sessionTimeout");
+      if (localValue) {
+        sessionTimeoutHours = parseInt(localValue);
+      }
+    } finally {
+      loadingTimeout = false;
     }
   });
 
@@ -77,6 +104,32 @@
     } finally {
       savingVisualStreaming = false;
     }
+  }
+
+  async function saveSessionTimeout() {
+    sessionTimeoutStatus = null;
+
+    // Validation
+    if (!sessionTimeoutHours || sessionTimeoutHours < 1 || sessionTimeoutHours > 168) {
+      sessionTimeoutStatus = "Please enter a timeout between 1 and 168 hours";
+      return;
+    }
+
+    try {
+      // Save to backend
+      await setUserPreference("session_timeout", sessionTimeoutHours.toString());
+
+      // Also save to localStorage for backward compatibility with frontend timeout
+      localStorage.setItem("theo.sessionTimeout", sessionTimeoutHours.toString());
+
+      sessionTimeoutStatus = `Session timeout set to ${sessionTimeoutHours} hours. This will take effect immediately for backend session validation.`;
+    } catch (err) {
+      sessionTimeoutStatus = `Error saving session timeout: ${err.message}`;
+    }
+
+    setTimeout(() => {
+      sessionTimeoutStatus = null;
+    }, 5000);
   }
 </script>
 
@@ -164,6 +217,35 @@
         <small>When enabled, messages will appear instantly instead of with a typewriter effect. Reduces CPU usage and may improve accessibility.</small>
       </div>
     </div>
+  </div>
+
+  <h2>Session Timeout</h2>
+  <p class="subtitle">Configure automatic logout after a period of inactivity.</p>
+
+  <div class="section">
+    <div class="form-group">
+      <label for="session-timeout">Timeout Duration (hours)</label>
+      <input
+        id="session-timeout"
+        type="number"
+        min="1"
+        max="168"
+        bind:value={sessionTimeoutHours}
+        placeholder="8"
+      />
+      <small>Default: 8 hours. Maximum: 168 hours (1 week)</small>
+    </div>
+
+    <button
+      class="btn-primary"
+      on:click={saveSessionTimeout}
+    >
+      Save Timeout Setting
+    </button>
+
+    {#if sessionTimeoutStatus}
+      <div class="success-message">{sessionTimeoutStatus}</div>
+    {/if}
   </div>
 </div>
 
