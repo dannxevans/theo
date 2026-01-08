@@ -204,6 +204,71 @@ def run_migrations(db_path: str):
     return all_success
 
 
+def cleanup_test_users_silent(db_path):
+    """
+    Remove test users from database (non-interactive version for automatic cleanup).
+
+    Args:
+        db_path: Path to the SQLite database file
+    """
+    import sqlite3
+
+    logger.info("[CLEANUP] Starting automatic test user cleanup")
+
+    if not os.path.exists(db_path):
+        logger.warning(f"[CLEANUP] Database not found at {db_path}")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Find test users
+        cursor.execute("""
+            SELECT id, username FROM users
+            WHERE username LIKE 'testuser_%' OR username = 'testuser' OR username = 'voicetest_user'
+        """)
+        test_users = cursor.fetchall()
+
+        if not test_users:
+            logger.info("[CLEANUP] ✓ No test users found")
+            return
+
+        logger.info(f"[CLEANUP] Found {len(test_users)} test user(s) to clean up")
+
+        # Delete test users and their related data
+        for user_id, username in test_users:
+            logger.info(f"[CLEANUP] Deleting test user: {username}")
+
+            # Delete user's related data
+            cursor.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM api_keys WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM preferences WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM intents WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM routing_preferences WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM feature_providers WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM debug_settings WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM system_prompt_config WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM mode_config WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM proactive_settings WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM user_routines WHERE user_id = ?", (user_id,))
+
+            # Finally, delete the user
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        conn.commit()
+        logger.info(f"[CLEANUP] ✓ Successfully deleted {len(test_users)} test user(s)")
+
+    except Exception as e:
+        logger.error(f"[CLEANUP] ✗ Cleanup failed: {e}")
+        conn.rollback()
+
+    finally:
+        conn.close()
+
+
 def init_database_backup():
     """
     Initialize database migrations on application startup.
@@ -231,6 +296,9 @@ def init_database_backup():
     if os.path.exists(db_path):
         logger.info("Running database migrations")
         run_migrations(db_path)
+
+        # Run test user cleanup after migrations
+        cleanup_test_users_silent(db_path)
     else:
         logger.info(f"Database not found at {db_path}, will be created on first use")
 

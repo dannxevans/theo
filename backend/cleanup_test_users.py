@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""
+Cleanup script to remove test users from production database.
+
+This script removes all users with usernames matching the pattern:
+- testuser_*
+- testuser
+
+Usage:
+    python3 backend/cleanup_test_users.py
+    python3 backend/cleanup_test_users.py /path/to/theo.db
+"""
+
+import sqlite3
+import os
+import sys
+
+
+def get_db_path():
+    """Get database path from command line arg or default location."""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+
+    # Default: project root /data/theo.db
+    return os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "data",
+        "theo.db"
+    )
+
+
+def cleanup_test_users():
+    """Remove test users from database."""
+    DB_PATH = get_db_path()
+
+    print(f"[CLEANUP] Starting test user cleanup...")
+    print(f"[CLEANUP] Database: {DB_PATH}")
+
+    if not os.path.exists(DB_PATH):
+        print(f"[CLEANUP] ERROR: Database not found at {DB_PATH}")
+        return False
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    try:
+        # Find test users
+        cursor.execute("""
+            SELECT id, username FROM users
+            WHERE username LIKE 'testuser_%' OR username = 'testuser'
+        """)
+        test_users = cursor.fetchall()
+
+        if not test_users:
+            print("[CLEANUP] ✓ No test users found")
+            return True
+
+        print(f"[CLEANUP] Found {len(test_users)} test user(s):")
+        for user_id, username in test_users:
+            print(f"  - {username} (ID: {user_id})")
+
+        # Ask for confirmation
+        response = input("\nDelete these users? (yes/no): ")
+        if response.lower() not in ['yes', 'y']:
+            print("[CLEANUP] Cancelled by user")
+            return False
+
+        # Delete test users and their related data
+        for user_id, username in test_users:
+            print(f"[CLEANUP] Deleting user: {username}")
+
+            # Delete user's sessions
+            cursor.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+
+            # Delete user's API keys
+            cursor.execute("DELETE FROM api_keys WHERE user_id = ?", (user_id,))
+
+            # Delete user's memories
+            cursor.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
+
+            # Delete user's sessions (chat sessions)
+            cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+            # Delete user's preferences
+            cursor.execute("DELETE FROM preferences WHERE user_id = ?", (user_id,))
+
+            # Delete user's intents
+            cursor.execute("DELETE FROM intents WHERE user_id = ?", (user_id,))
+
+            # Delete user's routing preferences
+            cursor.execute("DELETE FROM routing_preferences WHERE user_id = ?", (user_id,))
+
+            # Delete user's feature providers
+            cursor.execute("DELETE FROM feature_providers WHERE user_id = ?", (user_id,))
+
+            # Delete user's debug settings
+            cursor.execute("DELETE FROM debug_settings WHERE user_id = ?", (user_id,))
+
+            # Delete user's system prompt config
+            cursor.execute("DELETE FROM system_prompt_config WHERE user_id = ?", (user_id,))
+
+            # Delete user's mode config
+            cursor.execute("DELETE FROM mode_config WHERE user_id = ?", (user_id,))
+
+            # Delete user's proactive settings
+            cursor.execute("DELETE FROM proactive_settings WHERE user_id = ?", (user_id,))
+
+            # Delete user's routines
+            cursor.execute("DELETE FROM user_routines WHERE user_id = ?", (user_id,))
+
+            # Finally, delete the user
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        conn.commit()
+        print(f"[CLEANUP] ✓ Successfully deleted {len(test_users)} test user(s)")
+        print("[CLEANUP] All related data has been cleaned up")
+        return True
+
+    except Exception as e:
+        print(f"[CLEANUP] ✗ Cleanup failed: {e}")
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    success = cleanup_test_users()
+    sys.exit(0 if success else 1)
