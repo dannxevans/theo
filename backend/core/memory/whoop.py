@@ -51,9 +51,9 @@ class WHOOPOperations(BaseMemoryOperations):
                 .values(
                     access_token=access_token,
                     refresh_token=refresh_token,
-                    token_type=token_type,
                     expires_at=expires_at,
                     whoop_user_id=whoop_user_id,
+                    token_type=token_type,
                     is_valid=True,
                     last_refreshed_at=datetime.utcnow(),
                     last_error=None,
@@ -61,19 +61,18 @@ class WHOOPOperations(BaseMemoryOperations):
                 )
             )
 
-            # If no rows updated, insert new record
+            # If no rows affected, insert instead
             if result.rowcount == 0:
                 conn.execute(
                     insert(self.whoop_credentials).values(
                         user_id=user_id,
                         access_token=access_token,
                         refresh_token=refresh_token,
-                        token_type=token_type,
                         expires_at=expires_at,
                         whoop_user_id=whoop_user_id,
+                        token_type=token_type,
                         is_valid=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                        last_refreshed_at=datetime.utcnow()
                     )
                 )
 
@@ -85,24 +84,38 @@ class WHOOPOperations(BaseMemoryOperations):
             user_id: User ID
 
         Returns:
-            dict: WHOOP credentials or None if not found
+            dict: Credentials or None
         """
         with self.engine.begin() as conn:
-            row = conn.execute(
+            result = conn.execute(
                 select(self.whoop_credentials)
                 .where(self.whoop_credentials.c.user_id == user_id)
             ).fetchone()
-            return dict(row._mapping) if row else None
+
+            if not result:
+                return None
+
+            return {
+                'user_id': result.user_id,
+                'access_token': result.access_token,
+                'refresh_token': result.refresh_token,
+                'expires_at': result.expires_at,
+                'token_type': result.token_type,
+                'whoop_user_id': result.whoop_user_id,
+                'is_valid': bool(result.is_valid),
+                'last_refreshed_at': result.last_refreshed_at,
+                'last_error': result.last_error
+            }
 
     def update_whoop_token(self, user_id, access_token, expires_at, refresh_token=None):
         """
-        Update WHOOP access token after refresh.
+        Update WHOOP access token (after refresh).
 
         Args:
             user_id: User ID
             access_token: New access token
             expires_at: New expiration datetime
-            refresh_token: New refresh token (if rotated)
+            refresh_token: New refresh token (if rotated), optional
         """
         with self.engine.begin() as conn:
             values = {
@@ -124,13 +137,13 @@ class WHOOPOperations(BaseMemoryOperations):
                 .values(**values)
             )
 
-    def invalidate_whoop_credentials(self, user_id, error=None):
+    def invalidate_whoop_credentials(self, user_id, error_message):
         """
         Mark WHOOP credentials as invalid.
 
         Args:
             user_id: User ID
-            error: Optional error message
+            error_message: Error message to store
         """
         with self.engine.begin() as conn:
             conn.execute(
@@ -138,7 +151,7 @@ class WHOOPOperations(BaseMemoryOperations):
                 .where(self.whoop_credentials.c.user_id == user_id)
                 .values(
                     is_valid=False,
-                    last_error=error,
+                    last_error=error_message,
                     updated_at=datetime.utcnow()
                 )
             )
@@ -156,9 +169,16 @@ class WHOOPOperations(BaseMemoryOperations):
                 .where(self.whoop_credentials.c.user_id == user_id)
             )
 
+    # Thread-safe token refresh with database locking
+    _refresh_lock_cache = {}  # In-memory lock per user_id
+
     def refresh_whoop_token_if_needed(self, user_id):
         """
         Check if WHOOP token is expired and refresh if needed.
+
+        Uses an in-memory lock to prevent concurrent refresh attempts
+        from the same process, which would cause WHOOP API errors
+        (refresh tokens can only be used once).
 
         Args:
             user_id: User ID
@@ -168,62 +188,71 @@ class WHOOPOperations(BaseMemoryOperations):
         """
         from auth.whoop_oauth import WHOOPOAuth
         import logging
+        import threading
 
         logger = logging.getLogger(__name__)
 
-        credentials = self.get_whoop_credentials(user_id)
-        if not credentials or not credentials.get('is_valid'):
-            return None
+        # Get or create lock for this user
+        if user_id not in self._refresh_lock_cache:
+            self._refresh_lock_cache[user_id] = threading.Lock()
 
-        # Check if token is expired or will expire in next 5 minutes
-        expires_at = credentials.get('expires_at')
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at)
+        lock = self._refresh_lock_cache[user_id]
 
-        buffer_time = timedelta(minutes=5)
-        if datetime.utcnow() + buffer_time < expires_at:
-            # Token still valid
-            return credentials
+        # Acquire lock to prevent concurrent refreshes for same user
+        with lock:
+            credentials = self.get_whoop_credentials(user_id)
+            if not credentials or not credentials.get('is_valid'):
+                return None
 
-        # Token expired or about to expire - refresh it
-        refresh_token = credentials.get('refresh_token')
-        if not refresh_token:
-            logger.warning(f"[WHOOP_MEMORY] No refresh token for user {user_id}, cannot refresh")
-            self.invalidate_whoop_credentials(user_id, "No refresh token available")
-            return None
+            # Check if token is expired or will expire in next 5 minutes
+            expires_at = credentials.get('expires_at')
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at)
 
-        logger.info(f"[WHOOP_MEMORY] Refreshing expired token for user {user_id}")
+            buffer_time = timedelta(minutes=5)
+            if datetime.utcnow() + buffer_time < expires_at:
+                # Token still valid
+                return credentials
 
-        # Create a minimal wrapper that provides get_all() method for OAuth config lookup
-        class PreferenceWrapper:
-            def __init__(self, prefs):
-                self._prefs = prefs
-            def get_all(self, user_id):
-                return self._prefs
+            # Token expired or about to expire - refresh it
+            refresh_token = credentials.get('refresh_token')
+            if not refresh_token:
+                logger.warning(f"[WHOOP_MEMORY] No refresh token for user {user_id}, cannot refresh")
+                self.invalidate_whoop_credentials(user_id, "No refresh token available")
+                return None
 
-        # Get user preferences for OAuth config
-        prefs = self._get_user_preferences(user_id)
-        wrapper = PreferenceWrapper(prefs)
+            logger.info(f"[WHOOP_MEMORY] Refreshing expired token for user {user_id}")
 
-        # Attempt token refresh
-        new_tokens = WHOOPOAuth.refresh_access_token(refresh_token, user_id, wrapper)
-        if not new_tokens:
-            logger.error(f"[WHOOP_MEMORY] Token refresh failed for user {user_id}")
-            self.invalidate_whoop_credentials(user_id, "Token refresh failed")
-            return None
+            # Create a minimal wrapper that provides get_all() method for OAuth config lookup
+            class PreferenceWrapper:
+                def __init__(self, prefs):
+                    self._prefs = prefs
+                def get_all(self, user_id):
+                    return self._prefs
 
-        # Update stored credentials
-        self.update_whoop_token(
-            user_id,
-            new_tokens['access_token'],
-            new_tokens['expires_at'],
-            new_tokens.get('refresh_token')  # May be rotated
-        )
+            # Get user preferences for OAuth config
+            prefs = self._get_user_preferences(user_id)
+            wrapper = PreferenceWrapper(prefs)
 
-        logger.info(f"[WHOOP_MEMORY] ✓ Token refreshed successfully for user {user_id}")
+            # Attempt token refresh
+            new_tokens = WHOOPOAuth.refresh_access_token(refresh_token, user_id, wrapper)
+            if not new_tokens:
+                logger.error(f"[WHOOP_MEMORY] Token refresh failed for user {user_id}")
+                self.invalidate_whoop_credentials(user_id, "Token refresh failed")
+                return None
 
-        # Return updated credentials
-        return self.get_whoop_credentials(user_id)
+            # Update stored credentials
+            self.update_whoop_token(
+                user_id,
+                new_tokens['access_token'],
+                new_tokens['expires_at'],
+                new_tokens.get('refresh_token')  # May be rotated
+            )
+
+            logger.info(f"[WHOOP_MEMORY] ✓ Token refreshed successfully for user {user_id}")
+
+            # Return updated credentials
+            return self.get_whoop_credentials(user_id)
 
     # =============================
     # WHOOP Settings
@@ -237,81 +266,85 @@ class WHOOPOperations(BaseMemoryOperations):
             user_id: User ID
 
         Returns:
-            dict: WHOOP settings with defaults if not found
+            dict: Settings with defaults if not set
         """
         with self.engine.begin() as conn:
-            row = conn.execute(
+            result = conn.execute(
                 select(self.whoop_settings)
                 .where(self.whoop_settings.c.user_id == user_id)
             ).fetchone()
 
-            if row:
-                return dict(row._mapping)
-            else:
+            if not result:
                 # Return defaults
                 return {
-                    'user_id': user_id,
                     'sleep_notifications_enabled': True,
                     'workout_notifications_enabled': True,
+                    'stress_notifications_enabled': True,
+                    'stress_notification_time': '14:00',
                     'check_frequency_minutes': 30,
                     'quiet_hours_enabled': False,
                     'quiet_hours_start': None,
                     'quiet_hours_end': None
                 }
 
-    def update_whoop_settings(self, user_id, settings):
+            return {
+                'sleep_notifications_enabled': bool(result.sleep_notifications_enabled),
+                'workout_notifications_enabled': bool(result.workout_notifications_enabled),
+                'stress_notifications_enabled': bool(result.stress_notifications_enabled),
+                'stress_notification_time': result.stress_notification_time,
+                'check_frequency_minutes': result.check_frequency_minutes,
+                'quiet_hours_enabled': bool(result.quiet_hours_enabled),
+                'quiet_hours_start': result.quiet_hours_start,
+                'quiet_hours_end': result.quiet_hours_end
+            }
+
+    def update_whoop_settings(self, user_id, **settings):
         """
         Update WHOOP notification settings.
 
         Args:
             user_id: User ID
-            settings: Dictionary of settings to update
+            **settings: Settings to update (must be whitelisted)
         """
+        # Whitelist of allowed settings
+        allowed_fields = {
+            'sleep_notifications_enabled',
+            'workout_notifications_enabled',
+            'stress_notifications_enabled',
+            'stress_notification_time',
+            'check_frequency_minutes',
+            'quiet_hours_enabled',
+            'quiet_hours_start',
+            'quiet_hours_end'
+        }
+
+        # Filter to only allowed fields
+        filtered_settings = {k: v for k, v in settings.items() if k in allowed_fields}
+
+        if not filtered_settings:
+            return
+
         with self.engine.begin() as conn:
-            # Check if exists
-            existing = conn.execute(
-                select(self.whoop_settings.c.id)
+            # Try to update first
+            result = conn.execute(
+                update(self.whoop_settings)
                 .where(self.whoop_settings.c.user_id == user_id)
-            ).fetchone()
+                .values(updated_at=datetime.utcnow(), **filtered_settings)
+            )
 
-            if existing:
-                # Update - only allow specific fields to be updated
-                allowed_fields = [
-                    'sleep_notifications_enabled',
-                    'workout_notifications_enabled',
-                    'stress_notifications_enabled',
-                    'stress_notification_time',
-                    'check_frequency_minutes',
-                    'quiet_hours_enabled',
-                    'quiet_hours_start',
-                    'quiet_hours_end'
-                ]
-                update_values = {k: v for k, v in settings.items() if k in allowed_fields}
-                update_values['updated_at'] = datetime.utcnow()
-
-                conn.execute(
-                    update(self.whoop_settings)
-                    .where(self.whoop_settings.c.user_id == user_id)
-                    .values(**update_values)
-                )
-            else:
-                # Insert with defaults
-                insert_values = {
+            # If no rows affected, insert with defaults + updates
+            if result.rowcount == 0:
+                defaults = {
                     'user_id': user_id,
-                    'sleep_notifications_enabled': settings.get('sleep_notifications_enabled', True),
-                    'workout_notifications_enabled': settings.get('workout_notifications_enabled', True),
-                    'stress_notifications_enabled': settings.get('stress_notifications_enabled', True),
-                    'stress_notification_time': settings.get('stress_notification_time', '14:00'),
-                    'check_frequency_minutes': settings.get('check_frequency_minutes', 30),
-                    'quiet_hours_enabled': settings.get('quiet_hours_enabled', False),
-                    'quiet_hours_start': settings.get('quiet_hours_start'),
-                    'quiet_hours_end': settings.get('quiet_hours_end'),
-                    'created_at': datetime.utcnow(),
-                    'updated_at': datetime.utcnow()
+                    'sleep_notifications_enabled': True,
+                    'workout_notifications_enabled': True,
+                    'stress_notifications_enabled': True,
+                    'stress_notification_time': '14:00',
+                    'check_frequency_minutes': 30,
+                    'quiet_hours_enabled': False
                 }
-                conn.execute(
-                    insert(self.whoop_settings).values(**insert_values)
-                )
+                defaults.update(filtered_settings)
+                conn.execute(insert(self.whoop_settings).values(**defaults))
 
     # =============================
     # WHOOP Data Tracking
@@ -319,90 +352,72 @@ class WHOOPOperations(BaseMemoryOperations):
 
     def track_whoop_data(self, user_id, data_type, whoop_id):
         """
-        Track that we've processed a WHOOP record.
+        Track that a WHOOP data item has been processed.
 
         Args:
             user_id: User ID
-            data_type: Type of data ('sleep', 'workout', 'recovery')
-            whoop_id: WHOOP's ID for the record
-
-        Returns:
-            bool: True if inserted, False if already exists
+            data_type: Type (sleep, workout, recovery)
+            whoop_id: WHOOP's ID for this data item
         """
         with self.engine.begin() as conn:
-            # Check if already tracked
-            existing = conn.execute(
-                select(self.whoop_data_tracking.c.id)
-                .where(self.whoop_data_tracking.c.whoop_id == whoop_id)
-            ).fetchone()
-
-            if existing:
-                return False
-
-            # Insert new tracking record
             conn.execute(
                 insert(self.whoop_data_tracking).values(
                     user_id=user_id,
                     data_type=data_type,
                     whoop_id=whoop_id,
-                    notified_at=datetime.utcnow(),
-                    created_at=datetime.utcnow()
+                    notified_at=datetime.utcnow()
                 )
             )
-            return True
 
     def is_whoop_data_tracked(self, whoop_id):
         """
-        Check if we've already processed this WHOOP record.
+        Check if a WHOOP data item has already been tracked.
 
         Args:
-            whoop_id: WHOOP's ID for the record
+            whoop_id: WHOOP's ID
 
         Returns:
             bool: True if already tracked
         """
         with self.engine.begin() as conn:
-            row = conn.execute(
-                select(self.whoop_data_tracking.c.id)
+            result = conn.execute(
+                select(self.whoop_data_tracking)
                 .where(self.whoop_data_tracking.c.whoop_id == whoop_id)
             ).fetchone()
-            return row is not None
 
-    def get_tracked_whoop_data(self, user_id, data_type=None, days=7):
+            return result is not None
+
+    def get_tracked_whoop_data(self, user_id, data_type, since_date=None):
         """
-        Get list of tracked WHOOP IDs for a user.
+        Get tracked WHOOP data IDs.
 
         Args:
             user_id: User ID
-            data_type: Optional data type filter ('sleep', 'workout', 'recovery')
-            days: Number of days to look back (default 7)
+            data_type: Type (sleep, workout, recovery)
+            since_date: Optional cutoff date
 
         Returns:
-            list: List of WHOOP IDs
+            list: WHOOP IDs
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-
         with self.engine.begin() as conn:
-            query = select(self.whoop_data_tracking.c.whoop_id).where(
-                self.whoop_data_tracking.c.user_id == user_id,
-                self.whoop_data_tracking.c.created_at >= cutoff_date
+            query = (
+                select(self.whoop_data_tracking.c.whoop_id)
+                .where(self.whoop_data_tracking.c.user_id == user_id)
+                .where(self.whoop_data_tracking.c.data_type == data_type)
             )
 
-            if data_type:
-                query = query.where(self.whoop_data_tracking.c.data_type == data_type)
+            if since_date:
+                query = query.where(self.whoop_data_tracking.c.notified_at >= since_date)
 
-            rows = conn.execute(query).fetchall()
-            return [row[0] for row in rows]
+            result = conn.execute(query).fetchall()
+            return [row[0] for row in result]
 
     def cleanup_old_whoop_tracking(self, days=7):
         """
-        Delete tracking records older than N days for privacy.
+        Delete tracking records older than N days (privacy retention).
 
         Args:
-            days: Number of days to keep (default 7)
-
-        Returns:
-            int: Number of records deleted
+            days: Number of days to keep (default: 7)
         """
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
@@ -411,6 +426,7 @@ class WHOOPOperations(BaseMemoryOperations):
                 delete(self.whoop_data_tracking)
                 .where(self.whoop_data_tracking.c.created_at < cutoff_date)
             )
+
             return result.rowcount
 
     def delete_all_whoop_data(self, user_id):

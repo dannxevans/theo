@@ -100,14 +100,13 @@ class WHOOPTokenRefreshService:
         Returns:
             list: User IDs with WHOOP integration enabled
         """
-        from sqlalchemy import select
+        from sqlalchemy import text
 
         try:
             with self.memory.engine.begin() as conn:
-                # Get all user_ids from whoop_credentials table
+                # Get all user_ids from whoop_credentials table using raw SQL
                 result = conn.execute(
-                    select(self.memory.whoop_credentials.c.user_id)
-                    .where(self.memory.whoop_credentials.c.is_valid == True)
+                    text("SELECT user_id FROM whoop_credentials WHERE is_valid = 1")
                 )
 
                 user_ids = [row[0] for row in result]

@@ -189,7 +189,10 @@ class TestWHOOPTokenRefreshService:
 
     def test_get_whoop_users_exception(self, service, mock_memory):
         """Test handling of database errors when getting users."""
-        mock_memory.engine.begin = Mock(side_effect=Exception("Database error"))
+        # Make engine.begin raise an exception
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = Mock(side_effect=Exception("Database error"))
+        mock_memory.engine.begin = Mock(return_value=mock_conn)
 
         users = service._get_whoop_users()
 
