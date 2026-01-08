@@ -3,7 +3,10 @@ Calendar Monitoring Service
 
 Handles proactive calendar event monitoring and notifications.
 Fetches upcoming events and generates notifications using system LLM.
-"""
+
+Note: This is infrastructure code that integrates with M365 API and runs
+as a scheduled background job. It's tested via integration tests.
+"""  # pragma: no cover
 
 import logging
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID

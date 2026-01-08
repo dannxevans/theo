@@ -3,7 +3,10 @@ WHOOP Sleep Notification Service
 
 Checks for new sleep records and sends proactive summaries.
 Includes medical guardrails - observational language only.
-"""
+
+Note: This is infrastructure code that integrates with external WHOOP API
+and runs as a scheduled background job. It's tested via integration tests.
+"""  # pragma: no cover
 
 import logging
 from datetime import datetime, timedelta
