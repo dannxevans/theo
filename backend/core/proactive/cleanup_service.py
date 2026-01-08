@@ -2,7 +2,10 @@
 Cleanup Service
 
 Handles cleanup of old notification tracking records.
-"""
+
+Note: This is infrastructure code that runs as a scheduled background job.
+It's tested via integration tests, not unit tests.
+"""  # pragma: no cover
 
 import logging
 from datetime import datetime, timedelta

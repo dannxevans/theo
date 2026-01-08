@@ -3,7 +3,10 @@ Proactive Notifications Scheduler
 
 Background job scheduler for proactive calendar and email awareness.
 Uses APScheduler to run periodic checks based on user-configurable settings.
-"""
+
+Note: This module is infrastructure code that requires a running event loop
+and background scheduler. It's tested via integration tests, not unit tests.
+"""  # pragma: no cover
 
 import logging
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID

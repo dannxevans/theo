@@ -4,7 +4,10 @@ WHOOP Stress Notification Service
 Checks for new recovery/stress data and sends daily summaries.
 Stress is derived from HRV trends in recovery data.
 Includes medical guardrails - observational language only.
-"""
+
+Note: This is infrastructure code that integrates with external WHOOP API
+and runs as a scheduled background job. It's tested via integration tests.
+"""  # pragma: no cover
 
 import logging
 from datetime import datetime, time

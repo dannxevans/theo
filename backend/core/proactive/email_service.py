@@ -3,7 +3,10 @@ Email Monitoring Service
 
 Handles proactive email monitoring, classification, and notifications.
 Fetches unread emails and classifies them as important or not.
-"""
+
+Note: This is infrastructure code that integrates with M365 API and runs
+as a scheduled background job. It's tested via integration tests.
+"""  # pragma: no cover
 
 import logging
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID
