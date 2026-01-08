@@ -177,7 +177,7 @@ def test_change_password_success(client, memory, test_user, auth_token):
     headers = {"Authorization": f"Bearer {auth_token}"}
     response = client.post("/api/auth/change-password", headers=headers, json={
         "current_password": test_user["password"],
-        "new_password": "newpassword123"
+        "new_password": "NewPass123!"
     })
 
     assert response.status_code == 200
@@ -186,7 +186,7 @@ def test_change_password_success(client, memory, test_user, auth_token):
     # Verify new password works
     login_response = client.post("/api/auth/login", json={
         "username": test_user["username"],
-        "password": "newpassword123"
+        "password": "NewPass123!"
     })
     assert login_response.status_code == 200
 
@@ -212,7 +212,7 @@ def test_change_password_too_short(client, test_user, auth_token):
     })
 
     assert response.status_code == 400
-    assert "at least 4 characters" in response.json["error"].lower()
+    assert "at least 8 characters" in response.json["error"].lower()
 
 
 def test_change_password_missing_fields(client, auth_token):
