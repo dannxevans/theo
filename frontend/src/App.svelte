@@ -17,7 +17,8 @@
     deleteFolder,
     updateFolderCollapsed,
     moveSessionToFolder,
-    archiveSession
+    archiveSession,
+    checkWorkModeIPAccess
   } from "./lib/api.js";
 
   let isAuthenticated = false;
@@ -481,6 +482,26 @@ async function setMode(mode) {
 
   const previousMode = currentMode;
 
+  // Pre-check IP access for Work Mode
+  if (mode === "work") {
+    try {
+      const ipCheck = await checkWorkModeIPAccess();
+      if (!ipCheck.allowed) {
+        alert(
+          `Cannot enter Work Mode from this location.\n\n` +
+          `Your IP: ${ipCheck.current_ip}\n` +
+          `Reason: ${ipCheck.reason}\n\n` +
+          `Please contact your administrator to add your IP address.`
+        );
+        return;
+      }
+    } catch (err) {
+      console.error("IP check failed:", err);
+      // Continue anyway if check fails (fail open for better UX)
+      // Backend will still enforce restrictions
+    }
+  }
+
   try {
     // Notify old chat BEFORE switching
     window.dispatchEvent(new CustomEvent("modeSwitching", {
@@ -505,6 +526,27 @@ async function setMode(mode) {
     }
   } catch (err) {
     console.error("Failed to switch mode", err);
+
+    // Check if it's an IP restriction error
+    if (err.message && err.message.includes("IP address not authorized")) {
+      try {
+        const errorData = JSON.parse(err.message);
+        alert(
+          `Cannot enter Work Mode from this location.\n\n` +
+          `Your IP: ${errorData.current_ip || 'Unknown'}\n` +
+          `Reason: ${errorData.reason || 'IP address not authorized'}\n\n` +
+          `Please contact your administrator to add your IP address.`
+        );
+      } catch {
+        alert(
+          `Cannot enter Work Mode from this location.\n\n` +
+          `IP address not authorized for Work Mode.\n` +
+          `Please contact your administrator.`
+        );
+      }
+    } else {
+      alert(`Failed to switch mode: ${err.message || 'Unknown error'}`);
+    }
   }
 }
 

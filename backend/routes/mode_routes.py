@@ -81,6 +81,19 @@ def set_mode():
     if mode not in ["work", "personal"]:
         return jsonify({"error": "Mode must be 'work' or 'personal'"}), 400
 
+    # Check IP restrictions for Work Mode
+    if mode == "work":
+        from core.request_utils import get_client_ip
+        client_ip = get_client_ip(request)
+        is_allowed, reason = memory.is_ip_allowed_for_work_mode(client_ip)
+
+        if not is_allowed:
+            return jsonify({
+                "error": "IP address not authorized for Work Mode",
+                "current_ip": client_ip,
+                "reason": reason
+            }), 403
+
     # Set mode
     memory.set_user_mode(user["id"], mode)
     return jsonify({"status": "ok", "mode": mode})

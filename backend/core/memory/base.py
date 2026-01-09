@@ -40,6 +40,7 @@ class BaseMemoryOperations:
         self.user_mode_config = tables["user_mode_config"]
         self.mode_settings = tables["mode_settings"]
         self.work_mode_subtab_config = tables["work_mode_subtab_config"]
+        self.work_mode_ip_config = tables["work_mode_ip_config"]
         self.debug_settings = tables["debug_settings"]
         self.preferences = tables["preferences"]
         self.system_prompt_config = tables["system_prompt_config"]

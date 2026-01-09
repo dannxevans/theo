@@ -17,6 +17,7 @@ from .folders import FolderOperations
 from .providers import ProviderOperations
 from .users import UserOperations
 from .modes import ModeOperations
+from .work_mode_ip import WorkModeIPOperations
 from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
 from .whoop import WHOOPOperations
@@ -74,6 +75,7 @@ class MemoryStore:
         self.user_mode_config = tables["user_mode_config"]
         self.mode_settings = tables["mode_settings"]
         self.work_mode_subtab_config = tables["work_mode_subtab_config"]
+        self.work_mode_ip_config = tables["work_mode_ip_config"]
         self.debug_settings = tables["debug_settings"]
         self.preferences = tables["preferences"]
         self.system_prompt_config = tables["system_prompt_config"]
@@ -111,6 +113,7 @@ class MemoryStore:
         self._provider_ops = ProviderOperations(tables, self.Session, self.engine)
         self._user_ops = UserOperations(tables, self.Session, self.engine)
         self._mode_ops = ModeOperations(tables, self.Session, self.engine)
+        self._work_mode_ip_ops = WorkModeIPOperations(tables, self.Session, self.engine)
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
         self._whoop_ops = WHOOPOperations(tables, self.Session, self.engine)
@@ -558,6 +561,22 @@ class MemoryStore:
     def get_all_work_subtab_configs(self, user_id):
         """Get all work subtab configurations for a user."""
         return self._mode_ops.get_all_work_subtab_configs(user_id)
+
+    # =============================
+    # Work Mode IP Operations (delegated)
+    # =============================
+
+    def get_work_mode_ip_config(self):
+        """Get Work Mode IP restriction configuration."""
+        return self._work_mode_ip_ops.get_ip_config()
+
+    def update_work_mode_ip_config(self, enabled, allowed_ranges):
+        """Update Work Mode IP restriction configuration."""
+        return self._work_mode_ip_ops.update_ip_config(enabled, allowed_ranges)
+
+    def is_ip_allowed_for_work_mode(self, ip_address):
+        """Check if an IP address is allowed for Work Mode access."""
+        return self._work_mode_ip_ops.is_ip_allowed(ip_address)
 
     # =============================
     # Service Provider Operations (delegated)

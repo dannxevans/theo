@@ -146,6 +146,40 @@ def auth_headers(auth_token):
 
 
 @pytest.fixture
+def admin_token(memory, admin_user):
+    """
+    Create authentication token for admin user.
+    """
+    token = generate_session_token()
+    expires_at = datetime.utcnow() + timedelta(days=7)
+    memory.create_auth_session(token, admin_user["id"], expires_at)
+
+    return token
+
+
+@pytest.fixture
+def auth_headers_admin(admin_token):
+    """
+    Create authorization headers with bearer token for admin user.
+    """
+    return {
+        "Authorization": f"Bearer {admin_token}",
+        "Content-Type": "application/json"
+    }
+
+
+@pytest.fixture
+def auth_headers_non_admin(auth_token):
+    """
+    Create authorization headers with bearer token for non-admin user.
+    """
+    return {
+        "Authorization": f"Bearer {auth_token}",
+        "Content-Type": "application/json"
+    }
+
+
+@pytest.fixture
 def login_helper(client, memory):
     """
     Helper function to login and get auth token.
