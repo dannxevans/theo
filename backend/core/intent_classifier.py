@@ -415,6 +415,19 @@ class IntentClassifier:
             if keyword in text_l:
                 return "whoop", 0.90
 
+        # Plex Media Server keywords
+        plex_keywords = [
+            "plex", "what was i watching", "what am i watching", "what should i watch",
+            "what's on plex", "whats on plex", "recently watched", "on deck",
+            "currently playing", "watching on plex", "plex server", "media server",
+            "what to watch next", "continue watching", "what did i watch",
+            "last watched", "my plex", "plex library", "plex content"
+        ]
+
+        for keyword in plex_keywords:
+            if keyword in text_l:
+                return "plex", 0.90
+
         # Planning keywords - require explicit planning request language
         # Only trigger when user explicitly asks for help planning/scheduling
         explicit_planning_patterns = [

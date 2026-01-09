@@ -99,6 +99,26 @@ class ServiceProviderOperations(BaseMemoryOperations):
             ).fetchone()
             return dict(row._mapping) if row else None
 
+    def get_service_providers_by_type(self, user_id, provider_type):
+        """
+        Get service providers by type.
+
+        Args:
+            user_id: User identifier
+            provider_type: Provider type (e.g., "plex", "m365")
+
+        Returns:
+            List of service provider dictionaries
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                select(self.service_providers).where(
+                    (self.service_providers.c.user_id == user_id) &
+                    (self.service_providers.c.provider_type == provider_type)
+                )
+            ).fetchall()
+            return [dict(row._mapping) for row in rows]
+
     def get_preferred_provider(self, user_id, category):
         """
         Get the preferred provider for a category.

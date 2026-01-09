@@ -81,6 +81,13 @@
         const processingModel = metadata?.llm_provider_name || "Sonnet-4.5";
         return `${processingModel} · WHOOP · Live Data`;
       }
+      if (taskType === "plex") {
+        // Extract processing model and sub-task from metadata
+        const processingModel = metadata?.llm_provider_name || "Sonnet-4.5";
+        const service = metadata?.service || "Plex";
+        const subTask = metadata?.sub_task || "Media";
+        return `${processingModel} · ${service} · ${subTask}`;
+      }
       return null; // Other action_router responses don't show footer
     }
 

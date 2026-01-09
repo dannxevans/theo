@@ -20,6 +20,7 @@
     rejectConfirmation,
   } from "../lib/api.js";
   import ProactiveSettings from "./settings/ProactiveSettings.svelte";
+  import PlexSettings from "./settings/PlexSettings.svelte";
 
   let m365Connected = false;
   let m365Status = null;
@@ -779,6 +780,11 @@
         </button>
       </div>
     {/if}
+  </div>
+
+  <!-- Plex Integration Section -->
+  <div class="section">
+    <PlexSettings />
   </div>
 
   <!-- Pending Actions Section -->
