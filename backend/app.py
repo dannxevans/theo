@@ -124,6 +124,7 @@ from routes.provider_routes import provider_bp
 from routes.intent_routes import intent_bp
 from routes.routing_routes import routing_bp
 from routes.mode_routes import mode_bp
+from routes.work_mode_ip_routes import work_mode_ip_bp
 from routes.m365_routes import m365_bp
 from routes.whoop_routes import whoop_bp
 from routes.service_provider_routes import service_provider_bp
@@ -149,6 +150,7 @@ app.register_blueprint(provider_bp)
 app.register_blueprint(intent_bp)
 app.register_blueprint(routing_bp)
 app.register_blueprint(mode_bp)
+app.register_blueprint(work_mode_ip_bp)
 app.register_blueprint(m365_bp)
 app.register_blueprint(whoop_bp)
 app.register_blueprint(service_provider_bp)

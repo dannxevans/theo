@@ -117,6 +117,19 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Work Mode IP Restrictions
+    # =============================
+    work_mode_ip_config = Table(
+        "work_mode_ip_config",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("enabled", Boolean, nullable=False, default=False),
+        Column("allowed_ranges", Text, nullable=True),  # JSON array of CIDR ranges
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
     # Debug Settings
     # =============================
     debug_settings = Table(
@@ -587,6 +600,7 @@ def create_schema(meta: MetaData):
         "user_mode_config": user_mode_config,
         "mode_settings": mode_settings,
         "work_mode_subtab_config": work_mode_subtab_config,
+        "work_mode_ip_config": work_mode_ip_config,
         "debug_settings": debug_settings,
         "preferences": preferences,
         "system_prompt_config": system_prompt_config,
