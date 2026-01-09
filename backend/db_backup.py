@@ -158,6 +158,7 @@ def run_migrations(db_path: str):
         "027_add_whoop_intent.py",  # Add WHOOP intent for fitness tracking queries
         "028_fix_good_night_routine_timeframe.py",  # Fix Good Night routine calendar timeframe (issue #328)
         "029_add_user_name_email.py"  # Add name and email columns to users table for user management
+        "030_add_work_mode_ip_config.py"  # Add work_mode_ip_config table for IP-based Work Mode access control (issue #296)
     ]
 
     # Filter to only existing files

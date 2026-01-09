@@ -1198,6 +1198,58 @@ export async function getAllWorkSubtabConfigs() {
 }
 
 // =============================
+// Work Mode IP Restrictions
+// =============================
+
+export async function getWorkModeIPConfig() {
+  const response = await fetch(`${API_BASE}/api/work-mode-ip/config`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to get IP config");
+  }
+
+  return response.json();
+}
+
+export async function updateWorkModeIPConfig(config) {
+  const response = await fetch(`${API_BASE}/api/work-mode-ip/config`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(config)
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to update IP config");
+  }
+
+  return response.json();
+}
+
+export async function checkWorkModeIPAccess() {
+  const response = await fetch(`${API_BASE}/api/work-mode-ip/check`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to check IP access");
+  }
+
+  return response.json();
+}
+
+// =============================
 // M365 Integration
 // =============================
 

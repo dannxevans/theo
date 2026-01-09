@@ -1,5 +1,5 @@
 <script>
-  import { updateSystemPromptConfig, getAuthHeaders, getUserPreference, setUserPreference } from "../../lib/api";
+  import { updateSystemPromptConfig, getAuthHeaders, getUserPreference, setUserPreference, getWorkModeIPConfig, updateWorkModeIPConfig } from "../../lib/api";
   import { onMount } from "svelte";
 
   export let systemPromptConfig = {
@@ -17,6 +17,24 @@
   let sessionTimeoutHours = 8;
   let sessionTimeoutStatus = null;
   let loadingTimeout = true;
+
+  // IP Restrictions
+  let ipEnabled = false;
+  let ipAllowedRanges = [];
+  let newRange = "";
+  let savingIP = false;
+  let ipSaveStatus = null;
+  let ipError = null;
+  let loadingIP = true;
+
+  // Check if user is admin
+  let isAdmin = false;
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    isAdmin = user.is_admin || false;
+  } catch (e) {
+    console.error('Failed to parse user from localStorage:', e);
+  }
 
   onMount(async () => {
     // Load visual streaming preference
@@ -55,6 +73,22 @@
       }
     } finally {
       loadingTimeout = false;
+    }
+
+    // Load IP restrictions config (admin only)
+    if (isAdmin) {
+      try {
+        const config = await getWorkModeIPConfig();
+        ipEnabled = config.enabled || false;
+        ipAllowedRanges = config.allowed_ranges || [];
+      } catch (e) {
+        console.error("Failed to load IP config:", e);
+        ipError = `Failed to load configuration: ${e.message}`;
+      } finally {
+        loadingIP = false;
+      }
+    } else {
+      loadingIP = false;
     }
   });
 
@@ -130,6 +164,62 @@
     setTimeout(() => {
       sessionTimeoutStatus = null;
     }, 5000);
+  }
+
+  async function saveIPConfig() {
+    try {
+      savingIP = true;
+      ipSaveStatus = null;
+      ipError = null;
+
+      await updateWorkModeIPConfig({
+        enabled: ipEnabled,
+        allowed_ranges: ipAllowedRanges
+      });
+
+      ipSaveStatus = "IP restrictions saved successfully!";
+      setTimeout(() => {
+        ipSaveStatus = null;
+      }, 3000);
+    } catch (e) {
+      ipError = `Error: ${e.message}`;
+    } finally {
+      savingIP = false;
+    }
+  }
+
+  function addRange() {
+    const trimmed = newRange.trim();
+    if (!trimmed) {
+      ipError = "Please enter an IP range";
+      return;
+    }
+
+    // Basic CIDR validation
+    const cidrPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(\/\d{1,3})?$/;
+    if (!cidrPattern.test(trimmed)) {
+      ipError = "Invalid CIDR format. Example: 192.168.1.0/24 or 10.0.0.1/32";
+      return;
+    }
+
+    if (ipAllowedRanges.includes(trimmed)) {
+      ipError = "This IP range is already in the list";
+      return;
+    }
+
+    ipAllowedRanges = [...ipAllowedRanges, trimmed];
+    newRange = "";
+    ipError = null;
+  }
+
+  function removeRange(index) {
+    ipAllowedRanges = ipAllowedRanges.filter((_, i) => i !== index);
+  }
+
+  function handleKeyPress(event) {
+    if (event.key === "Enter") {
+      addRange();
+    }
   }
 </script>
 
@@ -247,6 +337,99 @@
       <div class="success-message">{sessionTimeoutStatus}</div>
     {/if}
   </div>
+
+  {#if isAdmin}
+    <h2>Work Mode IP Restrictions</h2>
+    <p class="subtitle">Control which IP addresses can access Work Mode (Admin Only).</p>
+
+    <div class="section">
+      {#if !loadingIP}
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={ipEnabled} />
+            Enable IP Restrictions for Work Mode
+          </label>
+          <small>
+            When enabled, users can only enter Work Mode from approved IP addresses.
+            Personal Mode remains unrestricted.
+          </small>
+        </div>
+
+        {#if ipEnabled}
+          <div class="form-group">
+            <label>Allowed IP Ranges (CIDR Notation)</label>
+
+            {#if ipAllowedRanges.length > 0}
+              <div class="range-list">
+                {#each ipAllowedRanges as range, i}
+                  <div class="range-item">
+                    <code class="range-code">{range}</code>
+                    <button
+                      type="button"
+                      class="btn-danger"
+                      on:click={() => removeRange(i)}
+                      disabled={savingIP}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <p class="hint warning">
+                ⚠️ No IP ranges configured. Work Mode will be blocked for all users.
+              </p>
+            {/if}
+
+            <div class="add-range">
+              <input
+                type="text"
+                class="range-input"
+                bind:value={newRange}
+                on:keypress={handleKeyPress}
+                placeholder="e.g., 192.168.1.0/24 or 10.0.0.1/32"
+                disabled={savingIP}
+              />
+              <button
+                type="button"
+                class="btn-secondary"
+                on:click={addRange}
+                disabled={savingIP}
+              >
+                Add Range
+              </button>
+            </div>
+
+            <small>
+              <strong>Examples:</strong><br />
+              • Single IP: <code>203.0.113.42/32</code><br />
+              • Subnet: <code>192.168.1.0/24</code> (256 addresses)<br />
+              • Large range: <code>10.0.0.0/8</code> (16.7 million addresses)
+            </small>
+          </div>
+        {/if}
+
+        {#if ipSaveStatus}
+          <div class="success-message">{ipSaveStatus}</div>
+        {/if}
+
+        {#if ipError}
+          <div class="error-message">{ipError}</div>
+        {/if}
+
+        <button
+          type="button"
+          class="btn-primary"
+          on:click={saveIPConfig}
+          disabled={savingIP}
+        >
+          {savingIP ? "Saving..." : "Save IP Restrictions"}
+        </button>
+      {:else}
+        <p class="hint">Loading IP configuration...</p>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -257,4 +440,80 @@
      - .form-actions from settings.css
      - .save-status from settings.css
   */
+
+  .range-list {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .range-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+
+  .range-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .range-code {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: var(--accent-color);
+    background: transparent;
+    padding: 0;
+    flex: 1;
+  }
+
+  .add-range {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .range-input {
+    flex: 1;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: #000;
+    font-size: 0.95rem;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  }
+
+  .range-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb, 79, 70, 229), 0.1);
+  }
+
+  .range-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--background-secondary);
+  }
+
+  .hint.warning {
+    color: var(--warning-color, #ff9800);
+    font-weight: 500;
+  }
+
+  small code {
+    background: var(--background-tertiary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+  }
 </style>
