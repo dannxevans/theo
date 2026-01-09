@@ -386,7 +386,7 @@
             AI Providers
           </button>
           <button class="dropdown-item" class:active={activeTab === "intents"} on:click={() => switchCategory("system", "intents")}>
-            LLM Routing Intents
+            Routing Intents
           </button>
           <button class="dropdown-item" class:active={activeTab === "routing"} on:click={() => switchCategory("system", "routing")}>
             Routing Rules
