@@ -9,7 +9,7 @@ Provides handlers for calendar-related actions:
 - External service booking assistance
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from core.user_utils import normalize_user_id, DEFAULT_USER_ID
 from datetime import datetime, timedelta
 import logging
@@ -164,24 +164,20 @@ class CalendarHandlers(BaseActionHandler):
 
             if not future_events:
                 date_str = format_date_range(start_date, end_date)
-                response = f"You have no upcoming events {date_str}."
+                # Use LLM to generate natural response even for no events
+                response, llm_provider_info = self._generate_calendar_summary(
+                    [], date_str, "", user_id
+                )
             else:
                 # Check if this is a multi-day range (more than 1 day)
                 is_multiday = (end_date - start_date).days > 1
                 event_list = format_event_list(future_events, show_date=is_multiday)
                 date_str = format_date_range(start_date, end_date)
 
-                # Check if events have enrichment data (weather/traffic)
-                has_enrichment = any(event.get("weather") or event.get("traffic") for event in future_events)
-
-                if has_enrichment:
-                    # Use LLM to generate friendly summary with enrichment context
-                    response, llm_provider_info = self._generate_enriched_summary(
-                        future_events, date_str, event_list, user_id
-                    )
-                else:
-                    # Standard format without enrichment
-                    response = f"Here are your upcoming events {date_str}:\n\n{event_list}"
+                # Always use LLM to generate friendly, conversational summary
+                response, llm_provider_info = self._generate_calendar_summary(
+                    future_events, date_str, event_list, user_id
+                )
 
             # Build response with appropriate provider attribution
             result = {
@@ -235,7 +231,7 @@ class CalendarHandlers(BaseActionHandler):
                 str(e)
             )
 
-    def _generate_enriched_summary(
+    def _generate_calendar_summary(
         self,
         events: List[Dict[str, Any]],
         date_str: str,
@@ -243,11 +239,11 @@ class CalendarHandlers(BaseActionHandler):
         user_id: int = None
     ) -> tuple:
         """
-        Use LLM to generate friendly summary of calendar events with enrichment data.
+        Use LLM to generate friendly, conversational summary of calendar events.
         Uses user's routing preferences to select the appropriate provider.
 
         Args:
-            events: List of calendar events with weather/traffic enrichment
+            events: List of calendar events (may include weather/traffic enrichment)
             date_str: Formatted date range string
             event_list: Pre-formatted bulleted event list
             user_id: User ID for routing preferences lookup
@@ -258,33 +254,45 @@ class CalendarHandlers(BaseActionHandler):
         """
         from core.router import route_request
 
-        # Build enrichment context for LLM
-        enrichment_details = []
-        for event in events:
-            details = {
-                "subject": event.get("subject"),
-                "location": event.get("location"),
-                "start_time": event.get("start_time")
-            }
+        # Handle empty events case
+        if not events:
+            prompt = f"""The user asked about their calendar {date_str}.
 
-            if event.get("weather"):
-                weather = event.get("weather")
-                details["weather"] = {
-                    "temperature": weather.get("temperature"),
-                    "description": weather.get("description")
-                }
+They have no upcoming events during this time.
 
-            if event.get("traffic"):
-                traffic = event.get("traffic")
-                details["traffic"] = {
-                    "duration_minutes": traffic.get("duration_minutes"),
-                    "traffic_delay_minutes": traffic.get("traffic_delay_minutes")
-                }
+Generate a brief, friendly response (1 sentence) letting them know they're free."""
+        else:
+            # Check if events have enrichment data
+            has_enrichment = any(event.get("weather") or event.get("traffic") for event in events)
 
-            enrichment_details.append(details)
+            if has_enrichment:
+                # Build enrichment context for LLM
+                enrichment_details = []
+                for event in events:
+                    details = {
+                        "subject": event.get("subject"),
+                        "location": event.get("location"),
+                        "start_time": event.get("start_time")
+                    }
 
-        # Create prompt for LLM
-        prompt = f"""Generate a friendly, conversational summary of the user's calendar events with contextual advice.
+                    if event.get("weather"):
+                        weather = event.get("weather")
+                        details["weather"] = {
+                            "temperature": weather.get("temperature"),
+                            "description": weather.get("description")
+                        }
+
+                    if event.get("traffic"):
+                        traffic = event.get("traffic")
+                        details["traffic"] = {
+                            "duration_minutes": traffic.get("duration_minutes"),
+                            "traffic_delay_minutes": traffic.get("traffic_delay_minutes")
+                        }
+
+                    enrichment_details.append(details)
+
+                # Create prompt for LLM with enrichment
+                prompt = f"""Generate a friendly, conversational summary of the user's calendar events with contextual advice.
 
 Events:
 {event_list}
@@ -299,6 +307,15 @@ Generate a natural, helpful response that:
 4. Gives practical advice (dress warmly, bring umbrella, allow extra time, etc.)
 
 Keep it concise (2-3 sentences max) and conversational."""
+            else:
+                # Create prompt for LLM without enrichment
+                prompt = f"""Generate a friendly, conversational summary of the user's calendar events.
+
+Events {date_str}:
+{event_list}
+
+Generate a natural, helpful response that mentions what events they have.
+Keep it concise (1-2 sentences) and conversational."""
 
         try:
             # Use route_request to respect user's routing preferences
@@ -332,9 +349,83 @@ Keep it concise (2-3 sentences max) and conversational."""
             return summary_text, provider_info
 
         except Exception as e:
-            self.logger.warning(f"[CALENDAR] Failed to generate enriched summary: {e}")
+            self.logger.warning(f"[CALENDAR] Failed to generate calendar summary: {e}")
             # Fallback to standard format
-            return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
+            if not events:
+                return f"You have no upcoming events {date_str}.", None
+            else:
+                return f"Here are your upcoming events {date_str}:\n\n{event_list}", None
+
+    def _extract_event_from_reasoning_entities(
+        self,
+        user_text: str,
+        reasoning_entities,
+        user_id: int
+    ) -> Optional[Dict]:
+        """
+        Extract event details from intent reasoning entities.
+
+        Args:
+            user_text: Original user text
+            reasoning_entities: ExtractedEntities from intent reasoning
+            user_id: User ID
+
+        Returns:
+            Event details dict or None if extraction fails
+        """
+        from core.actions.helpers import parse_date_range
+        from datetime import datetime, timedelta
+
+        try:
+            # Extract subject - prefer activities, fall back to items or parse from text
+            subject = None
+            if reasoning_entities.activities:
+                subject = reasoning_entities.activities[0]
+            elif reasoning_entities.items:
+                subject = reasoning_entities.items[0]
+            else:
+                # Try to extract subject from text by removing time/date words
+                import re
+                text_clean = user_text.lower()
+                # Remove common booking phrases
+                text_clean = re.sub(r'\b(add|schedule|book|create|set up|put)\b', '', text_clean)
+                text_clean = re.sub(r'\b(to|on|my|in the)\b', '', text_clean)
+                text_clean = re.sub(r'\b(calendar|appointment)\b', '', text_clean)
+                # Remove datetime references
+                for dt in reasoning_entities.datetimes:
+                    text_clean = text_clean.replace(dt.lower(), '')
+                subject = text_clean.strip()
+                if not subject or len(subject) < 2:
+                    return None
+
+            # Extract location
+            location = reasoning_entities.locations[0] if reasoning_entities.locations else None
+
+            # Parse datetime - combine all datetime entities
+            datetime_text = " ".join(reasoning_entities.datetimes) if reasoning_entities.datetimes else user_text
+
+            # Use existing parse_date_range helper
+            date_range = parse_date_range(datetime_text)
+            if not date_range:
+                return None
+
+            start_time, end_time = date_range
+
+            # If end_time is just the start of day, assume 1-hour duration
+            if end_time.hour == 0 and end_time.minute == 0:
+                end_time = start_time + timedelta(hours=1)
+
+            return {
+                "subject": subject,
+                "start_time": start_time,
+                "end_time": end_time,
+                "location": location,
+                "description": None
+            }
+
+        except Exception as e:
+            self.logger.warning(f"[CALENDAR] Failed to extract event from reasoning entities: {e}")
+            return None
 
     def handle_book_appointment(
         self,
@@ -373,8 +464,22 @@ Keep it concise (2-3 sentences max) and conversational."""
             # Handle service booking with smart context
             return self.handle_service_booking(user_text, user_id, session_id, service_category)
 
-        # Use LLM to extract event details from natural language
-        event_details = extract_event_with_llm(user_text, user_id, self.memory)
+        # Try to use entities from intent reasoning first (more efficient and accurate)
+        event_details = None
+        reasoning_entities = context.get("reasoning_entities")
+
+        if reasoning_entities:
+            event_details = self._extract_event_from_reasoning_entities(
+                user_text,
+                reasoning_entities,
+                user_id
+            )
+            if event_details:
+                self.logger.info(f"[CALENDAR] Used reasoning entities for event extraction: {event_details['subject']}")
+
+        # Fall back to LLM extraction if reasoning entities didn't work
+        if not event_details:
+            event_details = extract_event_with_llm(user_text, user_id, self.memory)
 
         if not event_details:
             return self._format_error_response(

@@ -58,7 +58,8 @@
     let providerType = "";
 
     // Special cases for non-AI responses (don't show model badge)
-    if (provider === "memory" || provider === "error") {
+    // Note: weather, routing, and plex/whoop have special handling below
+    if (provider === "memory" || provider === "error" || provider === "confirmation" || provider === "intent_reasoning") {
       return null;
     }
 
@@ -631,11 +632,12 @@
         metadata: t.metadata || null
       }));
 
-      // Track unique AI providers used in this session (exclude system providers)
-      const excludedProviders = ['action_router', 'error', 'memory'];
+      // Track unique AI providers used in this session
+      // Only include providers that are in the AI providers list (same as force provider dropdown)
+      const aiProviderIds = new Set(providers.map(p => p.id));
       usedProviders = new Set(
         messages
-          .filter(m => m.provider && !excludedProviders.includes(m.provider))
+          .filter(m => m.provider && aiProviderIds.has(m.provider))
           .map(m => m.provider)
       );
 

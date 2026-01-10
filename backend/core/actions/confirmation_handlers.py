@@ -64,7 +64,7 @@ class ConfirmationHandlers(BaseActionHandler):
         if result["status"] == "success":
             return {
                 "text": f"✓ Approved! {result.get('message', 'Action completed successfully.')}",
-                "provider": "action_router",
+                "provider": "confirmation",
                 "model": None,
                 "task_type": "approve_confirmation",
                 "metadata": {
@@ -128,7 +128,7 @@ class ConfirmationHandlers(BaseActionHandler):
         if result["status"] == "success":
             return {
                 "text": f"✗ Rejected. The action was cancelled.",
-                "provider": "action_router",
+                "provider": "confirmation",
                 "model": None,
                 "task_type": "reject_confirmation",
                 "metadata": {
