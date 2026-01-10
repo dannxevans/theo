@@ -147,6 +147,19 @@
       description: "Check last workout data",
       defaultParams: {},
     },
+    // Plex media server actions
+    {
+      type: "plex_recently_watched",
+      label: "Plex Recently Watched",
+      description: "What you've been watching",
+      defaultParams: {},
+    },
+    {
+      type: "plex_on_deck",
+      label: "Plex On Deck",
+      description: "What to watch next",
+      defaultParams: {},
+    },
     // Custom action
     {
       type: "custom_action",

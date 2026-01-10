@@ -168,6 +168,9 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         "whoop_sleep": "whoop",
         "whoop_recovery": "whoop",
         "whoop_workout": "whoop",
+        # Plex media server actions
+        "plex_recently_watched": "plex",
+        "plex_on_deck": "plex",
     }
 
     intent = action_type_mapping.get(action_type)
@@ -354,6 +357,26 @@ def _execute_action(action_type, params, session_id, user_id, mode, action_route
         # WHOOP workout query action
         action_context = {
             "text": "How was my last workout?",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "plex_recently_watched":
+        # Plex recently watched query action
+        action_context = {
+            "text": "What was I watching?",
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": intent,
+            "mode": mode
+        }
+
+    elif action_type == "plex_on_deck":
+        # Plex on deck query action
+        action_context = {
+            "text": "What should I watch next?",
             "session_id": session_id,
             "user_id": user_id,
             "intent": intent,
