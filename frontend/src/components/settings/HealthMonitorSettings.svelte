@@ -6,6 +6,7 @@
     ai_providers: [],
     m365_integration: { connected: false },
     whoop_integration: { connected: false },
+    plex_integration: { connected: false },
     service_providers: [],
     feature_providers: []
   };
@@ -381,7 +382,7 @@
   <!-- Section 3: Integrations -->
   <div class="section">
     <h3>Integrations</h3>
-    <p class="hint">External service integrations for calendar, email, and fitness tracking</p>
+    <p class="hint">External service integrations for calendar, email, fitness tracking, and media</p>
 
     <div class="health-grid">
       <!-- Microsoft 365 Card -->
@@ -389,15 +390,15 @@
       <div class="health-card-header">
         <h4>Microsoft 365</h4>
         <span class="health-badge"
-          class:badge-healthy={healthData.m365_integration?.connected && healthData.m365_integration?.token_valid && healthData.m365_integration?.hours_until_expiry > 24}
-          class:badge-degraded={healthData.m365_integration?.connected && healthData.m365_integration?.hours_until_expiry <= 24 && healthData.m365_integration?.hours_until_expiry > 0}
+          class:badge-healthy={healthData.m365_integration?.connected && healthData.m365_integration?.token_valid && healthData.m365_integration?.hours_until_expiry > 0.25}
+          class:badge-degraded={healthData.m365_integration?.connected && healthData.m365_integration?.hours_until_expiry <= 0.25 && healthData.m365_integration?.hours_until_expiry > 0}
           class:badge-unhealthy={!healthData.m365_integration?.connected || !healthData.m365_integration?.token_valid || healthData.m365_integration?.hours_until_expiry <= 0}
           class:badge-unknown={!healthData.m365_integration?.connected}>
           {#if !healthData.m365_integration?.connected}
             Not Configured
           {:else if !healthData.m365_integration.token_valid || healthData.m365_integration.hours_until_expiry <= 0}
             Disconnected
-          {:else if healthData.m365_integration.hours_until_expiry <= 24}
+          {:else if healthData.m365_integration.hours_until_expiry <= 0.25}
             Token Expiring Soon
           {:else}
             Connected
@@ -416,7 +417,7 @@
 
           {#if healthData.m365_integration.hours_until_expiry !== null}
             <p><strong>Token Expires:</strong>
-              <span class:warning-text={healthData.m365_integration.hours_until_expiry <= 24}
+              <span class:warning-text={healthData.m365_integration.hours_until_expiry <= 0.25}
                 class:error-text={healthData.m365_integration.hours_until_expiry <= 0}>
                 {#if healthData.m365_integration.hours_until_expiry > 0}
                   in {healthData.m365_integration.hours_until_expiry} hours
@@ -435,24 +436,14 @@
             <p class="error-text metric-small">Last Error: {healthData.m365_integration.last_error}</p>
           {/if}
 
-          {#if healthData.m365_integration.scopes && healthData.m365_integration.scopes.length > 0}
-            <div class="capabilities">
-              <p><strong>Capabilities:</strong></p>
-              <ul class="capability-list">
-                {#each healthData.m365_integration.scopes as scope}
-                  <li>
-                    {#if scope.includes('Calendar')}
-                      ✓ Calendar Access
-                    {:else if scope.includes('Mail')}
-                      ✓ Email Access
-                    {:else}
-                      ✓ {scope}
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            </div>
-          {/if}
+          <div class="capabilities">
+            <p><strong>Capabilities:</strong></p>
+            <ul class="capability-list">
+              <li>✓ Email Read and Send</li>
+              <li>✓ Calendar and Planning</li>
+              <li>✓ Tasks Management</li>
+            </ul>
+          </div>
 
           <button class="btn-small" on:click={testM365Connection} disabled={testingM365}>
             {testingM365 ? 'Testing...' : 'Test Connection'}
@@ -480,15 +471,15 @@
       <div class="health-card-header">
         <h4>WHOOP</h4>
         <span class="health-badge"
-          class:badge-healthy={healthData.whoop_integration?.connected && healthData.whoop_integration?.token_valid && healthData.whoop_integration?.hours_until_expiry > 24}
-          class:badge-degraded={healthData.whoop_integration?.connected && healthData.whoop_integration?.hours_until_expiry <= 24 && healthData.whoop_integration?.hours_until_expiry > 0}
+          class:badge-healthy={healthData.whoop_integration?.connected && healthData.whoop_integration?.token_valid && healthData.whoop_integration?.hours_until_expiry > 0.25}
+          class:badge-degraded={healthData.whoop_integration?.connected && healthData.whoop_integration?.hours_until_expiry <= 0.25 && healthData.whoop_integration?.hours_until_expiry > 0}
           class:badge-unhealthy={!healthData.whoop_integration?.connected || !healthData.whoop_integration?.token_valid || healthData.whoop_integration?.hours_until_expiry <= 0}
           class:badge-unknown={!healthData.whoop_integration?.connected}>
           {#if !healthData.whoop_integration?.connected}
             Not Configured
           {:else if !healthData.whoop_integration.token_valid || healthData.whoop_integration.hours_until_expiry <= 0}
             Disconnected
-          {:else if healthData.whoop_integration.hours_until_expiry <= 24}
+          {:else if healthData.whoop_integration.hours_until_expiry <= 0.25}
             Token Expiring Soon
           {:else}
             Connected
@@ -507,7 +498,7 @@
 
           {#if healthData.whoop_integration.hours_until_expiry !== null}
             <p><strong>Token Expires:</strong>
-              <span class:warning-text={healthData.whoop_integration.hours_until_expiry <= 24}
+              <span class:warning-text={healthData.whoop_integration.hours_until_expiry <= 0.25}
                 class:error-text={healthData.whoop_integration.hours_until_expiry <= 0}>
                 {#if healthData.whoop_integration.hours_until_expiry > 0}
                   in {healthData.whoop_integration.hours_until_expiry} hours
@@ -538,6 +529,63 @@
       {:else}
         <div class="health-card-body">
           <p class="empty-state">WHOOP account not connected. Connect in the Integrations section.</p>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Plex Card -->
+    <div class="health-card">
+      <div class="health-card-header">
+        <h4>Plex Media Server</h4>
+        <span class="health-badge"
+          class:badge-healthy={healthData.plex_integration?.connected && healthData.plex_integration?.token_valid}
+          class:badge-unhealthy={healthData.plex_integration?.connected && !healthData.plex_integration?.token_valid}
+          class:badge-unknown={!healthData.plex_integration?.connected}>
+          {#if !healthData.plex_integration?.connected}
+            Not Configured
+          {:else if !healthData.plex_integration.token_valid}
+            Disconnected
+          {:else}
+            Connected
+          {/if}
+        </span>
+      </div>
+
+      {#if healthData.plex_integration?.connected}
+        <div class="health-card-body">
+          <p><strong>Server:</strong> {healthData.plex_integration.server_name || 'Unknown'}</p>
+          <p><strong>Username:</strong> {healthData.plex_integration.plex_username || 'Unknown'}</p>
+          <p><strong>Token Status:</strong>
+            <span class:error-text={!healthData.plex_integration.token_valid}>
+              {healthData.plex_integration.token_valid ? 'Valid' : 'Invalid/Expired'}
+            </span>
+          </p>
+
+          {#if healthData.plex_integration.server_url}
+            <p class="metric-small">Server URL: {healthData.plex_integration.server_url}</p>
+          {/if}
+
+          {#if healthData.plex_integration.updated_at}
+            <p class="metric-small">Last Updated: {formatRelativeTime(healthData.plex_integration.updated_at)}</p>
+          {/if}
+
+          {#if healthData.plex_integration.last_error}
+            <p class="error-text metric-small">Last Error: {healthData.plex_integration.last_error}</p>
+          {/if}
+
+          <div class="capabilities">
+            <p><strong>Capabilities:</strong></p>
+            <ul class="capability-list">
+              <li>✓ Recently Watched</li>
+              <li>✓ On Deck Recommendations</li>
+              <li>✓ Currently Playing Sessions</li>
+              <li>✓ Routines Integration</li>
+            </ul>
+          </div>
+        </div>
+      {:else}
+        <div class="health-card-body">
+          <p class="empty-state">Plex account not connected. Connect in the Integrations section.</p>
         </div>
       {/if}
     </div>

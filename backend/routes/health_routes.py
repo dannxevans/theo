@@ -170,6 +170,22 @@ def get_health_overview():
             "last_error": whoop_creds.get("last_error")
         }
 
+    # Get Plex integration status
+    plex_integration = {"connected": False}
+    plex_creds = memory.get_plex_credentials(user["id"])
+
+    if plex_creds:
+        plex_integration = {
+            "connected": True,
+            "plex_user_id": plex_creds.get("plex_user_id"),
+            "plex_username": plex_creds.get("plex_username"),
+            "server_name": plex_creds.get("server_name"),
+            "server_url": plex_creds.get("server_url"),
+            "token_valid": plex_creds.get("is_valid", False),
+            "last_error": plex_creds.get("last_error"),
+            "updated_at": plex_creds.get("updated_at").isoformat() if plex_creds.get("updated_at") else None
+        }
+
     # Get service providers
     service_providers_list = memory.get_service_providers(user["id"])
     service_providers = []
@@ -275,6 +291,7 @@ def get_health_overview():
         "ai_providers": ai_providers,
         "m365_integration": m365_integration,
         "whoop_integration": whoop_integration,
+        "plex_integration": plex_integration,
         "service_providers": service_providers,
         "feature_providers": feature_providers
     })
