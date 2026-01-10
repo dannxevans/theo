@@ -15,3 +15,5 @@ pytest-cov
 pytest-mock
 pytest-flask
 apscheduler==3.10.4
+beautifulsoup4==4.12.2
+lxml==5.1.0

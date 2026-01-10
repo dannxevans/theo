@@ -632,6 +632,24 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Web Fetch Cache
+    # =============================
+    web_fetch_cache = Table(
+        "web_fetch_cache",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False),
+        Column("url", Text, nullable=False),
+        Column("url_hash", String(64), nullable=False),
+        Column("title", String(512), nullable=True),
+        Column("content", Text, nullable=False),
+        Column("metadata", Text, nullable=True),  # JSON metadata
+        Column("fetched_at", DateTime, nullable=False),
+        Column("expires_at", DateTime, nullable=False),
+        Column("content_hash", String(64), nullable=True),
+    )
+
+    # =============================
     # Classification Audit
     # =============================
     classification_audit = Table(
@@ -681,6 +699,7 @@ def create_schema(meta: MetaData):
         "plex_settings": plex_settings,
         "plex_notification_tracking": plex_notification_tracking,
         "calendar_events_cache": calendar_events_cache,
+        "web_fetch_cache": web_fetch_cache,
         "classification_audit": classification_audit,
         "feature_providers": feature_providers,
     }

@@ -87,7 +87,8 @@ class IntentClassifier:
         action_intents = [
             "book_appointment", "update_appointment", "cancel_appointment",
             "read_calendar", "compose_email", "read_email", "weather", "routing", "planning",
-            "read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task"
+            "read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task",
+            "web_fetch"
         ]
 
         if confidence < 0.8 and intent in action_intents and self.provider_registry:
@@ -442,6 +443,26 @@ class IntentClassifier:
         for pattern in explicit_planning_patterns:
             if re.search(pattern, text_l):
                 return "planning", 0.90
+
+        # Web Fetch keywords - explicit URL fetching requests
+        # High confidence when URL pattern detected
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        has_url = re.search(url_pattern, text_l)
+
+        if has_url:
+            # URL present - check for fetch-related keywords
+            web_fetch_keywords = [
+                "fetch", "get", "read", "retrieve", "load", "open",
+                "show me", "pull up", "grab", "check", "visit",
+                "what does", "summarize", "what's on"
+            ]
+
+            for keyword in web_fetch_keywords:
+                if keyword in text_l:
+                    return "web_fetch", 0.95
+
+            # If URL present without explicit keyword, moderate confidence
+            return "web_fetch", 0.80
 
         # Search keywords - explicit search requests for web-grounded information
         search_strong_keywords = [

@@ -1322,6 +1322,152 @@ def route_request(context: dict, stream: bool = False):
             }
 
     # =============================
+    # Web Fetch Intent Handling
+    # =============================
+    if intent == "web_fetch":
+        _debug(memory, "Handling web fetch request")
+
+        try:
+            from core.web_fetch_service import WebFetchService
+            import re
+            import time
+
+            # Get user_id and session_id from context
+            user_id = normalize_user_id(context.get("user_id"))
+            session_id = context.get("session_id", "web_fetch_enrichment")
+
+            # Extract URLs from message
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            urls = re.findall(url_pattern, text)
+
+            if not urls:
+                return {
+                    "text": "I couldn't find any URLs in your message. Please provide a valid HTTPS URL to fetch.",
+                    "provider": "error",
+                    "model": None,
+                    "task_type": "error",
+                    "metadata": {"error_type": "no_url_found"}
+                }
+
+            # Fetch content from all URLs
+            start_time = time.time()
+            web_service = WebFetchService(memory)
+
+            if len(urls) == 1:
+                # Single URL - use simple fetch
+                result = web_service.fetch_url(urls[0], user_id)
+                latency_ms = int((time.time() - start_time) * 1000)
+
+                # Log usage
+                _log_feature_provider_usage(
+                    memory, user_id, "web_fetch",
+                    success=result["success"],
+                    latency_ms=latency_ms,
+                    error_message=result.get("error")
+                )
+
+                if not result["success"]:
+                    return {
+                        "text": f"I couldn't fetch that URL: {result['error']}",
+                        "provider": "error",
+                        "model": None,
+                        "task_type": "error",
+                        "metadata": {
+                            "error_type": "fetch_failed",
+                            "url": urls[0],
+                            "error_message": result["error"]
+                        }
+                    }
+
+                # Format content for LLM processing
+                formatted_content = web_service.format_response(result["content"], urls[0])
+            else:
+                # Multiple URLs - fetch all
+                multi_result = web_service.fetch_urls(urls, user_id)
+                latency_ms = int((time.time() - start_time) * 1000)
+
+                # Log usage for each URL
+                for url_result in multi_result["results"]:
+                    _log_feature_provider_usage(
+                        memory, user_id, "web_fetch",
+                        success=url_result["success"],
+                        latency_ms=latency_ms // len(urls),  # Approximate per-URL time
+                        error_message=url_result.get("error")
+                    )
+
+                if not multi_result["success"]:
+                    return {
+                        "text": f"I couldn't fetch any of the URLs. Summary: {multi_result['summary']}",
+                        "provider": "error",
+                        "model": None,
+                        "task_type": "error",
+                        "metadata": {
+                            "error_type": "all_fetches_failed",
+                            "urls": urls,
+                            "summary": multi_result["summary"]
+                        }
+                    }
+
+                # Format multiple URLs for LLM processing
+                formatted_content = web_service.format_multi_response(multi_result["results"])
+
+            # Use system LLM to generate friendly response from web content
+            # Build prompt for LLM
+            prompt = f"""User asked: "{text}"
+
+Fetched web content:
+{formatted_content}
+
+Based on the webpage content above, provide a helpful answer to the user's question."""
+
+            # Use system intent for lightweight content summarization
+            system_message = """You are a helpful assistant that summarizes web content. Your job is to present fetched web information in a clear, useful way.
+
+Guidelines:
+- Be concise and informative
+- Answer the user's question directly using the web content
+- Cite specific information from the page when relevant
+- If the page doesn't contain the answer, say so clearly
+- Keep your response focused on what the user asked for"""
+
+            router_context = {
+                "text": prompt,
+                "session_id": session_id,
+                "memory": memory,
+                "user_id": str(user_id),
+                "forced_provider": None,
+                "force_intent": "system",  # Use system intent for internal summarization
+                "system_message": system_message
+            }
+
+            llm_result = route_request(router_context)
+            response_text = llm_result.get("text", "").strip()
+
+            return {
+                "text": response_text,
+                "provider": llm_result.get("provider", "web_fetch"),
+                "model": llm_result.get("model"),
+                "task_type": "web_fetch",
+                "metadata": {
+                    "urls": urls,
+                    "url_count": len(urls),
+                    "content_length": len(formatted_content),
+                    "fetch_latency_ms": latency_ms,
+                    "cached": result.get("cached", False) if len(urls) == 1 else None
+                }
+            }
+
+        except Exception as e:
+            logging.error(f"[ROUTER] Web fetch error: {e}", exc_info=True)
+            return {
+                "text": f"An error occurred while fetching the webpage: {str(e)}",
+                "provider": "error",
+                "model": None,
+                "task_type": "error",
+                "metadata": {"error_type": "exception", "error_message": str(e)}
+            }
+
+    # =============================
     # Action Intent Routing
     # =============================
     # Route action intents to ActionRouter instead of LLM providers
