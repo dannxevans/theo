@@ -5,18 +5,39 @@ Creates tables for Plex Media Server integration:
 - plex_credentials: OAuth tokens and server configuration
 - plex_settings: User notification preferences
 - plex_notification_tracking: Deduplication for proactive notifications (7-day retention)
+
+Run with: python3 backend/migrations/031_add_plex_integration.py
+Or with custom DB path: python3 backend/migrations/031_add_plex_integration.py /path/to/theo.db
 """
 
+import sqlite3
+import os
+import sys
 from datetime import datetime
 
 
-def run_migration(conn):
-    """
-    Create Plex integration tables.
+def get_db_path():
+    """Get database path from command line arg or default location."""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
 
-    Args:
-        conn: SQLite database connection
-    """
+    # Default: project root /data/theo.db
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "data",
+        "theo.db"
+    )
+
+
+def run_migration():
+    """Create Plex integration tables."""
+    DB_PATH = get_db_path()
+
+    print(f"[MIGRATION 031] Starting migration...")
+    print(f"[MIGRATION 031] Database: {DB_PATH}")
+
+    # Connect to database
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Create plex_credentials table
@@ -75,5 +96,29 @@ def run_migration(conn):
         ON plex_notification_tracking(created_at)
     """)
 
-    conn.commit()
-    print("✅ Migration 031: Plex integration tables created successfully")
+    # Check if tables exist
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name IN ('plex_credentials', 'plex_settings', 'plex_notification_tracking')
+    """)
+    existing_tables = [row[0] for row in cursor.fetchall()]
+
+    if len(existing_tables) == 3:
+        print("[MIGRATION 031] ✓ All Plex tables already exist, skipping")
+    else:
+        conn.commit()
+        print("[MIGRATION 031] ✓ Plex integration tables created successfully")
+        print("[MIGRATION 031] Features enabled:")
+        print("[MIGRATION 031]   - OAuth 2.0 authentication with Plex.tv")
+        print("[MIGRATION 031]   - Recently watched queries")
+        print("[MIGRATION 031]   - On deck recommendations")
+        print("[MIGRATION 031]   - Currently playing sessions")
+        print("[MIGRATION 031]   - Routines integration")
+
+    conn.close()
+    return True
+
+
+if __name__ == "__main__":
+    success = run_migration()
+    sys.exit(0 if success else 1)

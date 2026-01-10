@@ -17,11 +17,12 @@ def memory():
 @pytest.fixture
 def test_user(memory):
     """Create a test user."""
-    user = memory.create_user(
+    user_id = memory.create_user(
         username=f"plex_test_user_{datetime.now().timestamp()}",
-        password="test_password_123",
+        password_hash="$2b$12$test_hash_for_testing",
         is_admin=False,
     )
+    user = memory.get_user_by_id(user_id)
     yield user
     # Cleanup
     try:

@@ -11,21 +11,26 @@ from datetime import datetime, timedelta
 @pytest.fixture
 def test_user(memory):
     """Create a test user."""
-    user = memory.create_user(
+    user_id = memory.create_user(
         username=f"plex_route_test_{datetime.now().timestamp()}",
-        password="test_password_123",
+        password_hash="$2b$12$test_hash_for_testing",
         is_admin=False,
     )
+    user = memory.get_user_by_id(user_id)
     yield user
 
 
 @pytest.fixture
 def auth_headers(memory, test_user):
     """Create authentication headers."""
-    token = memory.create_auth_session(
-        test_user["id"], expires_at=datetime.utcnow() + timedelta(hours=24)
+    import uuid
+    session_id = str(uuid.uuid4())
+    memory.create_auth_session(
+        session_id=session_id,
+        user_id=test_user["id"],
+        expires_at=datetime.utcnow() + timedelta(hours=24)
     )
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {session_id}"}
 
 
 @pytest.fixture
@@ -37,7 +42,7 @@ def personal_mode(memory, test_user):
 class TestPlexAuthRoutes:
     """Test Plex authentication routes."""
 
-    @patch("routes.plex_routes.PlexOAuth.request_pin")
+    @patch("auth.plex_oauth.PlexOAuth.request_pin")
     def test_start_plex_auth_success(
         self, mock_request_pin, client, memory, auth_headers, test_user, personal_mode
     ):
@@ -73,7 +78,7 @@ class TestPlexAuthRoutes:
         assert response.status_code == 403
         assert "Personal Mode" in response.get_json()["error"]
 
-    @patch("routes.plex_routes.PlexOAuth.request_pin")
+    @patch("auth.plex_oauth.PlexOAuth.request_pin")
     def test_start_plex_auth_plex_error(
         self, mock_request_pin, client, auth_headers, personal_mode
     ):
@@ -84,7 +89,7 @@ class TestPlexAuthRoutes:
 
         assert response.status_code == 500
 
-    @patch("routes.plex_routes.PlexOAuth.check_pin_status")
+    @patch("auth.plex_oauth.PlexOAuth.check_pin_status")
     def test_poll_plex_auth_pending(
         self, mock_check_pin, client, memory, auth_headers, test_user, personal_mode
     ):
@@ -109,9 +114,9 @@ class TestPlexAuthRoutes:
         data = response.get_json()
         assert data["status"] == "pending"
 
-    @patch("routes.plex_routes.PlexOAuth.get_primary_server")
-    @patch("routes.plex_routes.PlexOAuth.get_user_info")
-    @patch("routes.plex_routes.PlexOAuth.check_pin_status")
+    @patch("auth.plex_oauth.PlexOAuth.get_primary_server")
+    @patch("auth.plex_oauth.PlexOAuth.get_user_info")
+    @patch("auth.plex_oauth.PlexOAuth.check_pin_status")
     def test_poll_plex_auth_authorized(
         self,
         mock_check_pin,
@@ -323,7 +328,7 @@ class TestPlexSettingsRoutes:
 class TestPlexLibraryRoutes:
     """Test Plex library routes."""
 
-    @patch("routes.plex_routes.PlexClient")
+    @patch("services.plex_client.PlexClient")
     def test_get_recently_watched(
         self,
         mock_client_class,
@@ -371,7 +376,7 @@ class TestPlexLibraryRoutes:
         assert response.status_code == 400
         assert "not connected" in response.get_json()["error"]
 
-    @patch("routes.plex_routes.PlexClient")
+    @patch("services.plex_client.PlexClient")
     def test_get_on_deck(
         self,
         mock_client_class,
@@ -402,7 +407,7 @@ class TestPlexLibraryRoutes:
         data = response.get_json()
         assert "items" in data
 
-    @patch("routes.plex_routes.PlexClient")
+    @patch("services.plex_client.PlexClient")
     def test_get_currently_playing(
         self,
         mock_client_class,
