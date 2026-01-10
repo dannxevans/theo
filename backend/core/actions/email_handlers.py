@@ -497,7 +497,7 @@ class EmailHandlers(BaseActionHandler):
 
         # Return confirmation request with metadata for UI widget
         return {
-            "text": f"**Draft email to {recipient}:**\n\n**Subject:** {subject}\n\n**Message:**\n{body_preview}\n\n",
+            "text": f"Draft email to {recipient}:\n\nSubject: {subject}\n\nMessage:\n{body_preview}",
             "provider": "action_router",
             "model": None,
             "task_type": "compose_email",
@@ -538,14 +538,13 @@ class EmailHandlers(BaseActionHandler):
             # Get user's name from memory facts
             user_name = None
             try:
-                facts = self.memory.get_facts(user_id)
-                for fact in facts:
-                    if fact.get("key", "").lower() in ["my name", "name"]:
-                        user_name = fact.get("value")
-                        logging.info(f"[EMAIL_HANDLERS] Found user name in facts: {user_name}")
-                        break
+                memories = self.memory.get_relevant_memories(user_id, "my name", max_results=5)
+                name_mem = next((m for m in memories if m.get('key', '').lower() in ['my name', 'name']), None)
+                if name_mem:
+                    user_name = name_mem.get('value')
+                    logging.info(f"[EMAIL_HANDLERS] Found user name in memory: {user_name}")
             except Exception as e:
-                logging.warning(f"[EMAIL_HANDLERS] Failed to fetch user name from facts: {e}")
+                logging.warning(f"[EMAIL_HANDLERS] Failed to fetch user name from memory: {e}")
 
             # Build context
             context_parts = []
@@ -662,63 +661,20 @@ Generate a reply email body:"""
         Returns:
             Tuple of (subject, body_html) or (None, None) if generation fails
         """
-        from providers.openai import OpenAIProvider
-        from core.provider_registry import ProviderRegistry
+        from core.router import route_request
 
         try:
-            # Get system provider for lightweight tasks (configurable)
-            registry = ProviderRegistry(self.memory)
-
-            # First check for "system" routing preference
-            system_provider_id = self.memory.get_routing_provider(user_id, "system") if self.memory else None
-            provider_cfg = None
-
-            if system_provider_id:
-                # Use configured system provider
-                provider_cfg = registry.get(system_provider_id)
-                logging.info(f"[EMAIL_HANDLERS] Using configured system provider: {system_provider_id}")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                # Try configured fallback provider for system intent
-                fallback_provider_id = self.memory.get_fallback_provider(user_id, "system") if self.memory else None
-                if fallback_provider_id:
-                    provider_cfg = registry.get(fallback_provider_id)
-                    if provider_cfg and provider_cfg.get("api_key"):
-                        logging.info(f"[EMAIL_HANDLERS] Using configured fallback provider: {fallback_provider_id}")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                # Fallback to OpenAI provider
-                provider_cfg = registry.get_by_type("openai")
-                logging.info("[EMAIL_HANDLERS] Using fallback OpenAI provider for email generation")
-
-            if not provider_cfg or not provider_cfg.get("api_key"):
-                logging.warning("[EMAIL_HANDLERS] No LLM provider available for email generation")
-                return None, None
-
-            # Instantiate appropriate provider based on type
-            provider_type = provider_cfg.get("type", "openai")
-            if provider_type == "openai":
-                provider = OpenAIProvider(
-                    api_key=provider_cfg["api_key"],
-                    base_url=provider_cfg.get("base_url"),
-                    model=provider_cfg.get("model") or "gpt-4o-mini"
-                )
-            else:
-                # For now, only OpenAI is supported for lightweight tasks
-                logging.warning(f"[EMAIL_HANDLERS] Provider type {provider_type} not supported for email generation")
-                return None, None
 
             # Get user's name from memory facts
             user_name = None
             try:
-                facts = self.memory.get_facts(user_id)
-                for fact in facts:
-                    if fact.get("key", "").lower() in ["my name", "name"]:
-                        user_name = fact.get("value")
-                        logging.info(f"[EMAIL_HANDLERS] Found user name in facts: {user_name}")
-                        break
+                memories = self.memory.get_relevant_memories(user_id, "my name", max_results=5)
+                name_mem = next((m for m in memories if m.get('key', '').lower() in ['my name', 'name']), None)
+                if name_mem:
+                    user_name = name_mem.get('value')
+                    logging.info(f"[EMAIL_HANDLERS] Found user name in memory: {user_name}")
             except Exception as e:
-                logging.warning(f"[EMAIL_HANDLERS] Failed to fetch user name from facts: {e}")
+                logging.warning(f"[EMAIL_HANDLERS] Failed to fetch user name from memory: {e}")
 
             # Build context
             context_parts = []
@@ -732,55 +688,119 @@ Generate a reply email body:"""
             context_text = "\n".join(context_parts)
 
             # Construct prompt
-            system_prompt = """You are an email assistant helping the user compose a new email.
+            system_prompt = """You are an email generator. Output ONLY in this exact format:
 
-Generate a professional, friendly email based on the user's instructions.
-
-Your response must be in this EXACT format:
-SUBJECT: [concise subject line based on email content]
+SUBJECT: <subject line>
 BODY:
-[email body with greeting, content, and closing]
+<email content>
 
-Guidelines:
-1. Generate a concise, relevant subject line that summarizes the email content
-2. Use proper email formatting (greeting, body, closing)
-3. Match an appropriate tone for the context
-4. Format as plain text (we'll convert to HTML)
-5. CRITICAL: Always include the sender's name after the closing (e.g., "Best regards,\nDanny" NOT "Best regards,"). Never use placeholders like "[Your Name]", "Theo", or leave it blank."""
+CRITICAL:
+- Start with "SUBJECT:" then the subject
+- Next line: "BODY:"
+- Then the email content
+- NO extra text, NO explanations, NO "You can..." or "Feel free..."
+- Plain text only, NO markdown formatting
+- End after signature
+- Use sender name from context if provided"""
 
-            # Build user prompt with explicit name instruction if available
-            name_instruction = ""
-            if user_name:
-                name_instruction = f"\n\nIMPORTANT: The email MUST be signed with the sender's name: {user_name}"
+            # Build user prompt
+            signature_instruction = f"Sign with: {user_name}" if user_name else "Generic closing"
 
-            user_prompt = f"""User request: {user_request}
+            user_prompt = f"""{user_request}
 
-{context_text}{name_instruction}
+Recipient: {recipient}
+{signature_instruction}
 
-Generate the email with subject and body:"""
+Generate email in SUBJECT:/BODY: format:"""
 
-            response = provider.chat(
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}]
-            )
+            # Use route_request to respect user's routing preferences
+            router_context = {
+                "text": user_prompt,
+                "session_id": "email_generation",
+                "memory": self.memory,
+                "user_id": str(user_id) if user_id else "1",
+                "forced_provider": None,
+                "force_intent": "system",  # Use system intent for internal tasks
+                "system_message": system_prompt
+            }
 
-            response_text = response.strip() if isinstance(response, str) else response.get("text", "").strip()
+            result = route_request(router_context)
+            response_text = result.get("text", "").strip()
+
+            # Debug: Log the raw LLM response
+            logging.info(f"[EMAIL_HANDLERS] Raw LLM response: {response_text[:500]}")
 
             # Parse subject and body from response
             subject = None
             body = None
 
+            # Try multiple subject patterns
             subject_match = re.search(r'SUBJECT:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
+            if not subject_match:
+                # Try without colon
+                subject_match = re.search(r'Subject\s+(.+?)(?:\n|$)', response_text, re.IGNORECASE)
             if subject_match:
                 subject = subject_match.group(1).strip()
 
-            body_match = re.search(r'BODY:\s*(.+)', response_text, re.IGNORECASE | re.DOTALL)
+            # Try multiple body patterns
+            body_match = re.search(r'BODY:\s*(.+?)(?:\n\n(?:You can|Feel free|Let me know|If you|Please|Note:|---|Here\'s)|$)', response_text, re.IGNORECASE | re.DOTALL)
+            if not body_match:
+                # Try without colon
+                body_match = re.search(r'Body\s*\n(.+?)(?:\n\n(?:You can|Feel free|Let me know|If you|Please|Note:|---|Here\'s)|$)', response_text, re.IGNORECASE | re.DOTALL)
             if body_match:
                 body = body_match.group(1).strip()
+
+            # If body not found with stop pattern, try capturing everything
+            if not body:
+                body_match = re.search(r'BODY:\s*(.+)', response_text, re.IGNORECASE | re.DOTALL)
+                if body_match:
+                    full_body = body_match.group(1).strip()
+                    # Try to find where email signature ends (common patterns)
+                    # Stop at double newline followed by conversational text
+                    lines = full_body.split('\n')
+                    email_lines = []
+                    found_signature = False
+                    for i, line in enumerate(lines):
+                        email_lines.append(line)
+                        # Check if this looks like a signature line
+                        if any(closing in line.lower() for closing in ['regards', 'sincerely', 'thanks', 'cheers', 'best']):
+                            # Look ahead - if next non-empty line doesn't start with conversational text, include it
+                            if i + 1 < len(lines):
+                                next_line = lines[i + 1].strip()
+                                if next_line and not any(phrase in next_line.lower() for phrase in ['you can', 'feel free', 'let me know', 'if you', 'please']):
+                                    email_lines.append(lines[i + 1])
+                            found_signature = True
+                            break
+
+                    if found_signature:
+                        body = '\n'.join(email_lines).strip()
+                    else:
+                        body = full_body
 
             if not subject or not body:
                 logging.error(f"[EMAIL_HANDLERS] Failed to parse subject/body from LLM response")
                 return None, None
+
+            # Strip any markdown formatting that might have slipped through
+            def strip_markdown(text):
+                """Remove common markdown formatting characters."""
+                # Remove bold/italic markers
+                text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)  # **bold**
+                text = re.sub(r'__(.+?)__', r'\1', text)      # __bold__
+                text = re.sub(r'\*(.+?)\*', r'\1', text)      # *italic*
+                text = re.sub(r'_(.+?)_', r'\1', text)        # _italic_
+                # Remove leading/trailing asterisks or underscores
+                text = text.strip('*_')
+                return text
+
+            subject = strip_markdown(subject)
+            body = strip_markdown(body)
+
+            # Replace any remaining placeholders with actual name
+            if user_name:
+                body = re.sub(r'\[Your [Nn]ame\]', user_name, body)
+                body = re.sub(r'\[Sender\]', user_name, body)
+                body = re.sub(r'\[Your [Nn]ame [Hh]ere\]', user_name, body)
 
             # Convert to simple HTML
             body_html = body.replace("\n", "<br>\n")

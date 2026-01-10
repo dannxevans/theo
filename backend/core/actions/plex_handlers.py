@@ -49,7 +49,7 @@ class PlexHandlers(BaseActionHandler):
         # Determine which Plex action based on keywords
         if any(phrase in text_l for phrase in ["currently playing", "what am i watching", "watching now", "playing now"]):
             return self.handle_get_currently_playing(user_text, session_id, user_id, context)
-        elif any(phrase in text_l for phrase in ["what should i watch", "what to watch", "on deck", "up next", "watch next"]):
+        elif any(phrase in text_l for phrase in ["what should i watch", "what to watch", "on deck", "up next", "watch next", "anything new", "new to watch", "new on plex"]):
             return self.handle_get_on_deck(user_text, session_id, user_id, context)
         else:
             # Default to recently watched for queries like "what was i watching"

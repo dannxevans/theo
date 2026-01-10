@@ -1078,3 +1078,107 @@ class MemoryStore:
                 .where(self.feature_providers.c.user_id == user_id)
                 .where(self.feature_providers.c.provider_type == provider_type)
             )
+
+    # =============================
+    # Intent Reasoning Operations
+    # =============================
+
+    def store_reasoning_trace(
+        self,
+        user_id: int,
+        reasoning_result,
+        session_id: str = None,
+        mode: str = None,
+        subtab: str = None,
+        user_text: str = None
+    ) -> int:
+        """
+        Store an intent reasoning trace for debugging and analysis.
+
+        Args:
+            user_id: User ID
+            reasoning_result: IntentReasoningResult object
+            session_id: Optional session ID
+            mode: Optional mode (personal/work)
+            subtab: Optional subtab
+            user_text: Original user input text
+
+        Returns:
+            int: ID of the created trace record
+        """
+        import json
+        from sqlalchemy import text
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text("""
+                    INSERT INTO intent_reasoning_traces
+                    (user_id, session_id, user_text, mode, subtab, intent, confidence,
+                     reasoning, entities, service_signals, parameters, is_ambiguous,
+                     clarification_question, token_count, latency_ms, source)
+                    VALUES
+                    (:user_id, :session_id, :user_text, :mode, :subtab, :intent, :confidence,
+                     :reasoning, :entities, :service_signals, :parameters, :is_ambiguous,
+                     :clarification_question, :token_count, :latency_ms, :source)
+                """),
+                {
+                    "user_id": user_id,
+                    "session_id": session_id,
+                    "user_text": user_text,
+                    "mode": mode,
+                    "subtab": subtab,
+                    "intent": reasoning_result.intent,
+                    "confidence": reasoning_result.confidence,
+                    "reasoning": reasoning_result.reasoning,
+                    "entities": json.dumps(reasoning_result.entities.__dict__ if hasattr(reasoning_result.entities, '__dict__') else {}),
+                    "service_signals": json.dumps([{"service": s.service, "relevance": s.relevance, "reason": s.reason} for s in reasoning_result.service_signals]),
+                    "parameters": json.dumps(reasoning_result.parameters),
+                    "is_ambiguous": 1 if reasoning_result.is_ambiguous else 0,
+                    "clarification_question": reasoning_result.clarification_question,
+                    "token_count": reasoning_result.token_count,
+                    "latency_ms": reasoning_result.latency_ms,
+                    "source": reasoning_result.source
+                }
+            )
+            return result.lastrowid
+
+    def get_reasoning_traces(
+        self,
+        user_id: int,
+        limit: int = 100,
+        intent_filter: str = None,
+        source_filter: str = None
+    ):
+        """
+        Retrieve reasoning traces for analysis.
+
+        Args:
+            user_id: User ID
+            limit: Maximum number of traces to return (default: 100)
+            intent_filter: Optional filter by intent
+            source_filter: Optional filter by source (reasoning/fallback/cache)
+
+        Returns:
+            List[dict]: List of trace records
+        """
+        from sqlalchemy import text
+
+        query = """
+            SELECT * FROM intent_reasoning_traces
+            WHERE user_id = :user_id
+        """
+        params = {"user_id": user_id, "limit": limit}
+
+        if intent_filter:
+            query += " AND intent = :intent"
+            params["intent"] = intent_filter
+
+        if source_filter:
+            query += " AND source = :source"
+            params["source"] = source_filter
+
+        query += " ORDER BY created_at DESC LIMIT :limit"
+
+        with self.engine.begin() as conn:
+            result = conn.execute(text(query), params)
+            return [dict(row._mapping) for row in result]
