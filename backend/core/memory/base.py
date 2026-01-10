@@ -64,6 +64,9 @@ class BaseMemoryOperations:
         self.whoop_settings = tables["whoop_settings"]
         self.whoop_data_tracking = tables["whoop_data_tracking"]
         self.calendar_events_cache = tables["calendar_events_cache"]
+        self.plex_credentials = tables["plex_credentials"]
+        self.plex_settings = tables["plex_settings"]
+        self.plex_notification_tracking = tables["plex_notification_tracking"]
 
     def _get_connection(self):
         """

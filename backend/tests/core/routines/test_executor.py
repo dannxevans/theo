@@ -406,3 +406,41 @@ def test_execute_whoop_workout_action(mock_context):
     call_args = mock_context["action_router"].route_action_request.call_args[0][0]
     assert call_args["intent"] == "whoop"
     assert "workout" in call_args["text"].lower()
+
+
+def test_execute_plex_recently_watched_action(mock_context):
+    """Test Plex recently watched action execution."""
+    result = _execute_action(
+        action_type="plex_recently_watched",
+        params={},
+        session_id="test-session",
+        user_id=1,
+        mode="personal",
+        action_router=mock_context["action_router"],
+        memory=mock_context["memory"]
+    )
+
+    # Should call action router with plex intent
+    mock_context["action_router"].route_action_request.assert_called_once()
+    call_args = mock_context["action_router"].route_action_request.call_args[0][0]
+    assert call_args["intent"] == "plex"
+    assert "watching" in call_args["text"].lower()
+
+
+def test_execute_plex_on_deck_action(mock_context):
+    """Test Plex on deck action execution."""
+    result = _execute_action(
+        action_type="plex_on_deck",
+        params={},
+        session_id="test-session",
+        user_id=1,
+        mode="personal",
+        action_router=mock_context["action_router"],
+        memory=mock_context["memory"]
+    )
+
+    # Should call action router with plex intent
+    mock_context["action_router"].route_action_request.assert_called_once()
+    call_args = mock_context["action_router"].route_action_request.call_args[0][0]
+    assert call_args["intent"] == "plex"
+    assert "watch next" in call_args["text"].lower()

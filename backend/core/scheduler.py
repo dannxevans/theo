@@ -67,6 +67,9 @@ class ProactiveScheduler:
             self._schedule_whoop_jobs()
             self._schedule_whoop_token_refresh_job()
 
+            # Schedule Plex jobs
+            self._schedule_plex_jobs()
+
             # Start the scheduler
             self.scheduler.start()
             self._running = True
@@ -405,6 +408,78 @@ class ProactiveScheduler:
 
         except Exception as e:
             logger.error(f"[SCHEDULER] Failed to schedule WHOOP token refresh job: {e}")
+
+    def _schedule_plex_jobs(self):
+        """
+        Schedule Plex notification jobs for all users with Plex connected.
+
+        Jobs are configured per user based on their notification settings.
+        Users must opt-in to each notification type (episodes, seasons, movies).
+        """
+        # Import here to avoid circular imports
+        from core.proactive.plex_new_episode_service import PlexNewEpisodeService
+
+        try:
+            # Get all users with Plex credentials
+            from sqlalchemy import text
+
+            with self.memory.engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT DISTINCT user_id FROM plex_credentials WHERE is_valid = 1")
+                )
+                user_ids = [row[0] for row in result.fetchall()]
+
+            if not user_ids:
+                logger.info("[SCHEDULER] No Plex users found, skipping Plex job scheduling")
+                return
+
+            # Initialize service
+            plex_service = PlexNewEpisodeService(self.memory)
+
+            # Schedule for each user based on their settings
+            for user_id in user_ids:
+                settings = self.memory.get_plex_settings(user_id)
+
+                # Check if any notifications are enabled
+                any_enabled = (
+                    settings.get('new_episode_notifications_enabled') or
+                    settings.get('new_season_notifications_enabled') or
+                    settings.get('new_movie_notifications_enabled')
+                )
+
+                if not any_enabled:
+                    logger.debug(f"[SCHEDULER] All Plex notifications disabled for user {user_id}")
+                    continue
+
+                # Get check frequency (default: 15 minutes)
+                frequency = settings.get('check_frequency_minutes', 15)
+
+                # Schedule job for this user
+                self.scheduler.add_job(
+                    func=lambda uid=user_id: plex_service.check_and_notify(uid),
+                    trigger=IntervalTrigger(minutes=frequency),
+                    id=f'plex_new_content_{user_id}',
+                    name=f'Plex New Content ({user_id})',
+                    replace_existing=True
+                )
+
+                logger.info(
+                    f"[SCHEDULER] Plex notification job scheduled for user {user_id} "
+                    f"(every {frequency} minutes)"
+                )
+
+            # Schedule cleanup job (daily)
+            self.scheduler.add_job(
+                func=lambda: self.memory.cleanup_old_plex_tracking(days=7),
+                trigger=CronTrigger(hour=3, minute=15),
+                id='plex_tracking_cleanup',
+                name='Plex Tracking Cleanup',
+                replace_existing=True
+            )
+            logger.info("[SCHEDULER] Plex tracking cleanup scheduled (daily at 03:15 UTC)")
+
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Failed to schedule Plex jobs: {e}")
 
 
 # Global scheduler instance
