@@ -931,6 +931,17 @@ def route_request(context: dict, stream: bool = False):
         try:
             from core.intent_reasoning import IntentReasoningEngine
 
+            # Get conversation history for context-aware intent reasoning
+            conversation_history = []
+            session_id = context.get("session_id")
+            if memory and session_id:
+                recent_turns = memory.get_recent_turns(session_id, limit=6)
+                conversation_history = [
+                    {"role": turn["role"], "content": turn["content"]}
+                    for turn in recent_turns
+                ]
+                logging.info(f"[ROUTER] Passing {len(conversation_history)} conversation turns to intent reasoning")
+
             reasoning_engine = IntentReasoningEngine(
                 provider_registry,
                 memory,
@@ -940,7 +951,8 @@ def route_request(context: dict, stream: bool = False):
                 text=text,
                 mode=context.get("mode"),
                 subtab=context.get("subtab"),
-                user_id=context.get("user_id")
+                user_id=context.get("user_id"),
+                conversation_history=conversation_history
             )
 
             # Log reasoning for debugging
