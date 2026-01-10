@@ -1329,9 +1329,9 @@ def route_request(context: dict, stream: bool = False):
     user_id = normalize_user_id(context.get("user_id"))
     action_intents = memory.get_action_intents(user_id) if memory else []
 
-    # Add hardcoded task intents that should always route to ActionRouter
+    # Add hardcoded task and plex intents that should always route to ActionRouter
     # These are not yet in the database migration but need to work
-    TASK_INTENTS = ["read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task", "update_task", "delete_task"]
+    TASK_INTENTS = ["read_tasks", "read_tasks_today", "read_tasks_week", "create_task", "complete_task", "update_task", "delete_task", "plex"]
 
     # Combine database intents with hardcoded task intents
     all_action_intents = action_intents + TASK_INTENTS

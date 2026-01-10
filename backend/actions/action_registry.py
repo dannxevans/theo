@@ -8,6 +8,7 @@ Loads providers from database and provides lookup methods.
 from typing import Dict, Optional, List, Tuple
 from actions.base import ActionProvider
 from actions.m365_provider import M365Provider
+from actions.plex_provider import PlexProvider
 import logging
 
 
@@ -68,6 +69,22 @@ class ActionProviderRegistry:
                         logging.info(f"[ACTION_REGISTRY] Loaded M365 provider (ID: {sp['id']})")
                     else:
                         logging.warning(f"[ACTION_REGISTRY] M365 credentials invalid for provider {sp['id']}")
+
+                elif provider_type == "plex":
+                    # Load Plex credentials
+                    creds = self.memory.get_plex_credentials(user_id)
+
+                    if creds and creds.get("is_valid"):
+                        provider = PlexProvider(
+                            access_token=creds["access_token"],
+                            server_url=creds["server_url"],
+                            user_id=user_id,
+                            memory_store=self.memory
+                        )
+                        self._providers[sp["id"]] = provider
+                        logging.info(f"[ACTION_REGISTRY] Loaded Plex provider (ID: {sp['id']})")
+                    else:
+                        logging.warning(f"[ACTION_REGISTRY] Plex credentials invalid for provider {sp['id']}")
 
                 # Add more provider types here as they're implemented
                 # elif provider_type == "google_calendar":
@@ -235,6 +252,19 @@ class ActionProviderRegistry:
                         access_token=creds["access_token"],
                         refresh_token=creds["refresh_token"],
                         expires_at=creds["expires_at"],
+                        user_id=user_id,
+                        memory_store=self.memory
+                    )
+                    self._providers[provider_id] = provider
+                    logging.info(f"[ACTION_REGISTRY] Reloaded provider {provider_id}")
+
+            elif provider_type == "plex":
+                creds = self.memory.get_plex_credentials(user_id)
+
+                if creds and creds.get("is_valid"):
+                    provider = PlexProvider(
+                        access_token=creds["access_token"],
+                        server_url=creds["server_url"],
                         user_id=user_id,
                         memory_store=self.memory
                     )

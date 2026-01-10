@@ -21,6 +21,7 @@ from .work_mode_ip import WorkModeIPOperations
 from .service_providers import ServiceProviderOperations
 from .m365 import M365Operations
 from .whoop import WHOOPOperations
+from .plex import PlexOperations
 from .actions import ActionOperations
 from .voice import VoiceOperations
 from .routines import RoutineOperations
@@ -117,6 +118,7 @@ class MemoryStore:
         self._service_provider_ops = ServiceProviderOperations(tables, self.Session, self.engine)
         self._m365_ops = M365Operations(tables, self.Session, self.engine)
         self._whoop_ops = WHOOPOperations(tables, self.Session, self.engine)
+        self._plex_ops = PlexOperations(tables, self.Session, self.engine)
         self._action_ops = ActionOperations(tables, self.Session, self.engine)
         self._routine_ops = RoutineOperations(self.engine)
         self._voice_ops = VoiceOperations(self.engine, tables)
@@ -596,6 +598,10 @@ class MemoryStore:
         """Get a single service provider by ID."""
         return self._service_provider_ops.get_service_provider(provider_id)
 
+    def get_service_providers_by_type(self, user_id, provider_type):
+        """Get service providers by type."""
+        return self._service_provider_ops.get_service_providers_by_type(user_id, provider_type)
+
     def get_preferred_provider(self, user_id, category):
         """Get the preferred provider for a category."""
         return self._service_provider_ops.get_preferred_provider(user_id, category)
@@ -689,6 +695,66 @@ class MemoryStore:
     def delete_all_whoop_data(self, user_id):
         """Delete all WHOOP data for a user."""
         return self._whoop_ops.delete_all_whoop_data(user_id)
+
+    # =============================
+    # Plex Operations (delegated)
+    # =============================
+
+    def store_plex_credentials(self, user_id, access_token, plex_user_id,
+                                plex_username, server_url, server_name=None, server_version=None):
+        """Store Plex OAuth credentials."""
+        return self._plex_ops.store_plex_credentials(
+            user_id, access_token, plex_user_id, plex_username,
+            server_url, server_name, server_version
+        )
+
+    def get_plex_credentials(self, user_id):
+        """Get Plex credentials for a user."""
+        return self._plex_ops.get_plex_credentials(user_id)
+
+    def update_plex_credentials(self, user_id, **kwargs):
+        """Update Plex credentials (partial update)."""
+        return self._plex_ops.update_plex_credentials(user_id, **kwargs)
+
+    def update_plex_server_url(self, user_id, server_url):
+        """Update Plex server URL."""
+        return self._plex_ops.update_plex_credentials(user_id, server_url=server_url)
+
+    def invalidate_plex_credentials(self, user_id, error_message):
+        """Mark Plex credentials as invalid."""
+        return self._plex_ops.invalidate_plex_credentials(user_id, error_message)
+
+    def delete_plex_credentials(self, user_id):
+        """Delete Plex credentials for a user."""
+        return self._plex_ops.delete_plex_credentials(user_id)
+
+    def get_plex_settings(self, user_id):
+        """Get Plex notification settings."""
+        return self._plex_ops.get_plex_settings(user_id)
+
+    def update_plex_settings(self, user_id, **kwargs):
+        """Update Plex notification settings."""
+        return self._plex_ops.update_plex_settings(user_id, **kwargs)
+
+    def delete_plex_settings(self, user_id):
+        """Delete Plex settings for a user."""
+        return self._plex_ops.delete_plex_settings(user_id)
+
+    def is_plex_item_notified(self, user_id, plex_item_key):
+        """Check if user has been notified about a Plex item."""
+        return self._plex_ops.is_plex_item_notified(user_id, plex_item_key)
+
+    def track_plex_notification(self, user_id, plex_item_key, plex_item_type):
+        """Track that user was notified about a Plex item."""
+        return self._plex_ops.track_plex_notification(user_id, plex_item_key, plex_item_type)
+
+    def cleanup_old_plex_tracking(self, days=7):
+        """Delete old Plex tracking records."""
+        return self._plex_ops.cleanup_old_plex_tracking(days)
+
+    def delete_all_plex_tracking(self, user_id):
+        """Delete all Plex tracking for a user."""
+        return self._plex_ops.delete_all_plex_tracking(user_id)
 
     # =============================
     # Action Operations (delegated)
@@ -864,6 +930,23 @@ class MemoryStore:
                     'value': value,
                     'updated_at': datetime.utcnow()
                 }
+            )
+            conn.execute(stmt)
+
+    def delete_user_preference(self, user_id, key):
+        """
+        Delete a user preference.
+
+        Args:
+            user_id: User identifier
+            key: Preference key to delete
+        """
+        from sqlalchemy import delete
+
+        with self._get_connection() as conn:
+            stmt = delete(self.preferences).where(
+                (self.preferences.c.user_id == user_id) &
+                (self.preferences.c.key == key)
             )
             conn.execute(stmt)
 

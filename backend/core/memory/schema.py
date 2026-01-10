@@ -524,6 +524,59 @@ def create_schema(meta: MetaData):
     )
 
     # =============================
+    # Plex Credentials
+    # =============================
+    plex_credentials = Table(
+        "plex_credentials",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False, unique=True),
+        Column("access_token", Text, nullable=False),
+        Column("plex_user_id", Text, nullable=False),
+        Column("plex_username", Text, nullable=True),
+        Column("server_url", Text, nullable=False),
+        Column("server_name", Text, nullable=True),
+        Column("server_version", Text, nullable=True),
+        Column("is_valid", Boolean, default=True),
+        Column("last_error", Text, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # Plex Settings
+    # =============================
+    plex_settings = Table(
+        "plex_settings",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False, unique=True),
+        Column("new_episode_notifications_enabled", Boolean, default=False),
+        Column("new_season_notifications_enabled", Boolean, default=False),
+        Column("new_movie_notifications_enabled", Boolean, default=False),
+        Column("check_frequency_minutes", Integer, default=15),
+        Column("quiet_hours_start", Text, nullable=True),
+        Column("quiet_hours_end", Text, nullable=True),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        Column("updated_at", DateTime, default=datetime.utcnow),
+    )
+
+    # =============================
+    # Plex Notification Tracking
+    # =============================
+    plex_notification_tracking = Table(
+        "plex_notification_tracking",
+        meta,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("user_id", Integer, nullable=False),
+        Column("plex_item_key", Text, nullable=False),
+        Column("plex_item_type", Text, nullable=False),
+        Column("notified_at", DateTime, default=datetime.utcnow),
+        Column("created_at", DateTime, default=datetime.utcnow),
+        UniqueConstraint("user_id", "plex_item_key", name="uq_plex_tracking"),
+    )
+
+    # =============================
     # Feature Providers
     # =============================
     feature_providers = Table(
@@ -624,6 +677,9 @@ def create_schema(meta: MetaData):
         "whoop_credentials": whoop_credentials,
         "whoop_settings": whoop_settings,
         "whoop_data_tracking": whoop_data_tracking,
+        "plex_credentials": plex_credentials,
+        "plex_settings": plex_settings,
+        "plex_notification_tracking": plex_notification_tracking,
         "calendar_events_cache": calendar_events_cache,
         "classification_audit": classification_audit,
         "feature_providers": feature_providers,

@@ -12,7 +12,7 @@ This is distinct from the LLM router (router.py):
 from typing import Dict, Any
 import logging
 
-from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers, WHOOPHandlers, TaskHandlers
+from .actions import CalendarHandlers, EmailHandlers, ConfirmationHandlers, WHOOPHandlers, TaskHandlers, PlexHandlers
 
 
 class ActionRouter:
@@ -74,6 +74,11 @@ class ActionRouter:
             memory_store,
             confirmation_manager
         )
+        self.plex_handlers = PlexHandlers(
+            action_registry,
+            memory_store,
+            confirmation_manager
+        )
 
     @property
     def confirmation_manager(self):
@@ -101,6 +106,8 @@ class ActionRouter:
             self.confirmation_handlers.confirmation_manager = value
         if hasattr(self, 'whoop_handlers'):
             self.whoop_handlers.confirmation_manager = value
+        if hasattr(self, 'plex_handlers'):
+            self.plex_handlers.confirmation_manager = value
 
     def route_action_request(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -162,6 +169,12 @@ class ActionRouter:
 
             # WHOOP actions
             "whoop": self.whoop_handlers.handle_whoop,
+
+            # Plex actions (general handler + specific handlers)
+            "plex": self.plex_handlers.handle_plex,
+            "plex_recently_watched": self.plex_handlers.handle_get_recently_watched,
+            "plex_on_deck": self.plex_handlers.handle_get_on_deck,
+            "plex_currently_playing": self.plex_handlers.handle_get_currently_playing,
 
             # Confirmation actions
             "approve_confirmation": self.confirmation_handlers.handle_approve_confirmation,
