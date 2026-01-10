@@ -899,11 +899,110 @@ def route_request(context: dict, stream: bool = False):
     # Check if intent is being forced (used for internal summarization to prevent loops)
     force_intent = context.get("force_intent")
 
+    # =============================
+    # Confirmation Handling (BEFORE intent reasoning)
+    # =============================
+    # Check for pending confirmations and approval/rejection keywords
+    if memory and context.get("user_id") and not force_intent:
+        from core.confirmation_manager import ConfirmationManager
+
+        conf_manager = ConfirmationManager(memory)
+        pending = conf_manager.get_pending_confirmations(context.get("user_id"))
+
+        if pending:
+            text_l = text.lower().strip()
+            CONFIRMATION_KEYWORDS = {
+                "approve_confirmation": ["yes", "approve", "confirm", "ok", "sure", "go ahead", "do it", "y"],
+                "reject_confirmation": ["no", "reject", "cancel", "don't", "stop", "n"],
+            }
+
+            # Check if user is responding to confirmation
+            for confirmation_intent, keywords in CONFIRMATION_KEYWORDS.items():
+                if any(keyword == text_l or text_l.startswith(keyword + " ") for keyword in keywords):
+                    logging.info(f"[ROUTER] Detected confirmation response: {confirmation_intent}")
+                    force_intent = confirmation_intent
+                    break
+
+    # =============================
+    # NEW: Intent Reasoning Layer
+    # =============================
+    reasoning_result = None
+    if provider_registry and not force_intent:
+        try:
+            from core.intent_reasoning import IntentReasoningEngine
+
+            reasoning_engine = IntentReasoningEngine(
+                provider_registry,
+                memory,
+                user_id=context.get("user_id")
+            )
+            reasoning_result = reasoning_engine.reason(
+                text=text,
+                mode=context.get("mode"),
+                subtab=context.get("subtab"),
+                user_id=context.get("user_id")
+            )
+
+            # Log reasoning for debugging
+            logging.info(f"[ROUTER] Reasoning result: intent={reasoning_result.intent}, "
+                         f"confidence={reasoning_result.confidence}, "
+                         f"services={[s.service for s in reasoning_result.service_signals]}")
+
+            # Store reasoning trace
+            if memory:
+                try:
+                    memory.store_reasoning_trace(
+                        user_id=context.get("user_id"),
+                        reasoning_result=reasoning_result,
+                        session_id=context.get("session_id"),
+                        mode=context.get("mode"),
+                        subtab=context.get("subtab"),
+                        user_text=text
+                    )
+                except Exception as trace_err:
+                    logging.warning(f"[ROUTER] Failed to store reasoning trace: {trace_err}")
+
+            # Handle ambiguous requests
+            if reasoning_result.is_ambiguous and reasoning_result.clarification_question:
+                return {
+                    "text": reasoning_result.clarification_question,
+                    "provider": reasoning_result.provider_id or "intent_reasoning",
+                    "model": reasoning_result.provider_model,
+                    "task_type": "clarification",
+                    "metadata": {
+                        "reasoning_trace": reasoning_result.reasoning,
+                        "suspected_intent": reasoning_result.intent,
+                        "confidence": reasoning_result.confidence,
+                        "entities": reasoning_result.entities.raw if hasattr(reasoning_result.entities, 'raw') else {},
+                        "service_signals": [s.service for s in reasoning_result.service_signals]
+                    }
+                }
+
+            # Use reasoning result if high confidence
+            if reasoning_result.confidence >= 0.85:
+                intent = reasoning_result.intent
+                _debug(memory, f"Intent from reasoning: {intent} (confidence: {reasoning_result.confidence})")
+
+                # Store entities and service signals in context for downstream use
+                context["reasoning_entities"] = reasoning_result.entities
+                context["reasoning_service_signals"] = reasoning_result.service_signals
+            else:
+                # Low confidence - fall through to existing classification
+                logging.info(f"[ROUTER] Low reasoning confidence ({reasoning_result.confidence}), using fallback")
+                reasoning_result = None
+
+        except Exception as e:
+            logging.warning(f"[ROUTER] Intent reasoning failed: {e}")
+            reasoning_result = None
+
+    # =============================
+    # Existing Intent Classification
+    # =============================
     # Use enhanced intent classification with mode and subtab awareness
     if force_intent:
         intent = force_intent
         _debug(memory, f"Intent forced to: {force_intent}")
-    else:
+    elif reasoning_result is None:
         intent = classify_intent_enhanced(
             text=text,
             memory=memory,
@@ -942,23 +1041,32 @@ def route_request(context: dict, stream: bool = False):
             }
 
         # Extract location from the message
-        # Use simple extraction - look for location after common phrases
-        import re
-        text_l = text.lower()
+        import re  # Import at top since it's used later for postcode extraction too
 
-        # Try to extract location using patterns
+        # First, check if intent reasoning extracted location entities
         location = None
-        location_patterns = [
-            r'weather (?:in|for|at) ([^?]+)',
-            r'temperature (?:in|for|at) ([^?]+)',
-            r'forecast (?:in|for|at) ([^?]+)',
-        ]
+        reasoning_entities = context.get("reasoning_entities")
 
-        for pattern in location_patterns:
-            match = re.search(pattern, text_l)
-            if match:
-                location = match.group(1).strip()
-                break
+        if reasoning_entities and hasattr(reasoning_entities, 'locations') and reasoning_entities.locations:
+            # Use the first location extracted by intent reasoning
+            location = reasoning_entities.locations[0]
+            _debug(memory, f"Using location from intent reasoning: {location}")
+        else:
+            # Fallback to regex-based extraction
+            text_l = text.lower()
+
+            # Try to extract location using patterns
+            location_patterns = [
+                r'weather (?:in|for|at) ([^?]+)',
+                r'temperature (?:in|for|at) ([^?]+)',
+                r'forecast (?:in|for|at) ([^?]+)',
+            ]
+
+            for pattern in location_patterns:
+                match = re.search(pattern, text_l)
+                if match:
+                    location = match.group(1).strip()
+                    break
 
         # If no location found, ask for it
         if not location:
@@ -1118,30 +1226,72 @@ def route_request(context: dict, stream: bool = False):
         import re
         text_l = text.lower()
 
-        # Try to extract locations using patterns
         origin = None
         destination = None
 
-        # Pattern 1: Explicit "from X to Y"
-        from_to_pattern = r'from\s+(.+?)\s+to\s+(.+?)(?:\?|$|\.)'
-        match = re.search(from_to_pattern, text_l)
-        if match:
-            origin = match.group(1).strip()
-            destination = match.group(2).strip()
-            logging.info(f"[ROUTING] Extracted from/to: '{origin}' → '{destination}'")
-        else:
-            # Pattern 2: Only "to Y" (assume current location as origin)
-            to_only_pattern = r'(?:route|traffic|directions|navigate|drive|commute)\s+(?:to|for)\s+(.+?)(?:\?|$|\.)'
-            match = re.search(to_only_pattern, text_l)
+        # First, try to use locations from intent reasoning
+        reasoning_entities = context.get("reasoning_entities")
+        if reasoning_entities and hasattr(reasoning_entities, 'locations') and reasoning_entities.locations:
+            locations = reasoning_entities.locations
+            logging.info(f"[ROUTING] Intent reasoning extracted locations: {locations}")
+
+            # Use heuristics to determine origin vs destination
+            if len(locations) == 1:
+                # Only one location - use as destination, default to home as origin
+                destination = locations[0]
+                origin = "home"
+                logging.info(f"[ROUTING] Single location extracted, using home as origin: '{origin}' → '{destination}'")
+            elif len(locations) >= 2:
+                # Multiple locations - use context clues to determine which is which
+                # Check if "from" appears before "to" in the text
+                from_index = text_l.find('from')
+                to_index = text_l.find('to')
+
+                if from_index != -1 and to_index != -1:
+                    if from_index < to_index:
+                        # "from X to Y" - first is origin, second is destination
+                        origin = locations[0]
+                        destination = locations[1] if len(locations) > 1 else locations[0]
+                    else:
+                        # "to Y from X" - reversed order
+                        destination = locations[0]
+                        origin = locations[1] if len(locations) > 1 else "home"
+                else:
+                    # No clear "from/to" - guess based on common patterns
+                    # If one location is "home", it's usually the origin
+                    if any(loc.lower() in ["home", "my home"] for loc in locations):
+                        home_idx = next(i for i, loc in enumerate(locations) if loc.lower() in ["home", "my home"])
+                        origin = locations[home_idx]
+                        destination = locations[1 - home_idx] if len(locations) == 2 else locations[0]
+                    else:
+                        # Default: first is origin, second is destination
+                        origin = locations[0]
+                        destination = locations[1]
+
+                logging.info(f"[ROUTING] Multiple locations, determined: '{origin}' → '{destination}'")
+
+        # Fallback to regex-based extraction if intent reasoning didn't extract locations
+        if not origin or not destination:
+            # Pattern 1: Explicit "from X to Y"
+            from_to_pattern = r'from\s+(.+?)\s+to\s+(.+?)(?:\?|$|\.)'
+            match = re.search(from_to_pattern, text_l)
             if match:
-                destination = match.group(1).strip()
-                # Try to get home location as default origin
-                if memory:
-                    memories = memory.get_relevant_memories(normalize_user_id(user_id), "home location", max_results=5)
-                    home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
-                    if home_mem:
-                        origin = "home"
-                        logging.info(f"[ROUTING] Extracted to-only pattern, using home as origin: '{origin}' → '{destination}'")
+                origin = match.group(1).strip()
+                destination = match.group(2).strip()
+                logging.info(f"[ROUTING] Regex extracted from/to: '{origin}' → '{destination}'")
+            else:
+                # Pattern 2: Only "to Y" (assume current location as origin)
+                to_only_pattern = r'(?:route|traffic|directions|navigate|drive|commute)\s+(?:to|for)\s+(.+?)(?:\?|$|\.)'
+                match = re.search(to_only_pattern, text_l)
+                if match:
+                    destination = match.group(1).strip()
+                    # Try to get home location as default origin
+                    if memory and not origin:
+                        memories = memory.get_relevant_memories(normalize_user_id(user_id), "home location", max_results=5)
+                        home_mem = next((m for m in memories if m.get('key') == 'Home Location'), None)
+                        if home_mem:
+                            origin = "home"
+                            logging.info(f"[ROUTING] Regex extracted to-only pattern, using home as origin: '{origin}' → '{destination}'")
 
         # If no match, ask for clarification
         if not origin or not destination:

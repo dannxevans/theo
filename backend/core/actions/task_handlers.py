@@ -123,11 +123,11 @@ class TaskHandlers(BaseActionHandler):
                     }
                 )
 
-            # Format tasks for display
-            formatted_text = self._format_task_list(tasks, "Your Tasks")
+            # Generate AI summary of tasks
+            summary_text = self._generate_task_summary(tasks, user_id, "")
 
             return self._format_success_response(
-                formatted_text,
+                summary_text,
                 "read_tasks",
                 {
                     "task_count": len(tasks),
