@@ -879,6 +879,9 @@ def instantiate_provider(provider_cfg):
 
 
 def route_request(context: dict, stream: bool = False):
+    # CRITICAL DEBUG: Log function entry with parameter types
+    logging.info(f"[ROUTER] route_request called with context type={type(context)}, stream={stream}")
+
     text = context.get("text", "")
     memory = context.get("memory")
 
@@ -1011,7 +1014,10 @@ def route_request(context: dict, stream: bool = False):
     # NEW: Orchestration Check
     # =============================
     # Check if we should orchestrate based on Intent Reasoning output
-    if reasoning_result and not force_intent:
+    # Skip orchestration if called recursively from within orchestration
+    skip_orchestration = context.get("_skip_orchestration", False)
+
+    if reasoning_result and not force_intent and not skip_orchestration:
         try:
             from core.orchestration.orchestrator import Orchestrator
 
@@ -1020,9 +1026,35 @@ def route_request(context: dict, stream: bool = False):
 
             if orch_decision.should_orchestrate:
                 logging.info("[ROUTER] Orchestration triggered")
-                # TODO: Call orchestrator.orchestrate() once Phase 2-3 are implemented
-                # For now, just log and continue to normal routing
-                logging.info("[ROUTER] Orchestration not yet implemented - falling through to normal routing")
+
+                # Get conversation history for orchestration
+                conversation_history = []
+                session_id = context.get("session_id")
+                if memory and session_id:
+                    recent_turns = memory.get_recent_turns(session_id, limit=6)
+                    conversation_history = [
+                        {"role": turn["role"], "content": turn["content"]}
+                        for turn in recent_turns
+                    ]
+
+                # Execute orchestration
+                orch_result = orchestrator.orchestrate(
+                    user_query=text,
+                    user_id=context.get("user_id"),
+                    session_id=session_id,
+                    reasoning_result=reasoning_result,
+                    conversation_history=conversation_history
+                )
+
+                # Return orchestration result
+                # Phase 2: Returns raw service data (will be synthesized in Phase 3)
+                return {
+                    "text": orch_result.text,
+                    "provider": "orchestration",
+                    "model": None,
+                    "task_type": "orchestration",
+                    "metadata": orch_result.metadata
+                }
             else:
                 logging.info(f"[ROUTER] Orchestration skipped: {orch_decision.skip_reason}")
 
@@ -1946,6 +1978,9 @@ Guidelines:
                 "routing": routing_decision,
             }
 
+    # CRITICAL DEBUG: Log stream parameter value before branching
+    logging.info(f"[ROUTER] Checking stream parameter: stream={stream}, type={type(stream)}")
+
     if stream:
         def stream_generator():
             full_text = []
@@ -2052,4 +2087,6 @@ Guidelines:
     if debug_instruction:
         result["debug_instruction"] = debug_instruction
 
+    # CRITICAL DEBUG: Log return type before returning
+    logging.info(f"[ROUTER] route_request returning type={type(result)}, keys={result.keys()}")
     return result

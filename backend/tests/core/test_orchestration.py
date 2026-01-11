@@ -5,7 +5,7 @@ Phase 1: Tests for orchestration trigger logic
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from dataclasses import dataclass
 from core.orchestration.orchestrator import Orchestrator, OrchestrationResult
 
@@ -431,3 +431,173 @@ class TestOrchestrationResult:
         assert result.text == "Test response"
         assert result.confirmations == []
         assert result.metadata == {"test": "data"}
+
+
+class TestServiceExecution:
+    """Test service execution logic."""
+
+    def test_execute_weather_service(self):
+        """Test weather service execution."""
+        memory = Mock()
+        memory.get_all.return_value = {
+            "feature_provider_openweather_api_key": "test_key_123"
+        }
+
+        orchestrator = Orchestrator(memory)
+
+        with patch('core.weather_service.WeatherService') as mock_weather_class:
+            mock_weather = Mock()
+            mock_weather.get_weather.return_value = {
+                "location": "London, GB",
+                "temperature": 15.2,
+                "description": "overcast clouds"
+            }
+            mock_weather_class.return_value = mock_weather
+
+            result = orchestrator._execute_service(
+                service="weather",
+                method="get_forecast",
+                params={"location": "London"},
+                user_id=1
+            )
+
+            assert result["method"] == "get_forecast"
+            assert result["data"]["location"] == "London, GB"
+            mock_weather_class.assert_called_once_with("test_key_123")
+            mock_weather.get_weather.assert_called_once_with("London")
+
+    def test_execute_memory_service(self):
+        """Test memory service execution."""
+        memory = Mock()
+        memory.get_all.return_value = [
+            {"key": "home location", "value": "123 Main St"},
+            {"key": "favorite food", "value": "pizza"},
+            {"key": "work location", "value": "456 Office Rd"}
+        ]
+
+        orchestrator = Orchestrator(memory)
+
+        result = orchestrator._execute_service(
+            service="memory",
+            method="search",
+            params={"query": "location"},
+            user_id=1
+        )
+
+        assert result["method"] == "search"
+        assert result["data"]["query"] == "location"
+        assert len(result["data"]["results"]) == 2  # home and work location
+        assert any("home location" in str(r) for r in result["data"]["results"])
+
+    def test_execute_service_with_location_alias(self):
+        """Test service execution with 'home' alias resolution."""
+        memory = Mock()
+        memory.get_all.return_value = {
+            "home location": "123 Main St, London",
+            "feature_provider_here_api_key": "test_here_key"
+        }
+
+        orchestrator = Orchestrator(memory)
+
+        with patch('core.traffic_service.TrafficService') as mock_traffic_class:
+            mock_traffic = Mock()
+            mock_traffic.get_traffic_estimate.return_value = {
+                "distance_km": 5.2,
+                "duration_minutes": 12
+            }
+            mock_traffic_class.return_value = mock_traffic
+
+            result = orchestrator._execute_service(
+                service="traffic",
+                method="get_route",
+                params={"origin": "home", "destination": "Airport"},
+                user_id=1
+            )
+
+            # Verify 'home' was resolved to actual address
+            mock_traffic.get_traffic_estimate.assert_called_once()
+            call_args = mock_traffic.get_traffic_estimate.call_args[0]
+            assert call_args[0] == "123 Main St, London"  # origin resolved
+            assert call_args[1] == "Airport"  # destination unchanged
+
+    def test_execute_service_missing_api_key(self):
+        """Test service execution fails gracefully when API key missing."""
+        memory = Mock()
+        memory.get_feature_providers.return_value = []  # No API keys
+
+        orchestrator = Orchestrator(memory)
+
+        try:
+            orchestrator._execute_service(
+                service="weather",
+                method="get_forecast",
+                params={"location": "London"},
+                user_id=1
+            )
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "API key not configured" in str(e)
+
+    def test_execute_service_unknown_service(self):
+        """Test execution fails for unknown service."""
+        memory = Mock()
+        orchestrator = Orchestrator(memory)
+
+        try:
+            orchestrator._execute_service(
+                service="unknown_service",
+                method="some_method",
+                params={},
+                user_id=1
+            )
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Unknown service" in str(e)
+
+    def test_execute_service_unknown_method(self):
+        """Test execution fails for unknown method."""
+        memory = Mock()
+        memory.get_all.return_value = []
+        orchestrator = Orchestrator(memory)
+
+        try:
+            orchestrator._execute_service(
+                service="memory",
+                method="unknown_method",
+                params={},
+                user_id=1
+            )
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Unknown memory method" in str(e)
+
+    def test_gather_context_with_service_failure(self):
+        """Test that one service failure doesn't block others."""
+        memory = Mock()
+        memory.get_all.return_value = {
+            "test": "data",
+            "feature_provider_openweather_api_key": "test_key"
+        }
+
+        orchestrator = Orchestrator(memory)
+
+        with patch('core.weather_service.WeatherService') as mock_weather_class:
+            # Weather service raises exception
+            mock_weather = Mock()
+            mock_weather.get_weather.side_effect = Exception("API Error")
+            mock_weather_class.return_value = mock_weather
+
+            services_to_query = [
+                {"service": "weather", "method": "get_forecast", "params": {"location": "London"}},
+                {"service": "memory", "method": "search", "params": {"query": "test"}}
+            ]
+
+            result = orchestrator._gather_context(services_to_query, user_id=1)
+
+            # Weather should have error
+            assert "error" in result.get("weather", {})
+            assert "API Error" in str(result["weather"]["error"])
+
+            # Memory should succeed
+            assert "data" in result.get("memory", {})
+            assert result["memory"]["method"] == "search"
