@@ -1008,6 +1008,29 @@ def route_request(context: dict, stream: bool = False):
             reasoning_result = None
 
     # =============================
+    # NEW: Orchestration Check
+    # =============================
+    # Check if we should orchestrate based on Intent Reasoning output
+    if reasoning_result and not force_intent:
+        try:
+            from core.orchestration.orchestrator import Orchestrator
+
+            orchestrator = Orchestrator(memory)
+            orch_decision = orchestrator.should_orchestrate(reasoning_result)
+
+            if orch_decision.should_orchestrate:
+                logging.info("[ROUTER] Orchestration triggered")
+                # TODO: Call orchestrator.orchestrate() once Phase 2-3 are implemented
+                # For now, just log and continue to normal routing
+                logging.info("[ROUTER] Orchestration not yet implemented - falling through to normal routing")
+            else:
+                logging.info(f"[ROUTER] Orchestration skipped: {orch_decision.skip_reason}")
+
+        except Exception as e:
+            logging.warning(f"[ROUTER] Orchestration check failed: {e}")
+            # Fall through to normal routing on error
+
+    # =============================
     # Existing Intent Classification
     # =============================
     # Use enhanced intent classification with mode and subtab awareness
