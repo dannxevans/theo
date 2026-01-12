@@ -1050,8 +1050,8 @@ def route_request(context: dict, stream: bool = False):
                 # Phase 2: Returns raw service data (will be synthesized in Phase 3)
                 return {
                     "text": orch_result.text,
-                    "provider": "orchestration",
-                    "model": None,
+                    "provider": "System",
+                    "model": "Multi-Service",
                     "task_type": "orchestration",
                     "metadata": orch_result.metadata
                 }
