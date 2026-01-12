@@ -67,13 +67,28 @@ class Orchestrator:
             OrchestrationResult with should_orchestrate flag and reasoning
         """
         # Check if Intent Reasoning detected ambiguity
+        # BUT: Don't skip if multiple services detected - orchestrator can handle missing info via defaults
+        # ALSO: Don't skip for appointment booking - orchestrator can find available slots
         if hasattr(reasoning_result, 'is_ambiguous') and reasoning_result.is_ambiguous:
-            self.logger.info("[ORCHESTRATOR] Intent Reasoning detected ambiguity")
-            # Let the clarification question go through normal routing
-            return OrchestrationResult(
-                should_orchestrate=False,
-                skip_reason="ambiguous_query"
-            )
+            has_multiple_services = len(reasoning_result.service_signals) > 1
+            is_appointment_booking = reasoning_result.intent in ['book_appointment', 'calendar_create']
+
+            if not has_multiple_services and not is_appointment_booking:
+                self.logger.info("[ORCHESTRATOR] Intent Reasoning detected ambiguity (single service, not appointment)")
+                # Let the clarification question go through normal routing
+                return OrchestrationResult(
+                    should_orchestrate=False,
+                    skip_reason="ambiguous_query"
+                )
+            elif is_appointment_booking:
+                self.logger.info(f"[ORCHESTRATOR] Ambiguity detected but appointment booking intent - forcing orchestration to find available slots")
+                # Force orchestration for appointment booking with vague timing
+                return OrchestrationResult(
+                    should_orchestrate=True,
+                    metadata={"decision_method": "appointment_booking_override", "reason": "Appointment booking with vague timing requires calendar availability check"}
+                )
+            else:
+                self.logger.info(f"[ORCHESTRATOR] Ambiguity detected but multiple services present ({[s.service for s in reasoning_result.service_signals]}) - proceeding with orchestration")
 
         # LLM-First Decision: Trust the LLM's recommendation (if provided)
         # Check if orchestration_recommended exists AND is not None
@@ -195,7 +210,7 @@ class Orchestrator:
 
         # Step 2: Plan which services to query (LLM decides)
         try:
-            service_plan = self._plan_services(
+            service_plan, processed_entities = self._plan_services(
                 user_query, user_id, reasoning_result, conversation_history
             )
         except Exception as e:
@@ -220,16 +235,44 @@ class Orchestrator:
 
         self.logger.info(f"[ORCHESTRATOR] Gathered data from {len(gathered_data)} service(s)")
 
-        # TODO: Step 4-6: Synthesize response, create confirmations (Phase 3)
-        # For now, return placeholder with gathered data
+        # Step 4: Synthesize response (LLM call #2)
+        try:
+            synthesis_result = self._synthesize_response(
+                user_query=user_query,
+                user_id=user_id,
+                gathered_data=gathered_data,
+                service_plan=service_plan,
+                conversation_history=conversation_history,
+                processed_entities=processed_entities
+            )
+        except Exception as e:
+            self.logger.error(f"[ORCHESTRATOR] Response synthesis failed: {e}")
+            # Fall back to raw data display
+            synthesis_result = {
+                "response": f"I gathered data from {len(gathered_data)} services, but couldn't synthesize a response. Raw data: {gathered_data}",
+                "needs_confirmation": False,
+                "proposed_actions": []
+            }
+
+        # Step 5: Create confirmations for actions (if needed)
+        confirmations = []
+        if synthesis_result.get("needs_confirmation"):
+            # TODO: Implement confirmation creation in future iteration
+            self.logger.info("[ORCHESTRATOR] Action confirmation needed (not yet implemented)")
+
+        # Step 6: Return result
         return OrchestrationResult(
             should_orchestrate=True,
-            text=f"Orchestration complete. Gathered data from {len(gathered_data)} services.",
+            text=synthesis_result["response"],
+            confirmations=confirmations,
             metadata={
-                "phase": "2_complete",
+                "phase": "3_complete",
                 "services_queried": list(gathered_data.keys()),
                 "service_plan": service_plan,
-                "gathered_data": gathered_data
+                "gathered_data": gathered_data,
+                "proposed_actions": synthesis_result.get("proposed_actions", []),
+                "synthesis_provider": synthesis_result.get("synthesis_provider"),
+                "synthesis_model": synthesis_result.get("synthesis_model")
             }
         )
 
@@ -261,9 +304,15 @@ class Orchestrator:
         user_facts = self.memory.get_all(user_id)
         facts_str = self._format_user_facts(user_facts)
 
+        # Pre-process entities to parse relative dates in Python
+        processed_entities = self._preprocess_entities(reasoning_result.entities)
+
         # Format Intent Reasoning insights
         service_signals_str = self._format_service_signals(reasoning_result.service_signals)
-        entities_str = self._format_entities(reasoning_result.entities)
+        entities_str = self._format_entities(processed_entities)
+
+        # Debug: Log what entities the LLM will see
+        self.logger.info(f"[ORCHESTRATOR] Entities being passed to LLM: {entities_str}")
 
         # Get service capabilities
         capabilities = get_service_capabilities_prompt()
@@ -285,13 +334,19 @@ Available services and methods:
 
 Based on the Intent Reasoning analysis above, plan which SPECIFIC METHODS to call and with what parameters.
 
-IMPORTANT RULES:
-1. Only query services with relevance >= 0.7 from Intent Reasoning
-2. Use extracted entities for parameters (locations, datetimes, people, etc.)
+CRITICAL RULES FOR DATE PARAMETERS:
+- NEVER calculate dates yourself from the user query
+- ONLY use dates from the "Extracted entities" section above
+- The dates in entities are ALREADY CALCULATED and in YYYY-MM-DD format
+- Example: If entities shows "Datetimes: 2026-01-14", use "2026-01-14" - do NOT recalculate it
+- TODAY is {self._get_current_date()} (for reference only)
+
+OTHER RULES:
+1. Only query services with relevance >= 0.5 from Intent Reasoning
+2. Use extracted entities for ALL parameters (locations, datetimes, people, etc.)
 3. Resolve location aliases: "home" → user's Home Location, "work" → user's Work Location
-4. For dates like "this weekend", "tomorrow", calculate actual dates (today is {self._get_current_date()})
-5. Keep queries minimal - only what's needed to answer the user's question
-6. Maximum 3 service queries total
+4. Keep queries minimal - only what's needed to answer the user's question
+5. Maximum 3 service queries total
 
 Respond with JSON only (no markdown):
 {{
@@ -302,13 +357,13 @@ Respond with JSON only (no markdown):
 }}
 """
 
-        # Route to Lightweight LLM System
+        # Route to Orchestration Planning intent
         # IMPORTANT: Set _skip_orchestration flag to prevent infinite recursion
         context = {
             "user_id": user_id,
             "session_id": "orchestration",  # Special session for internal operations
             "text": prompt,
-            "force_intent": "system",  # Use user's configured lightweight LLM
+            "force_intent": "system_orchestration_planning",  # Use orchestration planning intent
             "mode": "personal",
             "memory": self.memory,
             "_skip_orchestration": True  # Prevent re-entry into orchestration
@@ -344,7 +399,10 @@ Respond with JSON only (no markdown):
             self.logger.info(f"[ORCHESTRATOR] LLM planned {len(service_plan.get('services_to_query', []))} service queries")
             self.logger.info(f"[ORCHESTRATOR] Reasoning: {service_plan.get('reasoning', 'N/A')}")
 
-            return service_plan
+            # Post-process the plan to fix dates (LLM sometimes ignores our instructions)
+            service_plan = self._fix_service_plan_dates(service_plan, processed_entities)
+
+            return service_plan, processed_entities
 
         except json.JSONDecodeError as e:
             self.logger.error(f"[ORCHESTRATOR] Failed to parse LLM service plan: {e}")
@@ -487,26 +545,260 @@ Respond with JSON only (no markdown):
         Returns:
             Fact value or None
         """
-        facts = self.memory.get_all(user_id)
+        # get_memories() returns list of memory facts from 'memories' table
+        # get_all() returns dict of preferences from 'preferences' table
+        memories = self.memory.get_memories(user_id)
         fact_key_lower = fact_key.lower()
 
-        # memory.get_all() returns a dict, so iterate over key-value pairs
-        if isinstance(facts, dict):
-            for key, value in facts.items():
-                if key.lower() == fact_key_lower:
-                    return value
-        # Handle list format (if memory.get_memories() was used instead)
-        elif isinstance(facts, list):
-            for fact in facts:
-                if fact.get("key", "").lower() == fact_key_lower:
-                    return fact.get("value")
+        self.logger.info(f"[ORCHESTRATOR] Looking for fact '{fact_key}' (user_id={user_id}), got {len(memories) if memories else 0} memories")
 
+        if isinstance(memories, list):
+            for memory in memories:
+                # Memory structure: {'key': 'Home Location', 'value': '8 Harefields Way...'}
+                mem_key = memory.get("key", "")
+                self.logger.info(f"[ORCHESTRATOR] Checking memory key: '{mem_key}' against '{fact_key}'")
+                if mem_key.lower() == fact_key_lower:
+                    value = memory.get("value")
+                    self.logger.info(f"[ORCHESTRATOR] Found match! Returning: '{value}'")
+                    return value
+
+        self.logger.warning(f"[ORCHESTRATOR] No memory found for fact '{fact_key}'")
         return None
 
     def _get_current_date(self) -> str:
-        """Get current date in YYYY-MM-DD format."""
+        """Get current date in YYYY-MM-DD format with day of week."""
         from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d")
+        return datetime.now().strftime("%A, %Y-%m-%d")
+
+    def _fix_dates_in_text(self, text: str, processed_entities) -> str:
+        """
+        Fix dates in text (like reasoning) to replace incorrect dates with correct ones.
+
+        Args:
+            text: Text containing potentially incorrect dates
+            processed_entities: Pre-processed entities with correct dates
+
+        Returns:
+            Text with dates corrected
+        """
+        import re
+
+        if not text or not processed_entities:
+            return text
+
+        # Extract dates from entities
+        entity_dates = []
+        if hasattr(processed_entities, 'datetimes'):
+            entity_dates = processed_entities.datetimes
+
+        if not entity_dates:
+            return text
+
+        # Find all YYYY-MM-DD dates in text
+        date_pattern = r'\b(\d{4}-\d{2}-\d{2})\b'
+        found_dates = re.findall(date_pattern, text)
+
+        # Replace any dates that don't match entity dates
+        corrected_text = text
+        for found_date in found_dates:
+            if found_date not in entity_dates and len(entity_dates) > 0:
+                correct_date = entity_dates[0]
+                self.logger.info(
+                    f"[ORCHESTRATOR] Correcting date in text: '{found_date}' → '{correct_date}'"
+                )
+                corrected_text = corrected_text.replace(found_date, correct_date)
+
+        return corrected_text
+
+    def _fix_proposed_action_dates(self, synthesis_result: Dict, processed_entities) -> Dict:
+        """
+        Post-process proposed actions to fix dates that the LLM got wrong.
+
+        Args:
+            synthesis_result: Synthesis result with proposed_actions
+            processed_entities: Pre-processed entities with correct dates
+
+        Returns:
+            Fixed synthesis result
+        """
+        import re
+
+        # Extract dates from entities
+        entity_dates = []
+        if processed_entities and hasattr(processed_entities, 'datetimes'):
+            entity_dates = processed_entities.datetimes
+
+        if not entity_dates:
+            return synthesis_result
+
+        self.logger.info(f"[ORCHESTRATOR] Fixing dates in proposed actions. Entity dates: {entity_dates}")
+
+        # Fix dates in proposed actions
+        proposed_actions = synthesis_result.get('proposed_actions', [])
+        for action in proposed_actions:
+            params = action.get('params', {})
+
+            # Check for date parameters
+            for param_key, param_value in params.items():
+                if param_key in ['date', 'start_date', 'end_date', 'due_date']:
+                    # Check if this date is in YYYY-MM-DD format
+                    if isinstance(param_value, str) and re.match(r'^\d{4}-\d{2}-\d{2}$', param_value):
+                        # Check if it differs from our entity dates
+                        if param_value not in entity_dates and len(entity_dates) > 0:
+                            # LLM used a different date - replace with our calculated one
+                            correct_date = entity_dates[0]
+                            self.logger.warning(
+                                f"[ORCHESTRATOR] Proposed action used wrong date '{param_value}', "
+                                f"replacing with correct date '{correct_date}'"
+                            )
+                            params[param_key] = correct_date
+
+        return synthesis_result
+
+    def _fix_service_plan_dates(self, service_plan: Dict, processed_entities) -> Dict:
+        """
+        Post-process service plan to fix dates that the LLM got wrong.
+
+        LLMs (especially Haiku) sometimes ignore our instructions and calculate
+        their own dates. This method enforces that dates in params match the
+        dates we calculated in Python.
+
+        Args:
+            service_plan: Service plan from LLM
+            processed_entities: Pre-processed entities with correct dates
+
+        Returns:
+            Fixed service plan
+        """
+        from datetime import datetime
+        import re
+
+        # Extract dates from entities (already in YYYY-MM-DD format)
+        entity_dates = []
+        if processed_entities and hasattr(processed_entities, 'datetimes'):
+            entity_dates = processed_entities.datetimes
+
+        if not entity_dates:
+            # No dates to fix
+            return service_plan
+
+        self.logger.info(f"[ORCHESTRATOR] Fixing dates in service plan. Entity dates: {entity_dates}")
+
+        # Iterate through service queries and fix any date parameters
+        services_to_query = service_plan.get('services_to_query', [])
+        for service_query in services_to_query:
+            params = service_query.get('params', {})
+
+            # Check for date parameters
+            for param_key, param_value in params.items():
+                if param_key in ['date', 'start_date', 'end_date', 'due_date']:
+                    if not isinstance(param_value, str):
+                        continue
+
+                    # Check if this date is in YYYY-MM-DD format
+                    is_valid_format = re.match(r'^\d{4}-\d{2}-\d{2}$', param_value)
+
+                    if is_valid_format:
+                        # Check if it differs from our entity dates
+                        if param_value not in entity_dates and len(entity_dates) > 0:
+                            # LLM used a different date - replace with our calculated one
+                            correct_date = entity_dates[0]  # Use first entity date
+                            self.logger.warning(
+                                f"[ORCHESTRATOR] LLM used wrong date '{param_value}', "
+                                f"replacing with correct date '{correct_date}'"
+                            )
+                            params[param_key] = correct_date
+                    else:
+                        # Date is not in YYYY-MM-DD format (e.g., "2pm", "Wednesday", etc.)
+                        if len(entity_dates) > 0:
+                            correct_date = entity_dates[0]  # Use first entity date
+                            self.logger.warning(
+                                f"[ORCHESTRATOR] LLM used invalid date format '{param_value}', "
+                                f"replacing with correct date '{correct_date}'"
+                            )
+                            params[param_key] = correct_date
+
+        return service_plan
+
+    def _parse_relative_date(self, date_str: str) -> str:
+        """
+        Parse relative date expressions into YYYY-MM-DD format.
+
+        Handles:
+        - "today" → current date
+        - "tomorrow" → current date + 1 day
+        - Day names: "monday", "tuesday", etc. → next occurrence
+        - "this weekend" → next Saturday
+        - Already formatted dates (YYYY-MM-DD) → pass through
+
+        Args:
+            date_str: Date expression (relative or absolute)
+
+        Returns:
+            Date in YYYY-MM-DD format
+        """
+        from datetime import datetime, timedelta
+        import re
+
+        if not date_str:
+            return date_str
+
+        date_str_lower = date_str.lower().strip()
+        today = datetime.now()
+
+        # Already in YYYY-MM-DD format? Pass through
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', date_str_lower):
+            self.logger.info(f"[ORCHESTRATOR] Date already formatted: {date_str}")
+            return date_str
+
+        # Handle "today"
+        if date_str_lower == "today":
+            result = today.strftime("%Y-%m-%d")
+            self.logger.info(f"[ORCHESTRATOR] Parsed 'today' → {result}")
+            return result
+
+        # Handle "tomorrow"
+        if date_str_lower == "tomorrow":
+            result = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+            self.logger.info(f"[ORCHESTRATOR] Parsed 'tomorrow' → {result}")
+            return result
+
+        # Handle day names (monday, tuesday, etc.)
+        day_names = {
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+            "friday": 4, "saturday": 5, "sunday": 6
+        }
+
+        for day_name, day_num in day_names.items():
+            if day_name in date_str_lower:
+                # Calculate days until next occurrence
+                current_day = today.weekday()
+                days_ahead = (day_num - current_day) % 7
+
+                # If days_ahead is 0, it means "today" is that day
+                # User likely means "next occurrence" which is 7 days away
+                if days_ahead == 0:
+                    days_ahead = 7
+
+                target_date = today + timedelta(days=days_ahead)
+                result = target_date.strftime("%Y-%m-%d")
+                self.logger.info(f"[ORCHESTRATOR] Parsed '{day_name}' → {result} (today is {today.strftime('%A')}, {days_ahead} days ahead)")
+                return result
+
+        # Handle "this weekend" → Saturday
+        if "weekend" in date_str_lower:
+            current_day = today.weekday()
+            days_until_saturday = (5 - current_day) % 7
+            if days_until_saturday == 0:
+                days_until_saturday = 7
+            target_date = today + timedelta(days=days_until_saturday)
+            result = target_date.strftime("%Y-%m-%d")
+            self.logger.info(f"[ORCHESTRATOR] Parsed 'weekend' → {result} (Saturday)")
+            return result
+
+        # Couldn't parse - return as-is and let LLM handle it
+        self.logger.warning(f"[ORCHESTRATOR] Could not parse date '{date_str}', passing through")
+        return date_str
 
     def _format_user_facts(self, facts) -> str:
         """
@@ -553,6 +845,39 @@ Respond with JSON only (no markdown):
 
         return "\n".join(lines) if lines else "None above threshold"
 
+    def _preprocess_entities(self, entities):
+        """
+        Pre-process entities to convert relative dates to absolute dates.
+
+        This ensures date calculations are done in Python, not by the LLM.
+
+        Args:
+            entities: Intent reasoning entities object
+
+        Returns:
+            Modified entities object with parsed dates
+        """
+        if not entities:
+            return entities
+
+        # Parse datetime entities
+        if hasattr(entities, 'datetimes') and entities.datetimes:
+            import re
+            parsed_datetimes = []
+            for dt_str in entities.datetimes:
+                parsed = self._parse_relative_date(dt_str)
+
+                # Only keep actual dates (YYYY-MM-DD format)
+                # Filter out time expressions like "2pm", "morning", etc.
+                if re.match(r'^\d{4}-\d{2}-\d{2}$', parsed):
+                    parsed_datetimes.append(parsed)
+                else:
+                    self.logger.info(f"[ORCHESTRATOR] Filtering out non-date entity: '{parsed}'")
+
+            entities.datetimes = parsed_datetimes
+
+        return entities
+
     def _format_entities(self, entities) -> str:
         """Format extracted entities for LLM prompt."""
         if not entities:
@@ -597,6 +922,9 @@ Respond with JSON only (no markdown):
             if not location:
                 raise ValueError("Missing required parameter: location")
 
+            # Sanitize location address for better geocoding
+            location = self._sanitize_address_for_here(location)
+
             result = weather_service.get_weather(location)
             return {"method": method, "data": result}
         else:
@@ -605,6 +933,7 @@ Respond with JSON only (no markdown):
     def _execute_traffic_service(self, method: str, params: Dict, user_id: int) -> Dict:
         """Execute traffic service method."""
         from core.traffic_service import TrafficService
+        import re
 
         # Get HERE API key from feature providers
         api_key = self._get_feature_provider_key(user_id, "here_maps")
@@ -619,6 +948,14 @@ Respond with JSON only (no markdown):
             if not origin or not destination:
                 raise ValueError("Missing required parameters: origin, destination")
 
+            # Enhance generic location names (e.g., "airport" → "Manchester Airport")
+            origin = self._enhance_generic_location(origin, user_id)
+            destination = self._enhance_generic_location(destination, user_id)
+
+            # Sanitize addresses for HERE API (extract city + postcode)
+            origin = self._sanitize_address_for_here(origin)
+            destination = self._sanitize_address_for_here(destination)
+
             result = traffic_service.get_traffic_estimate(origin, destination)
             return {"method": method, "data": result}
         else:
@@ -627,6 +964,7 @@ Respond with JSON only (no markdown):
     def _execute_calendar_service(self, method: str, params: Dict, user_id: int) -> Dict:
         """Execute calendar service method (M365)."""
         from actions.action_registry import ActionProviderRegistry
+        from datetime import datetime, timedelta
 
         # Load M365 provider
         registry = ActionProviderRegistry(self.memory)
@@ -640,17 +978,21 @@ Respond with JSON only (no markdown):
 
         if method == "get_upcoming_events":
             days_ahead = params.get("days_ahead", 7)
-            result = provider.read_calendar(days_ahead=days_ahead)
-            return {"method": method, "data": result}
+            start_date = datetime.now()
+            end_date = start_date + timedelta(days=days_ahead)
+            result = provider.read_calendar(start_date=start_date, end_date=end_date)
+            return {"method": method, "data": {"events": result}}
         elif method == "check_availability":
             date = params.get("date")
             if not date:
                 raise ValueError("Missing required parameter: date")
-            # Use read_calendar and filter by date
-            result = provider.read_calendar(days_ahead=30)
-            # Filter events for the specific date
-            filtered = [e for e in result.get("events", []) if e.get("start", "").startswith(date)]
-            return {"method": method, "data": {"date": date, "events": filtered}}
+            # Parse date string (format: YYYY-MM-DD)
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+            start_date = target_date.replace(hour=0, minute=0, second=0)
+            end_date = target_date.replace(hour=23, minute=59, second=59)
+
+            result = provider.read_calendar(start_date=start_date, end_date=end_date)
+            return {"method": method, "data": {"date": date, "events": result}}
         else:
             raise ValueError(f"Unknown calendar method: {method}")
 
@@ -826,3 +1168,237 @@ Respond with JSON only (no markdown):
         except Exception as e:
             self.logger.error(f"[ORCHESTRATOR] Failed to get API key for {provider_name}: {e}")
             return None
+
+    def _enhance_generic_location(self, location: str, user_id: int) -> str:
+        """
+        Enhance generic location names with specific details based on user context.
+
+        Examples:
+            "airport" → "Manchester Airport" (if user is in Manchester/Salford area)
+            "station" → "Manchester Piccadilly" (if user is in Manchester)
+
+        Args:
+            location: Generic location name
+            user_id: User ID for context
+
+        Returns:
+            Enhanced location name or original if no enhancement needed
+        """
+        if not location:
+            return location
+
+        location_lower = location.lower().strip()
+
+        # Check if location is generic "airport"
+        if location_lower == "airport":
+            # Try to infer which airport based on user's home/work location
+            home_loc = self._get_user_fact(user_id, "home location")
+            work_loc = self._get_user_fact(user_id, "work location")
+
+            # Check if user is in Manchester/Salford area
+            for user_location in [home_loc, work_loc]:
+                if user_location:
+                    user_loc_lower = user_location.lower()
+                    if any(city in user_loc_lower for city in ["manchester", "salford", "wirral", "stockport"]):
+                        enhanced = "Manchester Airport"
+                        self.logger.info(f"[ORCHESTRATOR] Enhanced '{location}' → '{enhanced}' based on user location")
+                        return enhanced
+
+        # No enhancement needed
+        return location
+
+    def _sanitize_address_for_here(self, address: str) -> str:
+        """
+        Sanitize address for HERE API by extracting city + postcode.
+
+        Per wiki: HERE API performs better with simplified addresses containing
+        the last two components (typically city + postcode).
+
+        Examples:
+            "Soapworks, Colgate Ln, Salford M5 3LZ" → "Salford M5 3LZ"
+            "8 Harefields Way, Wirral. CH494SB" → "Wirral CH494SB"
+
+        Args:
+            address: Full address string
+
+        Returns:
+            Sanitized address (city + postcode) or original if already simple
+        """
+        import re
+
+        if not address:
+            return address
+
+        # If it's already coordinates (lat,lon), don't modify
+        if re.match(r'^-?\d+\.?\d*,-?\d+\.?\d*$', address.strip()):
+            return address
+
+        # UK postcode pattern
+        uk_postcode_pattern = r'[A-Z]{1,2}\d{1,2}\s?\d?[A-Z]{2}'
+
+        # Check if address contains UK postcode
+        postcode_match = re.search(uk_postcode_pattern, address, re.IGNORECASE)
+
+        if postcode_match:
+            # Split address by common delimiters
+            parts = re.split(r'[,.]', address)
+            # Clean up parts (strip whitespace)
+            parts = [p.strip() for p in parts if p.strip()]
+
+            # Take last 2 components (city + postcode)
+            if len(parts) >= 2:
+                sanitized = ", ".join(parts[-2:])
+                self.logger.info(f"[ORCHESTRATOR] Sanitized address: '{address}' → '{sanitized}'")
+                return sanitized
+
+        # No postcode found or already simple - return as-is
+        return address
+
+    def _synthesize_response(
+        self,
+        user_query: str,
+        user_id: int,
+        gathered_data: Dict[str, Any],
+        service_plan: Dict,
+        conversation_history: Optional[List[Dict[str, str]]],
+        processed_entities=None
+    ) -> Dict[str, Any]:
+        """
+        Synthesize a natural conversational response from gathered service data.
+
+        Uses LLM to transform raw service data into a helpful, contextual response.
+
+        Args:
+            user_query: Original user query
+            user_id: User ID
+            gathered_data: Data gathered from services (dict mapping service name to results)
+            service_plan: Original service plan with reasoning
+            conversation_history: Recent conversation turns
+            processed_entities: Pre-processed entities with correct dates
+
+        Returns:
+            dict with:
+                - response: Natural language response text
+                - needs_confirmation: Whether user confirmation is needed for actions
+                - proposed_actions: List of proposed actions (if any)
+        """
+        from core.router import route_request
+
+        self.logger.info("[ORCHESTRATOR] Synthesizing response from gathered data...")
+
+        # Format gathered data for LLM prompt
+        data_summary = self._format_gathered_data(gathered_data)
+
+        # Fix dates in service plan reasoning to avoid confusing the synthesis LLM
+        corrected_reasoning = self._fix_dates_in_text(
+            service_plan.get('reasoning', 'N/A'),
+            processed_entities
+        )
+
+        # Build synthesis prompt
+        prompt = f"""You are synthesizing a response based on data gathered from multiple services.
+
+User's original query: "{user_query}"
+
+Service planning reasoning:
+{corrected_reasoning}
+
+Gathered data:
+{data_summary}
+
+Your task:
+1. Analyze the gathered data in context of the user's query
+2. Provide a helpful, conversational response that directly addresses their request
+3. If the data suggests creating a task or taking an action, propose it clearly
+4. If you recommend an action, set needs_confirmation=true
+
+Response format (JSON):
+{{
+    "response": "Your natural language response here",
+    "needs_confirmation": false,
+    "proposed_actions": []
+}}
+
+If you propose actions, include them in proposed_actions as:
+{{
+    "type": "create_task",
+    "service": "tasks",
+    "params": {{"title": "...", "due_date": "...", "notes": "..."}},
+    "reasoning": "Why this action makes sense"
+}}
+
+Provide ONLY the JSON response, no other text."""
+
+        # Call LLM via router (force orchestration synthesis intent)
+        context = {
+            "text": prompt,
+            "user_id": user_id,
+            "force_intent": "system_orchestration_synthesis",
+            "mode": "personal",
+            "memory": self.memory,
+            "_skip_orchestration": True  # Prevent recursive orchestration
+        }
+
+        self.logger.info("[ORCHESTRATOR] About to call route_request for synthesis")
+        response = route_request(context=context, stream=False)
+        self.logger.info(f"[ORCHESTRATOR] route_request returned type={type(response)}")
+
+        # Extract response text and provider info
+        response_text = response.get("text", "").strip()
+        synthesis_provider = response.get("provider")
+        synthesis_model = response.get("model")
+        self.logger.info(f"[ORCHESTRATOR] Synthesis response length: {len(response_text)}")
+        self.logger.info(f"[ORCHESTRATOR] Synthesis provider: {synthesis_provider}, model: {synthesis_model}")
+
+        # Parse JSON response
+        try:
+            # Try to extract JSON from response (handle markdown code blocks)
+            if "```json" in response_text:
+                start = response_text.find("```json") + 7
+                end = response_text.find("```", start)
+                response_text = response_text[start:end].strip()
+            elif "```" in response_text:
+                start = response_text.find("```") + 3
+                end = response_text.find("```", start)
+                response_text = response_text[start:end].strip()
+
+            synthesis_result = json.loads(response_text)
+            self.logger.info(f"[ORCHESTRATOR] Successfully synthesized response")
+
+            # Post-process proposed actions to fix dates
+            synthesis_result = self._fix_proposed_action_dates(synthesis_result, processed_entities)
+
+            # Add synthesis provider info for attribution
+            synthesis_result["synthesis_provider"] = synthesis_provider
+            synthesis_result["synthesis_model"] = synthesis_model
+
+            return synthesis_result
+        except json.JSONDecodeError as e:
+            self.logger.error(f"[ORCHESTRATOR] Failed to parse synthesis JSON: {e}")
+            self.logger.error(f"[ORCHESTRATOR] Raw response: {response_text[:500]}")
+
+            # Fall back to using the response as-is
+            return {
+                "response": response_text if response_text else "I gathered the requested data but couldn't format a response.",
+                "needs_confirmation": False,
+                "proposed_actions": []
+            }
+
+    def _format_gathered_data(self, gathered_data: Dict[str, Any]) -> str:
+        """Format gathered service data for LLM prompt."""
+        if not gathered_data:
+            return "No data gathered"
+
+        lines = []
+        for service_name, service_result in gathered_data.items():
+            if "error" in service_result:
+                lines.append(f"\n{service_name.upper()} (ERROR):")
+                lines.append(f"  Error: {service_result['error']}")
+            else:
+                lines.append(f"\n{service_name.upper()}:")
+                method = service_result.get("method", "unknown")
+                data = service_result.get("data", {})
+                lines.append(f"  Method: {method}")
+                lines.append(f"  Data: {json.dumps(data, indent=2)}")
+
+        return "\n".join(lines)

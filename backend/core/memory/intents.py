@@ -182,6 +182,7 @@ class IntentOperations(BaseMemoryOperations):
                     "priority": r.priority,
                     "enabled": r.enabled,
                     "is_action": r.is_action if hasattr(r, 'is_action') else False,
+                    "category": r.category if hasattr(r, 'category') else ("action" if (hasattr(r, 'is_action') and r.is_action) else "user"),
                     "created_at": r.created_at,
                     "updated_at": r.updated_at,
                 }
@@ -218,11 +219,12 @@ class IntentOperations(BaseMemoryOperations):
                 "priority": row.priority,
                 "enabled": row.enabled,
                 "is_action": row.is_action if hasattr(row, 'is_action') else False,
+                "category": row.category if hasattr(row, 'category') else ("action" if (hasattr(row, 'is_action') and row.is_action) else "user"),
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
             }
 
-    def create_intent(self, user_id, intent_id, name, description, keywords, priority=0, enabled=True, is_action=False):
+    def create_intent(self, user_id, intent_id, name, description, keywords, priority=0, enabled=True, is_action=False, category=None):
         """
         Create a new intent.
 
@@ -235,9 +237,14 @@ class IntentOperations(BaseMemoryOperations):
             priority: Priority (higher = checked first)
             enabled: Whether intent is enabled
             is_action: Whether this is an action intent (calendar, email, etc.)
+            category: Intent category ("user", "action", "orchestration")
         """
 
         user_id = normalize_user_id(user_id)
+
+        # Auto-determine category if not provided
+        if category is None:
+            category = "action" if is_action else "user"
 
         with self._get_connection() as conn:
             conn.execute(
@@ -250,6 +257,7 @@ class IntentOperations(BaseMemoryOperations):
                     priority=priority,
                     enabled=enabled,
                     is_action=is_action,
+                    category=category,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                 )
@@ -455,6 +463,75 @@ class IntentOperations(BaseMemoryOperations):
                 is_action=intent.get("is_action", False),
             )
         logging.info(f"[MEMORY] Seeded {len(default_intents)} default intents for user {user_id}")
+
+    def seed_orchestration_intents(self, user_id):
+        """
+        Seed orchestration intents for multi-service orchestration.
+        These intents are triggered programmatically by the orchestrator,
+        not through keyword matching.
+
+        Args:
+            user_id: User identifier
+        """
+        user_id = normalize_user_id(user_id)
+
+        # Check if orchestration intents already exist
+        with self._get_connection() as conn:
+            result = conn.execute(
+                select(self.intents).where(
+                    (self.intents.c.user_id == user_id) &
+                    (self.intents.c.category == "orchestration")
+                )
+            ).fetchall()
+
+            if result:
+                logging.info(f"[MEMORY] Orchestration intents already exist for user {user_id}, skipping seed")
+                return
+
+        orchestration_intents = [
+            {
+                "id": "system_orchestration_planning",
+                "name": "Orchestration Planning",
+                "description": "AI-powered service planning for multi-service orchestration (Phase 2)",
+                "keywords": "",  # No keywords - triggered programmatically via force_intent
+                "priority": 95,
+                "is_action": False,
+                "category": "orchestration",
+            },
+            {
+                "id": "system_orchestration_synthesis",
+                "name": "Orchestration Synthesis",
+                "description": "Response synthesis for multi-service orchestration results (Phase 3)",
+                "keywords": "",  # No keywords - triggered programmatically via force_intent
+                "priority": 95,
+                "is_action": False,
+                "category": "orchestration",
+            },
+        ]
+
+        for intent in orchestration_intents:
+            self.create_intent(
+                user_id=user_id,
+                intent_id=intent["id"],
+                name=intent["name"],
+                description=intent["description"],
+                keywords=intent["keywords"],
+                priority=intent.get("priority", 0),
+                is_action=intent.get("is_action", False),
+                category=intent.get("category", "user"),
+            )
+
+            # Create default routing preferences for orchestration intents
+            # Primary: gpt-4o-mini (fast, cost-effective for structured tasks)
+            # Fallback: claude-haiku-3-5 (reliable, fast fallback)
+            self.set_routing_preference(
+                user_id=user_id,
+                intent=intent["id"],
+                provider_id="openai|gpt-4o-mini",
+                fallback_provider_id="anthropic|claude-haiku-3-5-20241022"
+            )
+
+        logging.info(f"[MEMORY] Seeded {len(orchestration_intents)} orchestration intents for user {user_id}")
 
     def get_action_intents(self, user_id):
         """

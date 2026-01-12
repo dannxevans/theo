@@ -37,15 +37,14 @@ class XAIProvider:
         if not self.api_key:
             raise ValueError("XAIProvider requires an api_key")
 
-    def chat(self, **kwargs):
+    def chat(self, system, messages, **kwargs):
         """
         Execute a chat completion against xAI.
 
         Parameters:
-        - model: string (passed directly from frontend config)
         - system: system prompt string
         - messages: list of {role, content}
-        - temperature: float
+        - **kwargs: Additional options (model, temperature, etc.)
 
         Returns:
         - str (assistant text only)
@@ -54,8 +53,6 @@ class XAIProvider:
             logging.info(f"[DEBUG][XAI] chat() method called with kwargs keys: {list(kwargs.keys())}")
 
         model = kwargs.get("model") or getattr(self, "model", None)
-        system = kwargs.get("system_prompt") or kwargs.get("system")
-        messages = kwargs.get("messages") or []
         temperature = kwargs.get("temperature", 0.2)
 
         if _is_debug_enabled():

@@ -978,7 +978,13 @@ def route_request(context: dict, stream: bool = False):
                     logging.warning(f"[ROUTER] Failed to store reasoning trace: {trace_err}")
 
             # Handle ambiguous requests
-            if reasoning_result.is_ambiguous and reasoning_result.clarification_question:
+            # BUT: defer clarification if multiple services detected - let orchestrator handle it
+            # ALSO: defer clarification for appointment booking - orchestrator can find available slots
+            has_multiple_services = len(reasoning_result.service_signals) > 1
+            is_appointment_booking = reasoning_result.intent in ['book_appointment', 'calendar_create']
+
+            if reasoning_result.is_ambiguous and reasoning_result.clarification_question and not has_multiple_services and not is_appointment_booking:
+                logging.info("[ROUTER] Returning clarification question (single service, not appointment)")
                 return {
                     "text": reasoning_result.clarification_question,
                     "provider": reasoning_result.provider_id or "intent_reasoning",
@@ -992,6 +998,10 @@ def route_request(context: dict, stream: bool = False):
                         "service_signals": [s.service for s in reasoning_result.service_signals]
                     }
                 }
+            elif is_appointment_booking:
+                logging.info(f"[ROUTER] Deferring clarification to orchestrator (appointment booking: {reasoning_result.intent})")
+            elif reasoning_result.is_ambiguous and reasoning_result.clarification_question and has_multiple_services:
+                logging.info(f"[ROUTER] Deferring clarification to orchestrator (multiple services: {[s.service for s in reasoning_result.service_signals]})")
 
             # Use reasoning result if high confidence
             if reasoning_result.confidence >= 0.85:
@@ -1002,9 +1012,14 @@ def route_request(context: dict, stream: bool = False):
                 context["reasoning_entities"] = reasoning_result.entities
                 context["reasoning_service_signals"] = reasoning_result.service_signals
             else:
-                # Low confidence - fall through to existing classification
-                logging.info(f"[ROUTER] Low reasoning confidence ({reasoning_result.confidence}), using fallback")
-                reasoning_result = None
+                # Low confidence - don't use the intent, but preserve service_signals for orchestration
+                logging.info(f"[ROUTER] Low reasoning confidence ({reasoning_result.confidence}), using fallback for intent")
+                logging.info(f"[ROUTER] Preserving service signals: {[s.service for s in reasoning_result.service_signals]}")
+
+                # Store service signals even for low confidence - orchestrator will decide if they warrant orchestration
+                context["reasoning_entities"] = reasoning_result.entities
+                context["reasoning_service_signals"] = reasoning_result.service_signals
+                # Note: We keep reasoning_result for orchestration check, but won't use its intent field
 
         except Exception as e:
             logging.warning(f"[ROUTER] Intent reasoning failed: {e}")
@@ -1048,10 +1063,15 @@ def route_request(context: dict, stream: bool = False):
 
                 # Return orchestration result
                 # Phase 2: Returns raw service data (will be synthesized in Phase 3)
+                # Footer format: "Sonnet-4.5 · Multi-Service · Orchestration"
+                # provider = synthesis_provider_name, model = synthesis_model_id
+                synthesis_model = orch_result.metadata.get("synthesis_model", "Unknown")
+                synthesis_provider = orch_result.metadata.get("synthesis_provider", "system")
+
                 return {
                     "text": orch_result.text,
-                    "provider": "System",
-                    "model": "Multi-Service",
+                    "provider": synthesis_provider,  # Provider name (e.g., "claude-sonnet")
+                    "model": synthesis_model,  # Full model ID (e.g., "claude-sonnet-4-5-20250929")
                     "task_type": "orchestration",
                     "metadata": orch_result.metadata
                 }
@@ -1069,7 +1089,8 @@ def route_request(context: dict, stream: bool = False):
     if force_intent:
         intent = force_intent
         _debug(memory, f"Intent forced to: {force_intent}")
-    elif reasoning_result is None:
+    elif reasoning_result is None or reasoning_result.confidence < 0.85:
+        # Use keyword classification if no reasoning or low confidence reasoning
         intent = classify_intent_enhanced(
             text=text,
             memory=memory,
@@ -1078,6 +1099,9 @@ def route_request(context: dict, stream: bool = False):
             subtab=context.get("subtab"),
             provider_registry=provider_registry
         )
+    else:
+        # High confidence reasoning - intent was already set at line 1003
+        pass
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)

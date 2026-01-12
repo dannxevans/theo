@@ -160,7 +160,8 @@ def run_migrations(db_path: str):
         "029_add_user_name_email.py",  # Add name and email columns to users table for user management
         "030_add_work_mode_ip_config.py",  # Add work_mode_ip_config table for IP-based Work Mode access control (issue #296)
         "031_add_plex_integration.py",  # Add Plex Media Server integration tables (credentials, settings, tracking) (issue #340)
-        "032_add_intent_reasoning_traces.py"  # Add intent_reasoning_traces table for Intent Reasoning debugging (issue #371)
+        "032_add_intent_reasoning_traces.py",  # Add intent_reasoning_traces table for Intent Reasoning debugging (issue #371)
+        "033_add_category_to_intents.py"  # Add category column to intents for orchestration intents (issue #371)
     ]
 
     # Filter to only existing files

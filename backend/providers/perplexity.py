@@ -41,17 +41,14 @@ class PerplexityProvider:
         if not self.api_key:
             raise ValueError("PerplexityProvider requires an api_key")
 
-    def chat(self, **kwargs):
+    def chat(self, system, messages, **kwargs):
         """
         Execute a chat completion with Perplexity.
 
         Parameters:
-        - model: string (model identifier)
         - system: system prompt string
         - messages: list of {role, content}
-        - temperature: float (default: 0.2)
-        - search_domain_filter: list of domains to restrict search (optional)
-        - return_citations: bool (default: True for search mode)
+        - **kwargs: Additional options (model, temperature, search_domain_filter, return_citations, etc.)
 
         Returns:
         - str (assistant response text)
@@ -62,8 +59,6 @@ class PerplexityProvider:
         """
 
         model = kwargs.get("model") or getattr(self, "model", None) or "llama-3.1-sonar-small-128k-online"
-        system = kwargs.get("system_prompt") or kwargs.get("system")
-        messages = kwargs.get("messages") or []
         temperature = kwargs.get("temperature", 0.2)
         search_domain_filter = kwargs.get("search_domain_filter", [])
         return_citations = kwargs.get("return_citations", self.search_mode)

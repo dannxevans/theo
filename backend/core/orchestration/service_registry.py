@@ -7,7 +7,7 @@ This registry is used to inform the LLM what operations are possible.
 
 SERVICE_REGISTRY = {
     "calendar": {
-        "description": "User's calendar events and availability (Microsoft 365)",
+        "description": "User's calendar - scheduled appointments, meetings, and time-blocked events (Microsoft 365). Use this to check availability, find meetings, or see what's scheduled.",
         "methods": {
             "get_upcoming_events": {
                 "params": {"days_ahead": "int (default: 7)"},
@@ -16,7 +16,7 @@ SERVICE_REGISTRY = {
             },
             "check_availability": {
                 "params": {"date": "string (YYYY-MM-DD)"},
-                "returns": "Free/busy status for the date",
+                "returns": "Calendar events for that date - shows meetings, appointments, and scheduled time blocks",
                 "example": "check_availability(date='2026-01-15')"
             }
         },
@@ -64,7 +64,7 @@ SERVICE_REGISTRY = {
         "read_only": True
     },
     "tasks": {
-        "description": "Task list and to-do items (Microsoft 365)",
+        "description": "User's to-do list and action items (Microsoft 365). Use this for things the user needs to do, NOT for checking scheduled time or availability. For scheduled events and availability, use calendar instead.",
         "methods": {
             "get_pending": {
                 "params": {},
