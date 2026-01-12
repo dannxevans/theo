@@ -1032,6 +1032,14 @@ def route_request(context: dict, stream: bool = False):
     # Skip orchestration if called recursively from within orchestration
     skip_orchestration = context.get("_skip_orchestration", False)
 
+    # Check if agentic AI is disabled (user preference)
+    user_id_for_pref = normalize_user_id(context.get("user_id"))
+    agentic_disabled = memory.get_user_preference(user_id_for_pref, "agentic_ai_disabled", "false") == "true"
+
+    if agentic_disabled:
+        logging.info("[ROUTER] Agentic AI disabled by user preference - skipping orchestration")
+        skip_orchestration = True
+
     if reasoning_result and not force_intent and not skip_orchestration:
         try:
             from core.orchestration.orchestrator import Orchestrator
