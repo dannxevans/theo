@@ -51,7 +51,7 @@
   <p class="subtitle">Assign specific AI providers to intents for customized routing. Action intents are not shown here as they have predefined routing.</p>
 
   <div class="routing-form">
-    {#each intents.filter(i => i.enabled && !i.is_action) as intent}
+    {#each intents.filter(i => i.enabled && i.category !== 'action') as intent}
       <div class="form-group">
         <label for="route-{intent.id}">{intent.name}</label>
         <div class="provider-selectors">

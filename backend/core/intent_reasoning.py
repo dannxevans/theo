@@ -66,6 +66,10 @@ class IntentReasoningResult:
     is_ambiguous: bool = False
     clarification_question: Optional[str] = None
 
+    # Orchestration recommendation (NEW - for multi-service coordination)
+    orchestration_recommended: bool = False
+    orchestration_reason: Optional[str] = None
+
     # Metadata
     token_count: int = 0
     latency_ms: int = 0
@@ -86,6 +90,8 @@ class IntentReasoningResult:
             "parameters": self.parameters,
             "is_ambiguous": self.is_ambiguous,
             "clarification_question": self.clarification_question,
+            "orchestration_recommended": self.orchestration_recommended,
+            "orchestration_reason": self.orchestration_reason,
             "token_count": self.token_count,
             "latency_ms": self.latency_ms,
             "source": self.source,
@@ -283,8 +289,25 @@ Entity Extraction Examples:
 
 IMPORTANT: For calendar/appointment intents, extract the FULL event description as an activity (e.g., "Lunch at Mums", "Meeting with John", "Doctor appointment")
 
+Orchestration Decision:
+Determine if this query requires multi-service orchestration (coordinating data from multiple services to provide a contextual response).
+- "orchestrate": true if query needs:
+  * Conditional planning based on external factors (e.g., "when weather is nice", "if traffic is light")
+  * Coordinating multiple services for decision-making (e.g., calendar + weather, calendar + traffic + weather)
+  * Contextual recommendations requiring multiple data sources
+- "orchestrate": false if query is:
+  * Simple single-service request (e.g., "what's the weather", "check my calendar")
+  * Straightforward action (e.g., "create a task", "send an email")
+  * No conditional factors or multi-service coordination needed
+
+Examples:
+- "buy groceries when weather is nice" → orchestrate:true, reason:"Weather-dependent planning requires calendar + weather coordination"
+- "create a task to buy groceries" → orchestrate:false, reason:"Simple task creation, no coordination needed"
+- "get to airport by 2pm tomorrow" → orchestrate:true, reason:"Requires traffic + calendar + possibly weather coordination"
+- "what's the weather today" → orchestrate:false, reason:"Single service query"
+
 Return ONLY this JSON structure:
-{"intent":"<id>","confidence":0.0-1.0,"entities":{"locations":[],"datetimes":[],"people":[],"activities":[],"items":[]},"services":[{"service":"<id>","relevance":0.0-1.0,"reason":"<brief>"}],"params":{},"reasoning":"<brief>","ambiguous":false,"clarify":null}'''
+{"intent":"<id>","confidence":0.0-1.0,"entities":{"locations":[],"datetimes":[],"people":[],"activities":[],"items":[]},"services":[{"service":"<id>","relevance":0.0-1.0,"reason":"<brief>"}],"params":{},"reasoning":"<brief>","ambiguous":false,"clarify":null,"orchestrate":false,"orch_reason":null}'''
 
         # Build user message with conversation context hint if available
         context_note = ""
@@ -344,6 +367,8 @@ Analyze and return JSON.'''
                 parameters=data.get("params", {}),
                 is_ambiguous=data.get("ambiguous", False),
                 clarification_question=data.get("clarify"),
+                orchestration_recommended=data.get("orchestrate", False),
+                orchestration_reason=data.get("orch_reason"),
                 source="reasoning"
             )
 

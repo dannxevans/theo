@@ -415,6 +415,37 @@
       {/each}
     </div>
   </div>
+
+  <!-- Orchestration Intents Section -->
+  <div class="section">
+    <h3>Orchestration Intents</h3>
+    <p class="subtitle">System intents for multi-service orchestration. These are triggered automatically and can be routed via Routing settings.</p>
+    <div class="intents-list">
+      {#each intents.filter(i => i.category === 'orchestration') as intent}
+        <div class="intent-card read-only">
+          <div class="intent-header">
+            <div class="intent-info">
+              <h4>
+                {intent.name}
+                <span class="intent-id">({intent.id})</span>
+                <span class="status-badge status-badge--info">System</span>
+              </h4>
+              {#if intent.description}
+                <p class="intent-description">{intent.description}</p>
+              {/if}
+            </div>
+            <div class="intent-priority">
+              Priority: {intent.priority}
+            </div>
+          </div>
+
+          <div class="intent-keywords empty">
+            No keywords (triggered programmatically)
+          </div>
+        </div>
+      {/each}
+    </div>
+  </div>
 </div>
 
 <style>
@@ -561,6 +592,12 @@
   .intent-card.editing {
     border-color: var(--info-500);
     background: var(--info-50);
+  }
+
+  .intent-card.read-only {
+    background: var(--bg-secondary);
+    border-color: var(--border-secondary);
+    opacity: 0.9;
   }
 
   .edit-form {
