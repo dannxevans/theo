@@ -227,6 +227,10 @@ class MemoryStore:
         """Seed default intents if none exist for the user."""
         return self._intent_ops.seed_default_intents(user_id)
 
+    def seed_orchestration_intents(self, user_id):
+        """Seed orchestration intents for multi-service orchestration."""
+        return self._intent_ops.seed_orchestration_intents(user_id)
+
     def get_action_intents(self, user_id):
         """Get all enabled action intents for a user."""
         return self._intent_ops.get_action_intents(user_id)

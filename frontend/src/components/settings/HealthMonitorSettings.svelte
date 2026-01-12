@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { setDebugFlag, setMessageDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage } from "../../lib/api";
+  import { setDebugFlag, setMessageDebugFlag, getProviderCosts, getVoiceCosts, resetProviderUsage, getUserPreference, setUserPreference } from "../../lib/api";
 
   export let healthData = {
     ai_providers: [],
@@ -13,6 +13,7 @@
   export let debugEnabled = false;
   export let messageDebugEnabled = false;
   export let advancedMode = false;
+  export let agenticAiDisabled = false;
 
   const dispatch = createEventDispatcher();
 
@@ -22,6 +23,7 @@
   let m365TestResult = null;
   let savingDebug = false;
   let savingMessageDebug = false;
+  let savingAgenticAi = false;
 
   // Cost tracking state
   let costData = null;
@@ -98,6 +100,18 @@
     window.dispatchEvent(new CustomEvent("advancedModeChanged", { detail: { enabled: value } }));
   }
 
+  async function toggleAgenticAi(value) {
+    savingAgenticAi = true;
+    try {
+      await setUserPreference("agentic_ai_disabled", value ? "true" : "false");
+      agenticAiDisabled = value;
+    } catch (error) {
+      console.error("Failed to toggle agentic AI:", error);
+    } finally {
+      savingAgenticAi = false;
+    }
+  }
+
   function handleRefresh() {
     dispatch("reload");
     loadCostData();
@@ -164,8 +178,16 @@
     return providerCost + voiceCost;
   }
 
-  onMount(() => {
+  onMount(async () => {
     loadCostData();
+    // Load agentic AI preference
+    try {
+      const value = await getUserPreference("agentic_ai_disabled");
+      agenticAiDisabled = value === "true";
+    } catch (error) {
+      console.error("Failed to load agentic AI preference:", error);
+      agenticAiDisabled = false; // Default to enabled
+    }
   });
 </script>
 
@@ -741,6 +763,20 @@
       />
       <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
         Shows Export and Fork features in chat interface
+      </small>
+    </div>
+
+    <div class="rule">
+      <label for="agentic-ai-disabled">Disable Agentic AI</label>
+      <input
+        id="agentic-ai-disabled"
+        type="checkbox"
+        checked={agenticAiDisabled}
+        disabled={savingAgenticAi}
+        on:change={(e) => toggleAgenticAi(e.target.checked)}
+      />
+      <small style="display: block; margin-top: 0.5rem; color: #6b7280;">
+        Disables orchestration and multi-service coordination.
       </small>
     </div>
   </div>

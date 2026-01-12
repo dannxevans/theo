@@ -879,6 +879,9 @@ def instantiate_provider(provider_cfg):
 
 
 def route_request(context: dict, stream: bool = False):
+    # CRITICAL DEBUG: Log function entry with parameter types
+    logging.info(f"[ROUTER] route_request called with context type={type(context)}, stream={stream}")
+
     text = context.get("text", "")
     memory = context.get("memory")
 
@@ -975,7 +978,13 @@ def route_request(context: dict, stream: bool = False):
                     logging.warning(f"[ROUTER] Failed to store reasoning trace: {trace_err}")
 
             # Handle ambiguous requests
-            if reasoning_result.is_ambiguous and reasoning_result.clarification_question:
+            # BUT: defer clarification if multiple services detected - let orchestrator handle it
+            # ALSO: defer clarification for appointment booking - orchestrator can find available slots
+            has_multiple_services = len(reasoning_result.service_signals) > 1
+            is_appointment_booking = reasoning_result.intent in ['book_appointment', 'calendar_create']
+
+            if reasoning_result.is_ambiguous and reasoning_result.clarification_question and not has_multiple_services and not is_appointment_booking:
+                logging.info("[ROUTER] Returning clarification question (single service, not appointment)")
                 return {
                     "text": reasoning_result.clarification_question,
                     "provider": reasoning_result.provider_id or "intent_reasoning",
@@ -989,6 +998,10 @@ def route_request(context: dict, stream: bool = False):
                         "service_signals": [s.service for s in reasoning_result.service_signals]
                     }
                 }
+            elif is_appointment_booking:
+                logging.info(f"[ROUTER] Deferring clarification to orchestrator (appointment booking: {reasoning_result.intent})")
+            elif reasoning_result.is_ambiguous and reasoning_result.clarification_question and has_multiple_services:
+                logging.info(f"[ROUTER] Deferring clarification to orchestrator (multiple services: {[s.service for s in reasoning_result.service_signals]})")
 
             # Use reasoning result if high confidence
             if reasoning_result.confidence >= 0.85:
@@ -999,13 +1012,83 @@ def route_request(context: dict, stream: bool = False):
                 context["reasoning_entities"] = reasoning_result.entities
                 context["reasoning_service_signals"] = reasoning_result.service_signals
             else:
-                # Low confidence - fall through to existing classification
-                logging.info(f"[ROUTER] Low reasoning confidence ({reasoning_result.confidence}), using fallback")
-                reasoning_result = None
+                # Low confidence - don't use the intent, but preserve service_signals for orchestration
+                logging.info(f"[ROUTER] Low reasoning confidence ({reasoning_result.confidence}), using fallback for intent")
+                logging.info(f"[ROUTER] Preserving service signals: {[s.service for s in reasoning_result.service_signals]}")
+
+                # Store service signals even for low confidence - orchestrator will decide if they warrant orchestration
+                context["reasoning_entities"] = reasoning_result.entities
+                context["reasoning_service_signals"] = reasoning_result.service_signals
+                # Note: We keep reasoning_result for orchestration check, but won't use its intent field
 
         except Exception as e:
             logging.warning(f"[ROUTER] Intent reasoning failed: {e}")
             reasoning_result = None
+
+    # =============================
+    # NEW: Orchestration Check
+    # =============================
+    # Check if we should orchestrate based on Intent Reasoning output
+    # Skip orchestration if called recursively from within orchestration
+    skip_orchestration = context.get("_skip_orchestration", False)
+
+    # Check if agentic AI is disabled (user preference)
+    user_id_for_pref = normalize_user_id(context.get("user_id"))
+    agentic_disabled = memory.get_user_preference(user_id_for_pref, "agentic_ai_disabled", "false") == "true"
+
+    if agentic_disabled:
+        logging.info("[ROUTER] Agentic AI disabled by user preference - skipping orchestration")
+        skip_orchestration = True
+
+    if reasoning_result and not force_intent and not skip_orchestration:
+        try:
+            from core.orchestration.orchestrator import Orchestrator
+
+            orchestrator = Orchestrator(memory)
+            orch_decision = orchestrator.should_orchestrate(reasoning_result)
+
+            if orch_decision.should_orchestrate:
+                logging.info("[ROUTER] Orchestration triggered")
+
+                # Get conversation history for orchestration
+                conversation_history = []
+                session_id = context.get("session_id")
+                if memory and session_id:
+                    recent_turns = memory.get_recent_turns(session_id, limit=6)
+                    conversation_history = [
+                        {"role": turn["role"], "content": turn["content"]}
+                        for turn in recent_turns
+                    ]
+
+                # Execute orchestration
+                orch_result = orchestrator.orchestrate(
+                    user_query=text,
+                    user_id=context.get("user_id"),
+                    session_id=session_id,
+                    reasoning_result=reasoning_result,
+                    conversation_history=conversation_history
+                )
+
+                # Return orchestration result
+                # Phase 2: Returns raw service data (will be synthesized in Phase 3)
+                # Footer format: "Sonnet-4.5 · Multi-Service · Orchestration"
+                # provider = synthesis_provider_name, model = synthesis_model_id
+                synthesis_model = orch_result.metadata.get("synthesis_model", "Unknown")
+                synthesis_provider = orch_result.metadata.get("synthesis_provider", "system")
+
+                return {
+                    "text": orch_result.text,
+                    "provider": synthesis_provider,  # Provider name (e.g., "claude-sonnet")
+                    "model": synthesis_model,  # Full model ID (e.g., "claude-sonnet-4-5-20250929")
+                    "task_type": "orchestration",
+                    "metadata": orch_result.metadata
+                }
+            else:
+                logging.info(f"[ROUTER] Orchestration skipped: {orch_decision.skip_reason}")
+
+        except Exception as e:
+            logging.warning(f"[ROUTER] Orchestration check failed: {e}")
+            # Fall through to normal routing on error
 
     # =============================
     # Existing Intent Classification
@@ -1014,7 +1097,8 @@ def route_request(context: dict, stream: bool = False):
     if force_intent:
         intent = force_intent
         _debug(memory, f"Intent forced to: {force_intent}")
-    elif reasoning_result is None:
+    elif reasoning_result is None or reasoning_result.confidence < 0.85:
+        # Use keyword classification if no reasoning or low confidence reasoning
         intent = classify_intent_enhanced(
             text=text,
             memory=memory,
@@ -1023,6 +1107,9 @@ def route_request(context: dict, stream: bool = False):
             subtab=context.get("subtab"),
             provider_registry=provider_registry
         )
+    else:
+        # High confidence reasoning - intent was already set at line 1003
+        pass
     forced = context.get("forced_provider")
 
     _debug(memory, "Final intent locked", intent=intent)
@@ -1923,6 +2010,9 @@ Guidelines:
                 "routing": routing_decision,
             }
 
+    # CRITICAL DEBUG: Log stream parameter value before branching
+    logging.info(f"[ROUTER] Checking stream parameter: stream={stream}, type={type(stream)}")
+
     if stream:
         def stream_generator():
             full_text = []
@@ -2029,4 +2119,6 @@ Guidelines:
     if debug_instruction:
         result["debug_instruction"] = debug_instruction
 
+    # CRITICAL DEBUG: Log return type before returning
+    logging.info(f"[ROUTER] route_request returning type={type(result)}, keys={result.keys()}")
     return result

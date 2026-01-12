@@ -96,6 +96,9 @@ try:
     existing_intents = memory.list_intents("1")
     if not existing_intents:
         memory.seed_default_intents("1")
+
+    # Seed orchestration intents (for all users, idempotent)
+    memory.seed_orchestration_intents("1")
 except Exception as e:
     logging.warning(f"Could not check/seed intents: {e}")
 

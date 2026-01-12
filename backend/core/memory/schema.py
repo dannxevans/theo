@@ -199,6 +199,7 @@ def create_schema(meta: MetaData):
         Column("priority", Integer, default=0),  # Higher priority checked first
         Column("enabled", Boolean, default=True),
         Column("is_action", Boolean, default=False),  # True for action intents (calendar, email, etc.)
+        Column("category", String, default="user"),  # "user", "action", "orchestration"
         Column("created_at", DateTime, default=datetime.utcnow),
         Column("updated_at", DateTime, default=datetime.utcnow),
     )

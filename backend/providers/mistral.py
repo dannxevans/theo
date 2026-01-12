@@ -37,23 +37,20 @@ class MistralProvider:
         if not self.api_key:
             raise ValueError("MistralProvider requires an api_key")
 
-    def chat(self, **kwargs):
+    def chat(self, system, messages, **kwargs):
         """
         Execute a chat completion against Mistral AI.
 
         Parameters:
-        - model: string (passed directly from frontend config)
         - system: system prompt string
         - messages: list of {role, content}
-        - temperature: float
+        - **kwargs: Additional options (model, temperature, debug, etc.)
 
         Returns:
         - str (assistant text only)
         """
 
         model = kwargs.get("model") or getattr(self, "model", None)
-        system = kwargs.get("system_prompt") or kwargs.get("system")
-        messages = kwargs.get("messages") or []
         temperature = kwargs.get("temperature", 0.2)
 
         if not model:
