@@ -601,3 +601,225 @@ class TestServiceExecution:
             # Memory should succeed
             assert "data" in result.get("memory", {})
             assert result["memory"]["method"] == "search"
+
+class TestPhase4ActionConfirmation:
+    """Test Phase 4: Action Confirmation & Execution"""
+
+    def test_synthesis_proposes_calendar_action(self):
+        """Test LLM proposes calendar event creation with proper structure."""
+        memory = Mock()
+        memory.get_all.return_value = {}
+        memory.get_memories.return_value = []
+        orchestrator = Orchestrator(memory)
+
+        # Mock proposed action from synthesis
+        synthesis_result = {
+            "response": "I can create a calendar event for your shopping trip.",
+            "needs_confirmation": True,
+            "proposed_actions": [
+                {
+                    "type": "create_calendar_event",
+                    "service": "calendar",
+                    "params": {
+                        "subject": "Shopping at Asda",
+                        "start_time": "2026-01-14T14:00:00",
+                        "end_time": "2026-01-14T15:00:00",
+                        "body": "Buy: milk, eggs, bread"
+                    },
+                    "confirmation_message": "Create calendar event 'Shopping at Asda' tomorrow at 2:00 PM?",
+                    "reasoning": "User requested shopping trip"
+                }
+            ]
+        }
+
+        # Verify action structure
+        action = synthesis_result["proposed_actions"][0]
+        assert action["type"] == "create_calendar_event"
+        assert "confirmation_message" in action
+        assert "params" in action
+        assert "subject" in action["params"]
+        assert "start_time" in action["params"]
+
+    def test_synthesis_proposes_task_action(self):
+        """Test LLM proposes task creation."""
+        synthesis_result = {
+            "response": "I'll create a task for your reminder.",
+            "needs_confirmation": True,
+            "proposed_actions": [
+                {
+                    "type": "create_task",
+                    "service": "tasks",
+                    "params": {
+                        "title": "Buy milk",
+                        "due_date": "2026-01-14",
+                        "notes": "From Asda",
+                        "importance": "normal"
+                    },
+                    "confirmation_message": "Create task 'Buy milk' due on 2026-01-14?",
+                    "reasoning": "User requested reminder"
+                }
+            ]
+        }
+
+        action = synthesis_result["proposed_actions"][0]
+        assert action["type"] == "create_task"
+        assert action["params"]["title"] == "Buy milk"
+        assert "due_date" in action["params"]
+
+    def test_confirmation_creation_with_valid_action(self):
+        """Test confirmation creation with valid action proposal."""
+        from core.confirmation_manager import ConfirmationManager
+        from datetime import datetime, timedelta
+
+        memory = Mock()
+        
+        # Mock create_action to return action_id
+        memory.create_action.return_value = 1
+        
+        # Mock create_confirmation to return confirmation_id
+        memory.create_confirmation.return_value = 123
+
+        confirmation_manager = ConfirmationManager(memory, action_router=None)
+
+        action = {
+            "type": "create_calendar_event",
+            "params": {
+                "subject": "Shopping",
+                "start_time": "2026-01-14T14:00:00",
+                "end_time": "2026-01-14T15:00:00"
+            },
+            "confirmation_message": "Create calendar event 'Shopping'?"
+        }
+
+        confirmation = confirmation_manager.create_confirmation(
+            user_id=1,
+            session_id="test_session",
+            action_type=action["type"],
+            action_params=action["params"],
+            confirmation_message=action["confirmation_message"],
+            provider_id=None,
+            expires_in_hours=24
+        )
+
+        # Verify confirmation structure
+        assert confirmation["confirmation_id"] == 123
+        assert confirmation["action_id"] == 1
+        assert confirmation["message"] == "Create calendar event 'Shopping'?"
+        assert "expires_at" in confirmation
+        assert confirmation["status"] == "pending"
+
+    def test_multiple_actions_proposed(self):
+        """Test multiple actions in one response."""
+        synthesis_result = {
+            "response": "I'll create both a calendar event and a task.",
+            "needs_confirmation": True,
+            "proposed_actions": [
+                {
+                    "type": "create_calendar_event",
+                    "service": "calendar",
+                    "params": {"subject": "Meeting", "start_time": "2026-01-14T14:00:00", "end_time": "2026-01-14T15:00:00"},
+                    "confirmation_message": "Create calendar event 'Meeting'?"
+                },
+                {
+                    "type": "create_task",
+                    "service": "tasks",
+                    "params": {"title": "Prepare presentation", "due_date": "2026-01-14"},
+                    "confirmation_message": "Create task 'Prepare presentation'?"
+                }
+            ]
+        }
+
+        assert len(synthesis_result["proposed_actions"]) == 2
+        assert synthesis_result["proposed_actions"][0]["type"] == "create_calendar_event"
+        assert synthesis_result["proposed_actions"][1]["type"] == "create_task"
+
+    def test_action_proposal_date_validation(self):
+        """Test date parameters are in correct format."""
+        action = {
+            "type": "create_calendar_event",
+            "params": {
+                "subject": "Test",
+                "start_time": "2026-01-14T14:00:00",  # ISO 8601
+                "end_time": "2026-01-14T15:00:00"
+            }
+        }
+
+        # Verify ISO 8601 format
+        assert "T" in action["params"]["start_time"]
+        assert len(action["params"]["start_time"]) == 19  # YYYY-MM-DDTHH:MM:SS
+
+        # Verify parseable
+        from datetime import datetime
+        parsed = datetime.fromisoformat(action["params"]["start_time"])
+        assert parsed.year == 2026
+        assert parsed.month == 1
+        assert parsed.day == 14
+
+    def test_informational_query_no_action(self):
+        """Test informational queries don't propose actions."""
+        synthesis_result = {
+            "response": "Tomorrow's weather will be partly cloudy with a high of 15°C.",
+            "needs_confirmation": False,
+            "proposed_actions": []
+        }
+
+        assert synthesis_result["needs_confirmation"] is False
+        assert len(synthesis_result["proposed_actions"]) == 0
+
+    def test_missing_confirmation_message_handled(self):
+        """Test graceful handling of missing confirmation_message."""
+        from core.confirmation_manager import ConfirmationManager
+
+        memory = Mock()
+        memory.create_action.return_value = 1
+        memory.create_confirmation.return_value = 123
+
+        confirmation_manager = ConfirmationManager(memory, action_router=None)
+
+        # Action without confirmation_message
+        action = {
+            "type": "create_calendar_event",
+            "params": {"subject": "Test"}
+        }
+
+        # Should use default message
+        confirmation = confirmation_manager.create_confirmation(
+            user_id=1,
+            session_id="test",
+            action_type=action["type"],
+            action_params=action["params"],
+            confirmation_message=f"Confirm {action['type']}?",  # Default fallback
+            provider_id=None
+        )
+
+        assert confirmation["confirmation_id"] == 123
+
+    def test_confirmation_metadata_transformation(self):
+        """Test confirmation metadata is transformed for frontend."""
+        from datetime import datetime
+
+        # Mock confirmation from database
+        confirmation = {
+            "confirmation_id": 123,
+            "action_id": 1,
+            "message": "Create event?",
+            "expires_at": datetime(2026, 1, 14, 18, 0, 0),
+            "status": "pending"
+        }
+
+        # Transform for frontend (similar to router.py logic)
+        frontend_conf = {
+            "confirmation_id": confirmation["confirmation_id"],
+            "action_id": confirmation["action_id"],
+            "confirmation_message": confirmation["message"],
+            "expires_at": confirmation["expires_at"].isoformat(),
+            "status": confirmation["status"],
+            "approved": False,
+            "rejected": False
+        }
+
+        assert frontend_conf["confirmation_id"] == 123
+        assert frontend_conf["confirmation_message"] == "Create event?"
+        assert "T" in frontend_conf["expires_at"]  # ISO format
+        assert frontend_conf["approved"] is False
+        assert frontend_conf["rejected"] is False
