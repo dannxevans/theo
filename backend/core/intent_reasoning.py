@@ -272,7 +272,8 @@ Intent Distinctions:
   NOT for shopping/errands with locations and timing - those need orchestration
 - read_calendar: Checking calendar/schedule (e.g., "what's on my calendar", "am I free tomorrow")
 - read_tasks: Viewing task/to-do list (e.g., "show my tasks", "what do I need to do")
-- compose_email: Sending/drafting emails (e.g., "email John about meeting")
+- compose_email: ONLY when user wants to SEND/DRAFT an email through the system (e.g., "email John about meeting", "send an email to the team")
+  NOT for text editing/rewriting assistance (e.g., "reword this email", "help me write this", "improve this text") - those are general intent
 - read_email: Reading inbox (e.g., "check my email", "any new messages")
 - weather: Weather queries (e.g., "what's the weather", "will it rain")
 - routing: Directions/navigation (e.g., "how do I get to", "route from home to work")
@@ -281,6 +282,7 @@ Intent Distinctions:
 - whoop: WHOOP fitness tracker QUERIES only (e.g., "how did I sleep", "what's my recovery", "strain score")
   NOT statements like "I slept well", "my recovery was good"
 - general: Conversational responses, acknowledgments, opinions, decisions, statements about actions rather than requests for actions
+  ALSO: Text editing/rewriting assistance (e.g., "reword this", "help me write this", "improve this text") - even if the text is email content
 
 CRITICAL: If user mentions BOTH a location (store name, place) AND a time (tomorrow, next week, etc.) for shopping/errands, classify as book_appointment and set orchestrate:true
 
@@ -317,6 +319,10 @@ Examples:
 - "I need to go to mums after work tomorrow" → orchestrate:true, reason:"Visit planning requires calendar check (when is work) + traffic routing + calendar event creation"
 - "visit dad tomorrow afternoon" → orchestrate:true, reason:"Visit planning requires calendar availability check + traffic routing + calendar event creation"
 - "what's the weather today" → orchestrate:false, reason:"Single service query"
+- "email John about the meeting tomorrow" → intent:"compose_email", orchestrate:false, reason:"User wants to send email through system"
+- "reword this email: [text]" → intent:"general", orchestrate:false, reason:"Text editing assistance, not email composition"
+- "help me write this email better" → intent:"general", orchestrate:false, reason:"Text editing assistance, not sending email"
+- "improve this: [email text]" → intent:"general", orchestrate:false, reason:"Text rewriting assistance, not email composition"
 
 Return ONLY this JSON structure:
 {"intent":"<id>","confidence":0.0-1.0,"entities":{"locations":[],"datetimes":[],"people":[],"activities":[],"items":[]},"services":[{"service":"<id>","relevance":0.0-1.0,"reason":"<brief>"}],"params":{},"reasoning":"<brief>","ambiguous":false,"clarify":null,"orchestrate":false,"orch_reason":null}'''
