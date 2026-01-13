@@ -40,7 +40,7 @@
   <div class="login-box">
     <div class="login-header">
       <img
-        src="/logo.svg"
+        src="/logo-primary.png"
         alt="THEO"
         class="login-logo"
       />
