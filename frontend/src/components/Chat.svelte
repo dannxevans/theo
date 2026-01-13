@@ -23,6 +23,7 @@
   import { tick, afterUpdate, onMount, onDestroy } from "svelte";
   import VoiceControls from "./VoiceControls.svelte";
   import ChatControls from "./ChatControls.svelte";
+  import ConfirmationCard from "./ConfirmationCard.svelte";
 
   export let sessionId;
   export let currentMode = "personal";
@@ -911,17 +912,34 @@
 
       // Update the message metadata to show approved status
       messages = messages.map(m => {
+        // Handle regular confirmations (M365, etc.)
         if (m.metadata && m.metadata.confirmation_id === confirmationId) {
           return {
             ...m,
             metadata: { ...m.metadata, approved: true, rejected: false }
           };
         }
+
+        // Handle orchestration confirmations (Phase 4)
+        if (m.metadata && m.metadata.orchestration_confirmations) {
+          const updatedConfirmations = m.metadata.orchestration_confirmations.map(conf => {
+            if (conf.confirmation_id === confirmationId) {
+              return { ...conf, approved: true, rejected: false };
+            }
+            return conf;
+          });
+
+          return {
+            ...m,
+            metadata: { ...m.metadata, orchestration_confirmations: updatedConfirmations }
+          };
+        }
+
         return m;
       });
 
-      // Reload messages to get any updates
-      await loadSessionMessages(sessionId);
+      // Note: Don't reload messages - the approved/rejected state is frontend-only
+      // and reloading would overwrite our local state changes
     } catch (e) {
       alert("Failed to approve: " + e.message);
     }
@@ -933,17 +951,34 @@
 
       // Update the message metadata to show rejected status
       messages = messages.map(m => {
+        // Handle regular confirmations (M365, etc.)
         if (m.metadata && m.metadata.confirmation_id === confirmationId) {
           return {
             ...m,
             metadata: { ...m.metadata, approved: false, rejected: true }
           };
         }
+
+        // Handle orchestration confirmations (Phase 4)
+        if (m.metadata && m.metadata.orchestration_confirmations) {
+          const updatedConfirmations = m.metadata.orchestration_confirmations.map(conf => {
+            if (conf.confirmation_id === confirmationId) {
+              return { ...conf, approved: false, rejected: true };
+            }
+            return conf;
+          });
+
+          return {
+            ...m,
+            metadata: { ...m.metadata, orchestration_confirmations: updatedConfirmations }
+          };
+        }
+
         return m;
       });
 
-      // Reload messages to get any updates
-      await loadSessionMessages(sessionId);
+      // Note: Don't reload messages - the approved/rejected state is frontend-only
+      // and reloading would overwrite our local state changes
     } catch (e) {
       alert("Failed to reject: " + e.message);
     }
@@ -1212,6 +1247,17 @@
                         </div>
                       {/if}
                     </div>
+                  {/if}
+
+                  <!-- Orchestration Confirmations (Phase 4) -->
+                  {#if m.metadata && m.metadata.orchestration_confirmations && m.metadata.orchestration_confirmations.length > 0}
+                    {#each m.metadata.orchestration_confirmations as confirmation}
+                      <ConfirmationCard
+                        confirmation={confirmation}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                      />
+                    {/each}
                   {/if}
 
                   {#if m.metadata && m.metadata.proactive && !m.metadata.dismissed}

@@ -1045,7 +1045,18 @@ def route_request(context: dict, stream: bool = False):
             from core.orchestration.orchestrator import Orchestrator
 
             orchestrator = Orchestrator(memory)
-            orch_decision = orchestrator.should_orchestrate(reasoning_result)
+
+            # Check if this is a clarification response BEFORE deciding whether to orchestrate
+            session_id = context.get("session_id")
+            user_id = context.get("user_id")
+            clarification_context = orchestrator._get_clarification_context(user_id, session_id)
+
+            if clarification_context:
+                logging.info(f"[ROUTER] Detected clarification response, forcing orchestration")
+                # Force orchestration for clarification responses
+                orch_decision = type('obj', (object,), {'should_orchestrate': True})()
+            else:
+                orch_decision = orchestrator.should_orchestrate(reasoning_result)
 
             if orch_decision.should_orchestrate:
                 logging.info("[ROUTER] Orchestration triggered")
@@ -1069,19 +1080,66 @@ def route_request(context: dict, stream: bool = False):
                     conversation_history=conversation_history
                 )
 
+                # Check if orchestration needs clarification
+                if hasattr(orch_result, 'needs_clarification') and orch_result.needs_clarification:
+                    logging.info("[ROUTER] Orchestration needs clarification, returning question")
+                    return {
+                        "text": orch_result.text,
+                        "provider": "orchestration",
+                        "model": None,
+                        "task_type": "clarification",
+                        "metadata": {
+                            "reason": orch_result.skip_reason,
+                            "needs_clarification": True
+                        }
+                    }
+
                 # Return orchestration result
-                # Phase 2: Returns raw service data (will be synthesized in Phase 3)
+                # Phase 4: Includes action confirmations with frontend-compatible metadata
                 # Footer format: "Sonnet-4.5 · Multi-Service · Orchestration"
                 # provider = synthesis_provider_name, model = synthesis_model_id
                 synthesis_model = orch_result.metadata.get("synthesis_model", "Unknown")
                 synthesis_provider = orch_result.metadata.get("synthesis_provider", "system")
+
+                # Transform confirmations for frontend compatibility
+                # Frontend expects M365-style confirmation metadata
+                confirmations = orch_result.metadata.get("confirmations", [])
+
+                # Build metadata with orchestration-specific confirmation format
+                response_metadata = orch_result.metadata.copy()
+
+                # If confirmations exist, add frontend-compatible format
+                if confirmations:
+                    # Transform each confirmation to match M365 confirmation structure
+                    orchestration_confirmations = []
+                    for conf in confirmations:
+                        orchestration_confirmations.append({
+                            "confirmation_id": conf["confirmation_id"],
+                            "action_id": conf["action_id"],
+                            "confirmation_message": conf["message"],
+                            "expires_at": conf["expires_at"].isoformat() if hasattr(conf["expires_at"], "isoformat") else str(conf["expires_at"]),
+                            "status": conf["status"],
+                            "approved": False,
+                            "rejected": False
+                        })
+
+                    # Add to metadata in frontend-compatible format
+                    response_metadata["orchestration_confirmations"] = orchestration_confirmations
+                    response_metadata["has_confirmations"] = True
+
+                    # CRITICAL: Remove raw confirmations field to prevent JSON serialization error
+                    # The raw confirmations contain datetime objects which can't be JSON serialized
+                    if "confirmations" in response_metadata:
+                        del response_metadata["confirmations"]
+
+                    logging.info(f"[ROUTER] Transformed {len(orchestration_confirmations)} confirmation(s) for frontend")
 
                 return {
                     "text": orch_result.text,
                     "provider": synthesis_provider,  # Provider name (e.g., "claude-sonnet")
                     "model": synthesis_model,  # Full model ID (e.g., "claude-sonnet-4-5-20250929")
                     "task_type": "orchestration",
-                    "metadata": orch_result.metadata
+                    "metadata": response_metadata
                 }
             else:
                 logging.info(f"[ROUTER] Orchestration skipped: {orch_decision.skip_reason}")

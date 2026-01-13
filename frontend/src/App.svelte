@@ -707,7 +707,7 @@ async function handleLogout() {
         aria-label="Go to Chat"
       >
         <img
-          src="/logo.svg"
+          src="/logo-primary.png"
           alt="THEO"
           class="logo"
         />

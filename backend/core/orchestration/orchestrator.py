@@ -42,6 +42,9 @@ class Orchestrator:
     MIN_HIGH_RELEVANCE_SERVICES = 2
     MIN_COMPLEX_ENTITIES = 3
 
+    # Class-level cache for clarification contexts (session_id -> context_data)
+    _clarification_contexts = {}
+
     def __init__(self, memory):
         """
         Initialize orchestrator.
@@ -201,12 +204,84 @@ class Orchestrator:
         """
         self.logger.info(f"[ORCHESTRATOR] Starting orchestration for query: {user_query[:100]}")
 
+        # Step 0: Check if this is a clarification response
+        clarification_context = self._get_clarification_context(user_id, session_id)
+        if clarification_context:
+            self.logger.info(
+                f"[ORCHESTRATOR] Detected clarification response for: "
+                f"{clarification_context.get('original_query')}"
+            )
+
+            # Check if this looks like an address response
+            if self._is_address_response(user_query, reasoning_result):
+                # Store the address in memory
+                person_name = clarification_context.get("missing_person")
+                self._store_person_address(user_id, person_name, user_query)
+
+                # Clear clarification context
+                self._clear_clarification_context(user_id, session_id)
+
+                # Resume original orchestration with the original query
+                original_query = clarification_context.get("original_query")
+                self.logger.info(f"[ORCHESTRATOR] Resuming orchestration with: {original_query}")
+
+                # Re-run orchestration with the original query
+                # We need to re-classify the original query to get fresh reasoning
+                from core.intent_reasoning import IntentReasoningEngine
+                from core.providers.registry import ProviderRegistry
+
+                # Get fresh reasoning for the original query
+                provider_registry = ProviderRegistry(self.memory)
+                reasoning_engine = IntentReasoningEngine(
+                    provider_registry,
+                    self.memory,
+                    user_id=user_id
+                )
+                resumed_reasoning = reasoning_engine.reason(
+                    original_query,
+                    mode="personal",  # TODO: Get actual mode from context
+                    subtab=None,
+                    conversation_history=conversation_history
+                )
+
+                # Continue orchestration with the original query
+                user_query = original_query
+                reasoning_result = resumed_reasoning
+
         # Step 1: Check if we should orchestrate
         decision = self.should_orchestrate(reasoning_result)
 
         if not decision.should_orchestrate:
             self.logger.info(f"[ORCHESTRATOR] Skipping: {decision.skip_reason}")
             return decision
+
+        # Step 1.5: Validate that person-based locations are known
+        validation_result = self._validate_person_locations(reasoning_result, user_id, user_query)
+        if validation_result:
+            # Need clarification - store context and return clarification question
+            self.logger.info(f"[ORCHESTRATOR] Person location unknown, requesting clarification")
+
+            # Store the original query context in session memory for resumption
+            self._store_clarification_context(
+                user_id=user_id,
+                session_id=session_id,
+                original_query=user_query,
+                missing_person=validation_result["missing_person"],
+                location_ref=validation_result["location_ref"]
+            )
+
+            return OrchestrationResult(
+                should_orchestrate=False,
+                skip_reason="missing_person_location",
+                text=validation_result["clarification_question"],
+                needs_clarification=True,
+                metadata={
+                    "awaiting_clarification": True,
+                    "clarification_type": "person_location",
+                    "missing_person": validation_result["missing_person"],
+                    "original_query": user_query
+                }
+            )
 
         # Step 2: Plan which services to query (LLM decides)
         try:
@@ -256,9 +331,59 @@ class Orchestrator:
 
         # Step 5: Create confirmations for actions (if needed)
         confirmations = []
-        if synthesis_result.get("needs_confirmation"):
-            # TODO: Implement confirmation creation in future iteration
-            self.logger.info("[ORCHESTRATOR] Action confirmation needed (not yet implemented)")
+        proposed_actions = synthesis_result.get("proposed_actions", [])
+
+        if proposed_actions:
+            from core.confirmation_manager import ConfirmationManager
+
+            # Initialize ConfirmationManager
+            # Note: action_router will be None here - it's only needed for execution (approval phase)
+            # The ActionRouter will be set when the confirmation is approved via the frontend
+            confirmation_manager = ConfirmationManager(self.memory, action_router=None)
+
+            self.logger.info(f"[ORCHESTRATOR] Creating {len(proposed_actions)} confirmation(s)")
+
+            for action in proposed_actions:
+                try:
+                    # Validate action structure
+                    action_type = action.get("type")
+                    action_params = action.get("params", {})
+                    confirmation_message = action.get("confirmation_message")
+
+                    if not action_type:
+                        self.logger.error(f"[ORCHESTRATOR] Action missing 'type' field: {action}")
+                        continue
+
+                    if not confirmation_message:
+                        self.logger.warning(f"[ORCHESTRATOR] Action missing 'confirmation_message', using default")
+                        confirmation_message = f"Confirm {action_type}?"
+
+                    # Create confirmation in database
+                    confirmation = confirmation_manager.create_confirmation(
+                        user_id=user_id,
+                        session_id=session_id,  # Use real session_id (not "orchestration")
+                        action_type=action_type,
+                        action_params=action_params,
+                        confirmation_message=confirmation_message,
+                        provider_id=None,  # Will be resolved during execution
+                        expires_in_hours=24  # Standard 24-hour expiration
+                    )
+
+                    confirmations.append(confirmation)
+                    self.logger.info(
+                        f"[ORCHESTRATOR] Created confirmation {confirmation['confirmation_id']} "
+                        f"for {action_type} (expires: {confirmation['expires_at']})"
+                    )
+
+                except Exception as e:
+                    self.logger.error(f"[ORCHESTRATOR] Failed to create confirmation: {e}", exc_info=True)
+                    # Continue processing other actions even if one fails
+                    continue
+
+            if confirmations:
+                self.logger.info(f"[ORCHESTRATOR] Successfully created {len(confirmations)} confirmation(s)")
+            else:
+                self.logger.warning("[ORCHESTRATOR] No confirmations created (all failed validation)")
 
         # Step 6: Return result
         return OrchestrationResult(
@@ -266,11 +391,12 @@ class Orchestrator:
             text=synthesis_result["response"],
             confirmations=confirmations,
             metadata={
-                "phase": "3_complete",
+                "phase": "4_complete",  # Updated to Phase 4 (Action Confirmation & Execution)
                 "services_queried": list(gathered_data.keys()),
                 "service_plan": service_plan,
                 "gathered_data": gathered_data,
                 "proposed_actions": synthesis_result.get("proposed_actions", []),
+                "confirmations": confirmations,  # Include confirmations in metadata for frontend
                 "synthesis_provider": synthesis_result.get("synthesis_provider"),
                 "synthesis_model": synthesis_result.get("synthesis_model")
             }
@@ -344,7 +470,12 @@ CRITICAL RULES FOR DATE PARAMETERS:
 OTHER RULES:
 1. Only query services with relevance >= 0.5 from Intent Reasoning
 2. Use extracted entities for ALL parameters (locations, datetimes, people, etc.)
-3. Resolve location aliases: "home" → user's Home Location, "work" → user's Work Location
+3. **INFER USER'S LOCATION FROM CALENDAR CONTEXT**:
+   - If querying traffic/routing, check if the target time falls during a calendar event
+   - If user has a calendar event at that time with a location, route FROM that location
+   - Example: Event "Work (Office)" at Colgate Lane from 07:00-17:00, pickup at 14:00 → route from Colgate Lane
+   - Only use "home" as origin if no calendar event at that time
+   - Location aliases: "home" → user's Home Location, "work" → user's Work Location
 4. Keep queries minimal - only what's needed to answer the user's question
 5. Maximum 3 service queries total
 
@@ -427,6 +558,7 @@ Respond with JSON only (no markdown):
         from core.orchestration.service_registry import validate_service_request
 
         gathered_data = {}
+        calendar_events = None  # Track calendar events for location inference
 
         for service_request in services_to_query:
             service = service_request.get("service")
@@ -440,6 +572,10 @@ Respond with JSON only (no markdown):
                 gathered_data[service] = {"error": error_msg}
                 continue
 
+            # SMART LOCATION INFERENCE: If this is a traffic query and we have calendar data, infer origin
+            if service == "traffic" and method == "get_route" and calendar_events is not None:
+                params = self._infer_traffic_origin_from_calendar(params, calendar_events, user_id)
+
             # Execute service call
             try:
                 self.logger.info(f"[ORCHESTRATOR] Calling {service}.{method}({params})")
@@ -447,12 +583,87 @@ Respond with JSON only (no markdown):
                 gathered_data[service] = result
                 self.logger.info(f"[ORCHESTRATOR] ✓ {service} returned data")
 
+                # Store calendar events for location inference
+                if service == "calendar" and "data" in result and "events" in result["data"]:
+                    calendar_events = result["data"]["events"]
+
             except Exception as e:
                 # Individual service failures don't block orchestration
                 self.logger.error(f"[ORCHESTRATOR] ✗ {service}.{method} failed: {e}")
                 gathered_data[service] = {"error": str(e)}
 
         return gathered_data
+
+    def _infer_traffic_origin_from_calendar(
+        self,
+        traffic_params: Dict,
+        calendar_events: List[Dict],
+        user_id: int
+    ) -> Dict:
+        """
+        Intelligently infer traffic origin based on calendar events.
+
+        If the user has a calendar event at the time they need to travel,
+        use that event's location as the origin instead of defaulting to 'home'.
+
+        Args:
+            traffic_params: Original traffic params (may have origin='home')
+            calendar_events: List of calendar events
+            user_id: User ID
+
+        Returns:
+            Updated traffic params with corrected origin
+        """
+        from datetime import datetime, time
+
+        origin = traffic_params.get("origin", "home")
+
+        # Only adjust if origin is 'home' (the default)
+        if origin != "home":
+            return traffic_params
+
+        # Try to infer the target time from context
+        # For now, use a simple heuristic: check if any event is happening during typical work hours
+        # TODO: Make this smarter by parsing the actual destination arrival time
+
+        for event in calendar_events:
+            start_time_str = event.get("start_time", "")
+            end_time_str = event.get("end_time", "")
+            location = event.get("location", "")
+
+            # Skip events without location
+            if not location:
+                continue
+
+            try:
+                # Parse times (handle M365's 7-digit fractional seconds)
+                # M365 format: "2026-01-14T07:00:00.0000000"
+                # Python's fromisoformat only handles up to 6 digits
+                start_time_clean = start_time_str.split('.')[0]  # Remove fractional seconds
+                end_time_clean = end_time_str.split('.')[0]
+                start_time = datetime.fromisoformat(start_time_clean)
+                end_time = datetime.fromisoformat(end_time_clean)
+
+                # If this is a work event during the day, use it as origin
+                # Heuristic: Events longer than 4 hours during daytime are likely work
+                duration_hours = (end_time - start_time).total_seconds() / 3600
+                is_daytime = 6 <= start_time.hour <= 18
+
+                if duration_hours >= 4 and is_daytime:
+                    self.logger.info(
+                        f"[ORCHESTRATOR] Inferring origin from calendar: "
+                        f"Event '{event.get('subject')}' at {location} "
+                        f"({start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')})"
+                    )
+                    traffic_params["origin"] = location
+                    return traffic_params
+
+            except Exception as e:
+                self.logger.warning(f"[ORCHESTRATOR] Failed to parse event times: {e}")
+                continue
+
+        # No suitable event found, keep original params
+        return traffic_params
 
     def _execute_service(
         self,
@@ -504,7 +715,7 @@ Respond with JSON only (no markdown):
 
     def _resolve_location_aliases(self, params: Dict, user_id: int) -> Dict:
         """
-        Resolve location aliases like 'home' and 'work' to actual addresses.
+        Resolve location aliases like 'home', 'work', and person-based locations to actual addresses.
 
         Args:
             params: Parameters dict
@@ -518,19 +729,29 @@ Respond with JSON only (no markdown):
         # Check for location parameters
         for key in ["location", "origin", "destination"]:
             if key in resolved:
-                location = resolved[key].lower().strip()
+                location = resolved[key].strip()
+                location_lower = location.lower()
 
-                if location == "home":
+                if location_lower == "home":
                     home_location = self._get_user_fact(user_id, "home location")
                     if home_location:
                         resolved[key] = home_location
                         self.logger.info(f"[ORCHESTRATOR] Resolved 'home' → '{home_location}'")
 
-                elif location == "work":
+                elif location_lower == "work":
                     work_location = self._get_user_fact(user_id, "work location")
                     if work_location:
                         resolved[key] = work_location
                         self.logger.info(f"[ORCHESTRATOR] Resolved 'work' → '{work_location}'")
+
+                # Check for person-based locations (e.g., "Mums", "mum's", "Dad's")
+                elif location_lower in ["mum", "mums", "mum's", "dad", "dads", "dad's"]:
+                    person_name = location_lower.rstrip("s'").rstrip("'s")
+                    person_cap = person_name.capitalize()
+                    person_address = self._get_user_fact(user_id, f"{person_cap}'s Address")
+                    if person_address:
+                        resolved[key] = person_address
+                        self.logger.info(f"[ORCHESTRATOR] Resolved '{location}' → '{person_address}'")
 
         return resolved
 
@@ -564,6 +785,206 @@ Respond with JSON only (no markdown):
 
         self.logger.warning(f"[ORCHESTRATOR] No memory found for fact '{fact_key}'")
         return None
+
+    def _validate_person_locations(
+        self,
+        reasoning_result,
+        user_id: int,
+        user_query: str
+    ) -> Optional[Dict[str, str]]:
+        """
+        Validate that person-based location references have stored addresses.
+
+        Checks extracted locations for person references (e.g., "mum", "dad", "John's")
+        and ensures we have a stored address for them before proceeding.
+
+        Args:
+            reasoning_result: IntentReasoningResult with entities
+            user_id: User ID
+            user_query: Original user query for context
+
+        Returns:
+            None if validation passes, or dict with "clarification_question" if validation fails
+        """
+        if not hasattr(reasoning_result, 'entities') or not reasoning_result.entities:
+            return None
+
+        entities = reasoning_result.entities
+        locations = getattr(entities, 'locations', [])
+        people = getattr(entities, 'people', [])
+
+        # Check if any locations are person-based references
+        person_based_locations = []
+        for location in locations:
+            location_lower = location.lower()
+
+            # Check for possessive forms: "mum's", "dad's", "John's", etc.
+            if location_lower.endswith("'s") or location_lower.endswith("s'"):
+                person_name = location_lower.rstrip("'s").rstrip("s'").strip()
+                person_based_locations.append((location, person_name))
+
+            # Check for direct person references: "mum", "dad", "mums", "dads"
+            elif location_lower in ["mum", "mums", "mum's", "dad", "dads", "dad's", "parents", "parent's"]:
+                person_based_locations.append((location, location_lower.rstrip("s")))
+
+            # Check if location matches any person entity
+            elif any(person.lower() in location_lower for person in people):
+                person_based_locations.append((location, location))
+
+        if not person_based_locations:
+            return None
+
+        # Check if we have stored locations for these people
+        for location_ref, person_name in person_based_locations:
+            # Try to find stored address
+            # Look for patterns like "Mum's Address", "Mum Location", etc.
+            # Try with capitalized first (stored by _store_person_address)
+            person_cap = person_name.capitalize()
+            stored_location = (
+                self._get_user_fact(user_id, f"{person_cap}'s Address") or
+                self._get_user_fact(user_id, f"{person_cap}'s Location") or
+                self._get_user_fact(user_id, f"{person_name}'s address") or
+                self._get_user_fact(user_id, f"{person_name}'s location") or
+                self._get_user_fact(user_id, f"{person_name} address") or
+                self._get_user_fact(user_id, f"{person_name} location")
+            )
+
+            if not stored_location:
+                # Missing location - request clarification
+                self.logger.info(
+                    f"[ORCHESTRATOR] Person-based location '{location_ref}' has no stored address"
+                )
+
+                # Generate clarification question
+                clarification = (
+                    f"I'd be happy to help you plan this! However, I don't have your {person_name}'s address stored. "
+                    f"Could you tell me where your {person_name} lives so I can provide routing information?"
+                )
+
+                return {
+                    "clarification_question": clarification,
+                    "missing_person": person_name,
+                    "location_ref": location_ref
+                }
+
+        # All person-based locations are known
+        return None
+
+    def _store_clarification_context(
+        self,
+        user_id: int,
+        session_id: int,
+        original_query: str,
+        missing_person: str,
+        location_ref: str
+    ):
+        """
+        Store clarification context in session-based memory.
+
+        Stores the original query and missing information so we can resume
+        orchestration when the user provides the clarification.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+            original_query: The original user query that needed clarification
+            missing_person: The person whose location is missing (e.g., "mum")
+            location_ref: The location reference from the query (e.g., "Mums")
+        """
+        import json
+
+        clarification_data = {
+            "original_query": original_query,
+            "missing_person": missing_person,
+            "location_ref": location_ref,
+            "type": "person_location"
+        }
+
+        # Store in class-level cache (simple in-memory storage)
+        Orchestrator._clarification_contexts[session_id] = clarification_data
+
+        self.logger.info(
+            f"[ORCHESTRATOR] Stored clarification context for session {session_id}: "
+            f"waiting for {missing_person}'s address"
+        )
+
+    def _get_clarification_context(self, user_id: int, session_id: int) -> Optional[Dict]:
+        """
+        Retrieve stored clarification context for a session.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+
+        Returns:
+            Clarification context dict or None if not found
+        """
+        return Orchestrator._clarification_contexts.get(session_id)
+
+    def _clear_clarification_context(self, user_id: int, session_id: int):
+        """Clear clarification context after it's been used."""
+        if session_id in Orchestrator._clarification_contexts:
+            del Orchestrator._clarification_contexts[session_id]
+            self.logger.info(f"[ORCHESTRATOR] Cleared clarification context for session {session_id}")
+
+    def _is_address_response(self, user_query: str, reasoning_result) -> bool:
+        """
+        Detect if user query looks like an address response.
+
+        Checks for location entities or address-like patterns.
+
+        Args:
+            user_query: User's query
+            reasoning_result: Intent reasoning result
+
+        Returns:
+            True if this looks like an address response
+        """
+        # Check if reasoning extracted locations
+        if hasattr(reasoning_result, 'entities') and reasoning_result.entities:
+            locations = getattr(reasoning_result.entities, 'locations', [])
+            if locations:
+                self.logger.info(f"[ORCHESTRATOR] Detected location entities: {locations}")
+                return True
+
+        # Check for address-like patterns (postcode, street name, etc.)
+        import re
+        # UK postcode pattern
+        postcode_pattern = r'\b[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}\b'
+        if re.search(postcode_pattern, user_query, re.IGNORECASE):
+            self.logger.info(f"[ORCHESTRATOR] Detected postcode pattern in: {user_query}")
+            return True
+
+        # Check for street/drive/road/avenue patterns
+        street_pattern = r'\b\d+\s+[A-Za-z\s]+(Street|Road|Drive|Avenue|Lane|Way|Close|Court)\b'
+        if re.search(street_pattern, user_query, re.IGNORECASE):
+            self.logger.info(f"[ORCHESTRATOR] Detected street address pattern in: {user_query}")
+            return True
+
+        return False
+
+    def _store_person_address(self, user_id: int, person_name: str, address: str):
+        """
+        Store a person's address in user memory.
+
+        Args:
+            user_id: User ID
+            person_name: Person's name (e.g., "mum", "dad")
+            address: The address to store
+        """
+        # Capitalize person name for memory key
+        memory_key = f"{person_name.capitalize()}'s Address"
+
+        # Store in memories table (permanent user facts)
+        self.memory.store_memory(
+            user_id=user_id,
+            memory_type="fact",
+            key=memory_key,
+            value=address.strip(),
+            pinned=True  # Pin person addresses so they don't decay
+        )
+
+        self.logger.info(f"[ORCHESTRATOR] Stored {memory_key}: {address}")
 
     def _get_current_date(self) -> str:
         """Get current date in YYYY-MM-DD format with day of week."""
@@ -1309,8 +1730,22 @@ Gathered data:
 Your task:
 1. Analyze the gathered data in context of the user's query
 2. Provide a helpful, conversational response that directly addresses their request
-3. If the data suggests creating a task or taking an action, propose it clearly
-4. If you recommend an action, set needs_confirmation=true
+3. **CRITICAL**: If traffic/routing data is provided with a destination, look for address details in the gathered data and mention the specific location found (city/town at minimum)
+   - Example: "Asda in Salford" or "Asda Trafford Park" (not just "Asda")
+   - This helps user verify the correct location was geocoded
+4. If the data suggests creating a task or event, propose specific actionable steps
+5. If you recommend an action, set needs_confirmation=true and include proposed_actions
+
+CRITICAL RULES FOR ACTION PROPOSALS:
+- ONLY propose actions that the user explicitly or implicitly requested
+- DO NOT propose actions for informational queries (e.g., "What's the weather?" should NOT create a calendar event)
+- **Shopping/errands with location and time** → MUST propose "create_calendar_event" (NOT "create_task")
+  Example: "buy groceries from Asda tomorrow" → create_calendar_event with time slot
+- **Tasks/reminders WITHOUT specific time** → propose "create_task"
+  Example: "remind me to call John" → create_task
+- Appointments with explicit times → propose "create_calendar_event"
+- Each action MUST include a human-readable "confirmation_message" for user approval
+- Use the exact date format from entities (YYYY-MM-DD) - DO NOT recalculate dates
 
 Response format (JSON):
 {{
@@ -1319,13 +1754,94 @@ Response format (JSON):
     "proposed_actions": []
 }}
 
-If you propose actions, include them in proposed_actions as:
+ACTION TYPES AND SCHEMAS:
+
+1. Calendar Event:
+{{
+    "type": "create_calendar_event",
+    "service": "calendar",
+    "params": {{
+        "subject": "Event title",
+        "start_time": "YYYY-MM-DDTHH:MM:SS",  // ISO 8601 format
+        "end_time": "YYYY-MM-DDTHH:MM:SS",    // ISO 8601 format
+        "location": "Location (optional)",
+        "description": "Description (optional)"
+    }},
+    "confirmation_message": "Create calendar event 'Event title' on [date] at [time]?",
+    "reasoning": "Why this action makes sense"
+}}
+
+2. Task:
 {{
     "type": "create_task",
     "service": "tasks",
-    "params": {{"title": "...", "due_date": "...", "notes": "..."}},
+    "params": {{
+        "title": "Task title",
+        "due_date": "YYYY-MM-DD",
+        "notes": "Task details (optional)",
+        "importance": "normal"  // normal, high, low
+    }},
+    "confirmation_message": "Create task '[title]' due on [date]?",
     "reasoning": "Why this action makes sense"
 }}
+
+EXAMPLES:
+
+Example 1 - Shopping List:
+User: "I need to buy milk, eggs, and bread from Asda tomorrow"
+Gathered data: Calendar shows 2-3pm free tomorrow
+Response:
+{{
+    "response": "I've checked your calendar and you're free tomorrow between 2-3pm. I can create a calendar event for your Asda shopping trip.",
+    "needs_confirmation": true,
+    "proposed_actions": [
+        {{
+            "type": "create_calendar_event",
+            "service": "calendar",
+            "params": {{
+                "subject": "Shopping at Asda",
+                "start_time": "2026-01-14T14:00:00",
+                "end_time": "2026-01-14T15:00:00",
+                "description": "Buy: milk, eggs, bread"
+            }},
+            "confirmation_message": "Create calendar event 'Shopping at Asda' tomorrow at 2:00 PM for 1 hour?",
+            "reasoning": "User requested shopping trip, calendar shows availability"
+        }}
+    ]
+}}
+
+Example 2 - Appointment Booking:
+User: "Book a haircut at Cuts Barber on Friday at 2pm"
+Response:
+{{
+    "response": "I can add this haircut appointment to your calendar for Friday at 2pm.",
+    "needs_confirmation": true,
+    "proposed_actions": [
+        {{
+            "type": "create_calendar_event",
+            "service": "calendar",
+            "params": {{
+                "subject": "Haircut",
+                "start_time": "2026-01-17T14:00:00",
+                "end_time": "2026-01-17T14:30:00",
+                "location": "Cuts Barber"
+            }},
+            "confirmation_message": "Create calendar event 'Haircut' at Cuts Barber on Friday at 2:00 PM?",
+            "reasoning": "User explicitly requested appointment booking"
+        }}
+    ]
+}}
+
+Example 3 - Informational Query (NO ACTION):
+User: "What's the weather tomorrow?"
+Gathered data: Weather shows 15°C, partly cloudy
+Response:
+{{
+    "response": "Tomorrow's weather will be partly cloudy with a high of 15°C.",
+    "needs_confirmation": false,
+    "proposed_actions": []
+}}
+Note: NO action proposed - user only wants information.
 
 Provide ONLY the JSON response, no other text."""
 
