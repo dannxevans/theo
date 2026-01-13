@@ -27,6 +27,9 @@ class TrafficService:
         """
         self.api_key = api_key
         self.logger = logging.getLogger(__name__)
+        # Store last geocoded addresses for including in response
+        self._last_origin_resolved = None
+        self._last_destination_resolved = None
 
     def get_traffic_estimate(
         self,
@@ -63,9 +66,18 @@ class TrafficService:
             }
         """
         try:
-            # Geocode if necessary
+            # Store original addresses for reference
+            origin_address = origin
+            destination_address = destination
+
+            # Geocode if necessary (stores resolved address in _last_geocoded_address)
+            self._last_geocoded_address = None
             origin_coords = self._ensure_coordinates(origin)
+            origin_resolved = self._last_geocoded_address or origin  # Use resolved address if available
+
+            self._last_geocoded_address = None
             destination_coords = self._ensure_coordinates(destination)
+            destination_resolved = self._last_geocoded_address or destination  # Use resolved address if available
 
             if not origin_coords or not destination_coords:
                 self.logger.error("[TRAFFIC] Failed to geocode origin or destination")
@@ -111,6 +123,8 @@ class TrafficService:
             traffic_info = {
                 "origin": origin_coords,
                 "destination": destination_coords,
+                "origin_address": origin_resolved,  # Resolved address from geocoding
+                "destination_address": destination_resolved,  # Resolved address from geocoding
                 "transport_mode": transport_mode,
                 "distance_meters": summary["length"],
                 "distance_km": round(summary["length"] / 1000, 2),
@@ -187,7 +201,10 @@ class TrafficService:
             params = {
                 "q": address,
                 "apikey": self.api_key,
-                "limit": 1
+                "limit": 1,
+                # Add UK bias for generic queries like "Asda", "Tesco", etc.
+                "in": "countryCode:GBR",  # Bias results to United Kingdom
+                "at": "53.4808,-2.2426"  # Center on Manchester, UK (covers Wirral and Salford)
             }
 
             self.logger.info(f"[TRAFFIC] Geocoding address: {address}")
@@ -203,10 +220,18 @@ class TrafficService:
                 self.logger.error(f"[TRAFFIC] No geocoding results for: {address}")
                 return None
 
-            position = data["items"][0]["position"]
+            item = data["items"][0]
+            position = item["position"]
             coords = f"{position['lat']},{position['lng']}"
 
-            self.logger.info(f"[TRAFFIC] Geocoded '{address}' to {coords}")
+            # Extract resolved address for display
+            # Prefer title (e.g., "Asda Superstore") or address label
+            resolved_address = item.get("title", item.get("address", {}).get("label", address))
+
+            # Store the resolved address so get_traffic_estimate can include it
+            self._last_geocoded_address = resolved_address
+
+            self.logger.info(f"[TRAFFIC] Geocoded '{address}' to {coords} ({resolved_address})")
             return coords
 
         except requests.exceptions.Timeout:

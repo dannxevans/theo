@@ -267,7 +267,9 @@ CRITICAL CONVERSATION CONTEXT RULES:
 
 Intent Distinctions:
 - book_appointment: Adding events TO CALENDAR with specific times (e.g., "add lunch to my calendar at 3pm", "schedule meeting tomorrow")
-- create_task: Adding TO-DO items WITHOUT specific times (e.g., "add buy milk to my tasks", "remind me to call John")
+  ALSO: Shopping/errands with location and time (e.g., "buy groceries at Asda tomorrow" → needs orchestration for calendar + route)
+- create_task: Adding TO-DO items WITHOUT specific times or locations (e.g., "add buy milk to my tasks", "remind me to call John")
+  NOT for shopping/errands with locations and timing - those need orchestration
 - read_calendar: Checking calendar/schedule (e.g., "what's on my calendar", "am I free tomorrow")
 - read_tasks: Viewing task/to-do list (e.g., "show my tasks", "what do I need to do")
 - compose_email: Sending/drafting emails (e.g., "email John about meeting")
@@ -279,6 +281,8 @@ Intent Distinctions:
 - whoop: WHOOP fitness tracker QUERIES only (e.g., "how did I sleep", "what's my recovery", "strain score")
   NOT statements like "I slept well", "my recovery was good"
 - general: Conversational responses, acknowledgments, opinions, decisions, statements about actions rather than requests for actions
+
+CRITICAL: If user mentions BOTH a location (store name, place) AND a time (tomorrow, next week, etc.) for shopping/errands, classify as book_appointment and set orchestrate:true
 
 Available Services: calendar, location, weather, search, tasks, email, memory, plex
 
@@ -295,15 +299,23 @@ Determine if this query requires multi-service orchestration (coordinating data 
   * Conditional planning based on external factors (e.g., "when weather is nice", "if traffic is light")
   * Coordinating multiple services for decision-making (e.g., calendar + weather, calendar + traffic + weather)
   * Contextual recommendations requiring multiple data sources
+  * Shopping/errand planning with location and time (e.g., "buy groceries tomorrow", "go shopping at Asda")
+  * Travel/arrival planning (e.g., "pick up sister at airport", "get to meeting")
+  * Visiting people at specific locations (e.g., "go to mums tomorrow", "visit dad after work", "see gran this weekend")
 - "orchestrate": false if query is:
   * Simple single-service request (e.g., "what's the weather", "check my calendar")
-  * Straightforward action (e.g., "create a task", "send an email")
+  * Straightforward action WITHOUT timing/location coordination (e.g., "send an email to John")
   * No conditional factors or multi-service coordination needed
+  * Task creation where user explicitly says "remind me" or "add to tasks" (not calendar event)
 
 Examples:
+- "buy milk, eggs, and bread from Asda tomorrow" → orchestrate:true, reason:"Shopping errand requires calendar availability check + route planning to store + calendar event creation"
+- "remind me to buy groceries" → orchestrate:false, reason:"User explicitly wants task reminder, not calendar event"
 - "buy groceries when weather is nice" → orchestrate:true, reason:"Weather-dependent planning requires calendar + weather coordination"
-- "create a task to buy groceries" → orchestrate:false, reason:"Simple task creation, no coordination needed"
-- "get to airport by 2pm tomorrow" → orchestrate:true, reason:"Requires traffic + calendar + possibly weather coordination"
+- "create a task to buy groceries" → orchestrate:false, reason:"User explicitly wants task creation, no coordination needed"
+- "pick up sister at airport 2pm tomorrow" → orchestrate:true, reason:"Requires calendar check + traffic routing + calendar event creation"
+- "I need to go to mums after work tomorrow" → orchestrate:true, reason:"Visit planning requires calendar check (when is work) + traffic routing + calendar event creation"
+- "visit dad tomorrow afternoon" → orchestrate:true, reason:"Visit planning requires calendar availability check + traffic routing + calendar event creation"
 - "what's the weather today" → orchestrate:false, reason:"Single service query"
 
 Return ONLY this JSON structure:
