@@ -121,6 +121,7 @@
 
 /* Chat header buttons */
 .chat-header button {
+  font-family: var(--font-primary);
   min-height: 36px;
   font-size: var(--font-size-xs);
   padding: var(--space-2) var(--space-3);

@@ -13,6 +13,7 @@
   align-items: center;
   justify-content: center;
   border: none;
+  font-family: var(--font-primary);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -156,6 +157,7 @@
   justify-content: center;
   height: 32px;
   padding: 0 var(--space-3);
+  font-family: var(--font-primary);
   font-size: var(--font-size-sm);
   font-weight: 500;
   border-radius: var(--radius-full);
@@ -234,6 +236,7 @@
 .new-session {
   margin: 0 0.75rem 0.5rem 0.75rem;
   padding: 0.5rem 0.65rem;
+  font-family: var(--font-primary);
   font-size: 0.875rem;
   border-radius: var(--radius-md);
   border: none;
@@ -263,6 +266,7 @@
 .action-btn {
   background: transparent;
   border: none;
+  font-family: var(--font-primary);
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 0.9rem;
@@ -289,6 +293,7 @@
 .delete-btn {
   background: transparent;
   border: none;
+  font-family: var(--font-primary);
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 0.9rem;
