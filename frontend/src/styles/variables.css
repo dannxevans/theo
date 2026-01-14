@@ -5,25 +5,29 @@
 
 /* =============================
    Font Definitions
-   Eurostile Font Family
+   Aptos Font Family
    ============================= */
 
 @font-face {
-  font-family: 'Eurostile';
-  src: url('/fonts/eurostile/eurostile.woff2') format('woff2'),
-       url('/fonts/eurostile/eurostile.woff') format('woff'),
-       url('/fonts/eurostile/eurostile.ttf') format('truetype');
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'Eurostile';
-  src: url('/fonts/eurostile/eurostile-bold.woff2') format('woff2'),
-       url('/fonts/eurostile/eurostile-bold.woff') format('woff'),
-       url('/fonts/eurostile/eurostile-bold.ttf') format('truetype');
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos-Bold.ttf') format('truetype');
   font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos-SemiBold.ttf') format('truetype');
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
@@ -150,7 +154,7 @@
   --font-size-2xl: 1.5rem;   /* 24px */
 
   /* Font Families */
-  --font-primary: 'Eurostile', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-primary: 'Aptos', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace;
 
   /* Z-index Scale */
