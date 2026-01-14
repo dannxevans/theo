@@ -47,6 +47,10 @@ theo/
 │   │   ├── pii_filter.py           # PII detection & filtering
 │   │   ├── classification_audit.py # Intent classification auditing
 │   │   ├── here_service.py         # HERE Maps integration
+│   │   ├── traffic_service.py      # Traffic/routing with smart location inference
+│   │   │
+│   │   ├── orchestration/          # Multi-service orchestration (#371, #374)
+│   │   │   └── orchestrator.py     # LLM-first orchestration engine
 │   │   │
 │   │   ├── actions/                # Action handlers
 │   │   │   ├── action_handler.py
@@ -116,6 +120,7 @@ theo/
     │   │       ├── MemoryTab.svelte
     │   │       ├── VoiceTab.svelte
     │   │       ├── ActionsTab.svelte
+    │   │       ├── ConfirmationCard.svelte  # Action confirmation UI (Phase 4)
     │   │       └── ...
     │   │
     │   ├── lib/
@@ -160,11 +165,61 @@ Sophisticated memory management with 12 specialized modules:
 - **Deduplication**: Prevents duplicate memories
 - **Lifecycle**: Automatic memory aging and archival
 
-### 4. Action System
+### 4. Intelligent Multi-Service Orchestration (#371, #374)
+
+**Status**: ✅ Production Ready (Phases 1-4 Complete, January 2026)
+
+LLM-first orchestration engine that coordinates multiple services to answer complex, multi-faceted queries. Instead of requiring users to manually query each service, THEO intelligently orchestrates calendar, weather, traffic, and other services to provide contextual responses.
+
+**Four-Phase Flow:**
+
+1. **Phase 1: Intent Reasoning & Decision** (core/intent_reasoning.py)
+   - LLM analyzes query and extracts entities (locations, times, people, activities)
+   - Identifies service signals with confidence scores
+   - Decides if orchestration is needed: `orchestrate: true/false`
+
+2. **Phase 2: Service Planning & Context Gathering** (core/orchestration/orchestrator.py)
+   - LLM creates service query plan
+   - Executes queries in parallel (calendar, weather, traffic, etc.)
+   - Smart location inference (routes from work during work hours)
+   - Person address validation with multi-turn clarification
+
+3. **Phase 3: Response Synthesis & Action Planning**
+   - LLM transforms raw service data into natural language
+   - Proposes actions (calendar events, tasks) based on context
+   - Generates confirmation messages for user approval
+
+4. **Phase 4: User Confirmation & Execution**
+   - Frontend displays interactive confirmation card (ConfirmationCard.svelte)
+   - User approves/rejects within 5 minutes
+   - Action router executes approved actions (M365, tasks, etc.)
+   - Results integrated back into conversation
+
+**Example Query:**
+```
+"Buy groceries at Asda tomorrow"
+→ Orchestrate: calendar (availability) + traffic (route to store)
+→ Synthesize: "You're free after 5:30pm. Asda is 15 min from work."
+→ Propose: Create event "Buy groceries at Asda" at 5:45pm
+→ User approves → Event created
+```
+
+**Key Features:**
+- Multi-turn clarification (e.g., "What is mum's address?" → stores fact → resumes)
+- Smart location inference from calendar context
+- Geographic bias (UK-focused geocoding via HERE Maps)
+- Parallel service execution for performance (~7-11 seconds total)
+- Token-efficient (~1,200 tokens per orchestration)
+
+**Control:**
+- UI toggle: Settings → Health Monitor → Advanced → "Disable Agentic AI"
+- Database: `preferences.disable_agentic_mode`
+
+### 5. Action System
 
 Two-step confirmation workflow for external actions:
 
-1. **Action Detection**: LLM identifies actionable requests
+1. **Action Detection**: LLM identifies actionable requests (or orchestrator proposes actions)
 2. **User Confirmation**: UI prompt for approval (core/confirmation_manager.py)
 3. **Execution**: Action router dispatches to appropriate provider
 4. **Result Handling**: Response integrated back into conversation
@@ -172,6 +227,7 @@ Two-step confirmation workflow for external actions:
 Supported actions:
 - Microsoft 365 Calendar (create/update events)
 - Microsoft 365 Email (send emails)
+- Tasks (create/complete)
 - Weather queries
 - Traffic/routing (HERE Maps)
 - Planning (weather + traffic + calendar context)
@@ -180,21 +236,22 @@ Supported actions:
 - Plex media library (search, history, playback)
 - Perplexity search with citations
 
-### 5. Work/Personal Modes
+### 6. Work/Personal Modes
 
 Dual-mode system with mode-specific configurations:
 - Separate system prompts
 - Different intents and routing rules
 - Mode-specific context building
+- **Note**: Personal actions (calendar, email, tasks) blocked in Work mode
 
-### 6. Voice Features
+### 7. Voice Features
 
 - **TTS**: OpenAI text-to-speech with streaming (reduced latency from 25+ seconds to 2-3 seconds)
 - **STT**: OpenAI speech-to-text (Whisper)
 - **Auto-read Mode**: Automatic TTS for responses
 - Voice controls in UI (VoiceControls.svelte)
 
-### 7. Authentication
+### 8. Authentication
 
 Three authentication methods:
 - **Session Tokens**: Web UI login
@@ -226,11 +283,24 @@ SQLite database with SQLAlchemy ORM. Key tables:
 
 ## Recent Major Features (January 2026)
 
+### #371 & #374 - Intelligent Multi-Service Orchestration (Phases 1-4)
+**Status**: ✅ Production Ready
+
+Complete LLM-first orchestration system that coordinates multiple services (calendar, weather, traffic) to answer complex queries. Key achievements:
+- **Phase 1**: Intent Reasoning determines orchestration need with entity extraction and service signals
+- **Phase 2**: LLM-planned parallel service queries with smart location inference
+- **Phase 3**: Natural language synthesis with action proposals
+- **Phase 4**: Two-step confirmation UI with 5-minute expiry and action execution
+
+Example: "Buy groceries at Asda tomorrow" → checks calendar → calculates route → proposes calendar event → user approves → event created.
+
+Features: Multi-turn clarification for missing info (person addresses), smart work location inference, UK geographic bias, graceful degradation on service failures.
+
 ### #367 - Intent and Behaviour Fix
-Latest improvements to intent classification and behaviour routing.
+Latest improvements to intent classification and behaviour routing. Fixed Work mode bug where text rewriting requests were incorrectly classified as email composition actions.
 
 ### #363 - AI-Powered Intent Reasoning Layer
-Added LLM-powered intent reasoning for complex queries that don't match keyword patterns. Analyzes messages with conversation context, extracting rich entities and service signals.
+Added LLM-powered intent reasoning for complex queries that don't match keyword patterns. Analyzes messages with conversation context, extracting rich entities and service signals. Now integrated with orchestration system (Phase 1).
 
 ### #361 - Web Reading and Link Fetching
 Added secure web content fetching with SSRF protection and intelligent caching (1-hour TTL).
@@ -498,14 +568,14 @@ DATABASE_URL=sqlite:///data/theo.db # Database connection
 
 ## Recent Changes (Latest Commits)
 
-1. **cf5d597**: Intent and Behaviour Fix (#367)
-2. **6b0820a**: Intent and Behaviour fix
-3. **f3372f2**: AI-Powered Intent Reasoning Layer (#365)
-4. **1468f15**: AI-Powered Intent Reasoning Layer #363
-5. **13b3ff5**: Web reading and link fetching capability (#361)
+1. **caf4e9b**: Intent reasoning fix for work mode
+2. **32bfbd0**: #374: Phase 4 - Action Confirmation & Execution for Orchestration
+3. **49d4ce2**: Stage: #371 Intelligent Multi-Service Orchestration
+4. **cf5d597**: Intent and Behaviour Fix (#367)
+5. **f3372f2**: AI-Powered Intent Reasoning Layer (#365)
 
 ---
 
-**Last Updated**: January 11, 2026
-**Current Branch**: frosty-edison
+**Last Updated**: January 13, 2026
+**Current Branch**: awesome-satoshi
 **Main Repository**: /Users/dannyblack/Development/theo
