@@ -1250,6 +1250,25 @@ export async function checkWorkModeIPAccess() {
 }
 
 // =============================
+// Kiosk Mode
+// =============================
+
+export async function checkKioskAccess() {
+  const response = await fetch(`${API_BASE}/api/kiosk/check-access`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.reason || "Kiosk mode access denied");
+  }
+
+  return response.json();
+}
+
+// =============================
 // M365 Integration
 // =============================
 
@@ -1734,9 +1753,16 @@ export async function getFeatureProviders() {
 
 /**
  * Get a specific feature provider
+ * @param {string} providerType - The provider type (e.g., 'porcupine', 'openweather')
+ * @param {boolean} includeKey - Whether to include the actual API key (default: false)
  */
-export async function getFeatureProvider(providerType) {
-  const response = await fetch(`${API_BASE}/api/feature-providers/${providerType}`, {
+export async function getFeatureProvider(providerType, includeKey = false) {
+  const url = new URL(`${API_BASE}/api/feature-providers/${providerType}`, window.location.origin);
+  if (includeKey) {
+    url.searchParams.append('include_key', 'true');
+  }
+
+  const response = await fetch(url.toString(), {
     headers: getAuthHeaders()
   });
 

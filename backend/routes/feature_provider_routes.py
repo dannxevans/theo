@@ -64,13 +64,16 @@ def get_feature_providers():
     # Get API keys from preferences (stored separately for security)
     prefs = memory.get_all(str(user_id))
 
-    # Add API key and APP ID status (whether they exist, not the actual values)
+    # Add API key, APP ID, and wake word status (whether they exist, not the actual values)
     for provider in providers:
         key_name = f"feature_provider_{provider['provider_type']}_api_key"
         provider["has_api_key"] = key_name in prefs and bool(prefs[key_name])
 
         app_id_name = f"feature_provider_{provider['provider_type']}_app_id"
         provider["has_app_id"] = app_id_name in prefs and bool(prefs[app_id_name])
+
+        wake_word_name = f"feature_provider_{provider['provider_type']}_wake_word"
+        provider["has_wake_word"] = wake_word_name in prefs and bool(prefs[wake_word_name])
 
     return jsonify(providers)
 
@@ -125,13 +128,28 @@ def get_feature_provider(provider_type):
         "updated_at": row["updated_at"]
     }
 
-    # Get API key and APP ID status from preferences
+    # Get API key, APP ID, and wake word status from preferences
     prefs = memory.get_all(str(user_id))
     key_name = f"feature_provider_{provider_type}_api_key"
     provider["has_api_key"] = key_name in prefs and bool(prefs[key_name])
 
     app_id_name = f"feature_provider_{provider_type}_app_id"
     provider["has_app_id"] = app_id_name in prefs and bool(prefs[app_id_name])
+
+    wake_word_name = f"feature_provider_{provider_type}_wake_word"
+    provider["has_wake_word"] = wake_word_name in prefs and bool(prefs[wake_word_name])
+
+    # Optionally include actual API key if include_key=true query param
+    # This allows kiosk mode to retrieve the key for wake-word detection
+    include_key = request.args.get("include_key") == "true"
+    if include_key and key_name in prefs:
+        provider["api_key"] = prefs[key_name]
+
+    if include_key and app_id_name in prefs:
+        provider["app_id"] = prefs[app_id_name]
+
+    if include_key and wake_word_name in prefs:
+        provider["wake_word"] = prefs[wake_word_name]
 
     return jsonify(provider)
 
@@ -140,7 +158,7 @@ def get_feature_provider(provider_type):
 def configure_feature_provider(provider_type):
     """
     Configure or update a feature provider.
-    Request body: { "provider_name": "...", "api_key": "...", "app_id": "...", "is_enabled": bool }
+    Request body: { "provider_name": "...", "api_key": "...", "app_id": "...", "wake_word": "...", "is_enabled": bool }
     Returns: { "status": "ok" }
     """
     from core.memory import MemoryStore
@@ -161,6 +179,7 @@ def configure_feature_provider(provider_type):
     provider_name = data.get("provider_name")
     api_key = data.get("api_key")
     app_id = data.get("app_id")
+    wake_word = data.get("wake_word")
     is_enabled = data.get("is_enabled", True)
 
     if not provider_name:
@@ -209,6 +228,11 @@ def configure_feature_provider(provider_type):
         app_id_name = f"feature_provider_{provider_type}_app_id"
         memory.remember(str(user_id), app_id_name, app_id)
 
+    # Store wake word in preferences if provided
+    if wake_word:
+        wake_word_name = f"feature_provider_{provider_type}_wake_word"
+        memory.remember(str(user_id), wake_word_name, wake_word)
+
     return jsonify({"status": "ok"})
 
 
@@ -249,17 +273,18 @@ def delete_feature_provider(provider_type):
     conn.commit()
     conn.close()
 
-    # Delete API key and APP ID from preferences
+    # Delete API key, APP ID, and wake word from preferences
     key_name = f"feature_provider_{provider_type}_api_key"
     app_id_name = f"feature_provider_{provider_type}_app_id"
+    wake_word_name = f"feature_provider_{provider_type}_wake_word"
 
     # Use direct SQL to delete from preferences since there's no delete method in MemoryStore
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         DELETE FROM preferences
-        WHERE user_id = ? AND key IN (?, ?)
-    """, (str(user_id), key_name, app_id_name))
+        WHERE user_id = ? AND key IN (?, ?, ?)
+    """, (str(user_id), key_name, app_id_name, wake_word_name))
     conn.commit()
     conn.close()
 
