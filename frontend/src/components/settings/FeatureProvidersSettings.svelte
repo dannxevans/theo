@@ -21,6 +21,17 @@
       requiresAppId: true,
       signupUrl: "https://developer.here.com/",
       docsUrl: "https://developer.here.com/documentation/routing-api/8.16.0/dev_guide/index.html"
+    },
+    {
+      type: "porcupine",
+      name: "Porcupine (Picovoice)",
+      description: "Wake-word detection for Kiosk Mode",
+      apiKeyLabel: "Porcupine Access Key",
+      wakeWordLabel: "Wake Word",
+      wakeWordPlaceholder: "e.g., Hey Theo, Computer, Jarvis",
+      requiresWakeWord: true,
+      signupUrl: "https://console.picovoice.ai/",
+      docsUrl: "https://picovoice.ai/docs/porcupine/"
     }
   ];
 
@@ -34,9 +45,11 @@
     providerStates[provider.type] = {
       apiKey: "",
       appId: "",
+      wakeWord: "",
       isEnabled: false,
       hasApiKey: false,
       hasAppId: false,
+      hasWakeWord: false,
       showApiKey: false,
       showAppId: false,
       saving: false
@@ -51,11 +64,16 @@
     loading = true;
     try {
       for (const provider of PROVIDERS) {
-        const config = await getFeatureProvider(provider.type);
+        const config = await getFeatureProvider(provider.type, true); // include_key=true to get wake_word
         if (config) {
           providerStates[provider.type].hasApiKey = config.has_api_key;
           providerStates[provider.type].hasAppId = config.has_app_id || false;
+          providerStates[provider.type].hasWakeWord = config.has_wake_word || false;
           providerStates[provider.type].isEnabled = config.is_enabled;
+          // Load actual wake_word value if present
+          if (config.wake_word) {
+            providerStates[provider.type].wakeWord = config.wake_word;
+          }
         }
       }
     } catch (error) {
@@ -79,6 +97,11 @@
       return;
     }
 
+    if (provider.requiresWakeWord && !state.wakeWord && !state.hasWakeWord) {
+      alert(`Please enter a wake word for ${provider.name}`);
+      return;
+    }
+
     state.saving = true;
     saveStatus = null;
 
@@ -98,6 +121,11 @@
         config.app_id = state.appId;
       }
 
+      // Only include wake word if it was entered/changed
+      if (state.wakeWord) {
+        config.wake_word = state.wakeWord;
+      }
+
       await configureFeatureProvider(providerType, config);
 
       // Update state
@@ -111,6 +139,11 @@
         state.hasAppId = true;
         state.appId = ""; // Clear the input after saving
         state.showAppId = false;
+      }
+
+      if (state.wakeWord) {
+        state.hasWakeWord = true;
+        // Keep wake word visible (don't clear like API key)
       }
 
       saveStatus = `${provider.name} configuration saved!`;
@@ -232,16 +265,32 @@
             </small>
           </div>
 
+          {#if provider.requiresWakeWord}
+            <div class="form-group">
+              <label for="{provider.type}-wake-word">{provider.wakeWordLabel}</label>
+              <input
+                id="{provider.type}-wake-word"
+                type="text"
+                bind:value={providerStates[provider.type].wakeWord}
+                placeholder={provider.wakeWordPlaceholder || "Enter wake word"}
+                disabled={providerStates[provider.type].saving}
+              />
+              <small class="form-help">
+                Built-in keywords: Alexa, Americano, Blueberry, Bumblebee, Computer, Grapefruit, Grasshopper, Hey Google, Hey Siri, Jarvis, Okay Google, Picovoice, Porcupine, Terminator. Custom wake words like "Hey Theo" are supported - train your model at console.picovoice.ai and place the .ppn file in /frontend/public/wake/Hey-Theo_en_wasm_v4_0_0.ppn
+              </small>
+            </div>
+          {/if}
+
           <div class="form-group">
             <label class="checkbox-label">
               <input
                 type="checkbox"
                 bind:checked={providerStates[provider.type].isEnabled}
-                disabled={providerStates[provider.type].saving || !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId)}
+                disabled={providerStates[provider.type].saving || !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId) || (provider.requiresWakeWord && !providerStates[provider.type].hasWakeWord)}
               />
               <span>Enable {provider.name} integration</span>
             </label>
-            {#if !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId)}
+            {#if !providerStates[provider.type].hasApiKey || (provider.requiresAppId && !providerStates[provider.type].hasAppId) || (provider.requiresWakeWord && !providerStates[provider.type].hasWakeWord)}
               <small class="form-help">Configure credentials first to enable</small>
             {/if}
           </div>
@@ -341,6 +390,25 @@
     font-weight: 500;
     font-size: 0.9rem;
     color: #374151;
+  }
+
+  .form-group input[type="text"]:not(.api-key-input-group input) {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  .form-group input[type="text"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .form-group input[type="text"]:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
   }
 
   .api-key-input-group {

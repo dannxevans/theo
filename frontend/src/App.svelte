@@ -3,6 +3,7 @@
   import Chat from "./components/Chat.svelte";
   import Settings from "./components/Settings.svelte";
   import Login from "./components/Login.svelte";
+  import KioskMode from "./components/KioskMode.svelte";
   import {
     getSessions,
     deleteSessionApi,
@@ -18,7 +19,9 @@
     updateFolderCollapsed,
     moveSessionToFolder,
     archiveSession,
-    checkWorkModeIPAccess
+    checkWorkModeIPAccess,
+    checkKioskAccess,
+    getFeatureProvider
   } from "./lib/api.js";
 
   let isAuthenticated = false;
@@ -26,6 +29,8 @@
   let showSettings = false;
   let currentMode = "personal"; // "work" or "personal"
   let activeWorkSubtab = "conversation"; // "conversation" | "email" | "code"
+  let kioskMode = false; // Kiosk mode active
+  let kioskSessionId = null; // Session ID for kiosk mode
 
   // Dropdown state
   let modeDropdownOpen = false;
@@ -550,6 +555,45 @@ async function setMode(mode) {
   }
 }
 
+// Enter Kiosk Mode
+async function enterKioskMode() {
+  try {
+    // Check if kiosk access is allowed (Personal mode only)
+    await checkKioskAccess();
+
+    // Create a new session for kiosk
+    const id = generateUUID();
+    kioskSessionId = id;
+
+    // Optimistically add to top of sessions list
+    sessions = [
+      {
+        id,
+        title: "New chat",
+        summary: "",
+        mode: currentMode,
+        updated_at: new Date().toISOString()
+      },
+      ...sessions
+    ].slice(0, MAX_SESSIONS);
+
+    // Enter kiosk mode
+    kioskMode = true;
+  } catch (err) {
+    console.error("Failed to enter kiosk mode:", err);
+    alert(`Cannot enter Kiosk Mode: ${err.message || 'Unknown error'}`);
+  }
+}
+
+// Exit Kiosk Mode
+function exitKioskMode() {
+  kioskMode = false;
+  kioskSessionId = null;
+
+  // Reload sessions to show new kiosk session in sidebar
+  loadSessions();
+}
+
 function handleLogin(token, user) {
   isAuthenticated = true;
   currentUser = user;
@@ -740,6 +784,14 @@ async function handleLogout() {
             >
               Work
             </button>
+            {#if currentMode === "personal"}
+              <button
+                class="dropdown-item kiosk-mode-btn"
+                on:click={() => { enterKioskMode(); modeDropdownOpen = false; }}
+              >
+                Kiosk Mode
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -1138,7 +1190,12 @@ async function handleLogout() {
 
     <section class="main">
       <div class="chat-main">
-        {#if showSettings}
+        {#if kioskMode}
+          <KioskMode
+            sessionId={kioskSessionId}
+            on:exit={exitKioskMode}
+          />
+        {:else if showSettings}
           <Settings />
         {:else}
           <Chat
