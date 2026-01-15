@@ -68,6 +68,22 @@
   font-weight: 600;
 }
 
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--gray-200);
+  margin: var(--space-2) 0;
+}
+
+.dropdown-item.kiosk-mode-btn {
+  color: var(--theo-indigo);
+  font-weight: 500;
+}
+
+.dropdown-item.kiosk-mode-btn:hover {
+  background-color: var(--info-50);
+  color: var(--theo-indigo);
+}
+
 /* ============================
    Work Mode Sub-Tabs
    ============================ */

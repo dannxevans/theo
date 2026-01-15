@@ -141,6 +141,7 @@ from routes.planning_routes import planning_bp
 from routes.routine_routes import routine_bp
 from routes.debug_routes import debug_bp
 from routes.audit_routes import audit_bp
+from routes.kiosk_routes import kiosk_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(auth_bp)
@@ -168,6 +169,7 @@ app.register_blueprint(planning_bp)
 app.register_blueprint(routine_bp)
 app.register_blueprint(debug_bp)
 app.register_blueprint(audit_bp)
+app.register_blueprint(kiosk_bp)
 
 # Set g.user_id for all requests based on auth token
 @app.before_request

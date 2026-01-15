@@ -251,7 +251,60 @@ Dual-mode system with mode-specific configurations:
 - **Auto-read Mode**: Automatic TTS for responses
 - Voice controls in UI (VoiceControls.svelte)
 
-### 8. Authentication
+### 8. Kiosk Mode (#384)
+
+**Status**: ✅ Production Ready (January 2026)
+
+Voice-first, hands-free interface for mini-PC or kiosk-style devices. Kiosk is an **interface mode** that runs within Personal mode, not a separate user mode.
+
+**Key Features:**
+- Wake-word activation with "Hey Google" (using Porcupine Web for custom wake-word detection)
+- Audio-reactive visualization with state-aware animations (idle/listening/processing/speaking)
+- Full-screen support with manual toggle
+- Voice-only interaction (no keyboard input)
+- Creates standard Personal mode sessions (stored in sidebar)
+
+**Architecture:**
+- **Access Control**: Only accessible from Personal mode (validated via `/api/kiosk/check-access`)
+- **Frontend Components**:
+  - `KioskMode.svelte` - Main kiosk interface
+  - `AudioVisualizer.svelte` - Canvas-based audio visualization (60fps)
+  - `wakeWordService.js` - Porcupine wake-word detection service
+- **Backend**: Minimal - single endpoint for access validation (`kiosk_routes.py`)
+- **Session Handling**: Creates new Personal mode session on entry, auto-titles from first message
+- **Voice Flow**: SSE streaming for responses, existing STT/TTS endpoints
+
+**Entry Point:**
+- User Mode dropdown → "🎤 Kiosk Mode" (bottom of menu, only visible in Personal mode)
+
+**User Experience:**
+1. User clicks "🎤 Kiosk Mode" from Personal mode
+2. New session created, kiosk interface loads
+3. Wake-word service listens for "Hey Google"
+4. User speaks → STT → THEO responds → TTS plays
+5. Returns to idle, waiting for next wake-word
+6. Exit button returns to main app
+
+**Configuration:**
+- **Porcupine Access Key** - Configure in Settings → Feature Providers → Porcupine
+  - Get free access key from [Picovoice Console](https://console.picovoice.ai/)
+  - Stored securely in feature_providers preferences
+  - Automatically loaded when entering Kiosk Mode
+  - If not configured, kiosk still works with manual wake button (wake-word disabled)
+- **Porcupine Model Files** - Must be served from `/public/porcupine/` directory
+  - Download from Picovoice Console when obtaining access key
+  - Required for wake-word detection to function
+- Full personal actions available (calendar, email, tasks) since it's Personal mode
+- No special IP restrictions (inherits from Personal mode settings)
+
+**Files:**
+- Backend: `backend/routes/kiosk_routes.py`, `backend/app.py`
+- Frontend: `frontend/src/components/KioskMode.svelte`, `frontend/src/components/AudioVisualizer.svelte`, `frontend/src/lib/wakeWordService.js`
+- API: `frontend/src/lib/api.js` (checkKioskAccess)
+- Styles: `frontend/src/styles/components/modals.css` (dropdown styles)
+- Dependencies: `@picovoice/porcupine-web`, `@picovoice/web-voice-processor`
+
+### 9. Authentication
 
 Three authentication methods:
 - **Session Tokens**: Web UI login
