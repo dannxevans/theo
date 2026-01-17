@@ -1,0 +1,250 @@
+/**
+ * Kiosk Dashboard Styling
+ * Futuristic AI aesthetic with glassmorphism
+ */
+
+/* Aptos Font Family */
+@font-face {
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos';
+  src: url('/fonts/aptos/Aptos-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos Display';
+  src: url('/fonts/aptos/Aptos-Display.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aptos Display';
+  src: url('/fonts/aptos/Aptos-Display-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Kiosk Color Palette */
+  --kiosk-bg: #0a0a0a;
+  --kiosk-card-bg: rgba(20, 20, 30, 0.6);
+  --kiosk-card-border: rgba(100, 255, 255, 0.2);
+  --kiosk-accent-cyan: #00ffff;
+  --kiosk-accent-purple: #a855f7;
+  --kiosk-text-primary: #e0e0e0;
+  --kiosk-text-secondary: #9ca3af;
+  --kiosk-glow: 0 0 20px rgba(0, 255, 255, 0.3);
+  --kiosk-glow-purple: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+/* Kiosk Container Base */
+.kiosk-container {
+  background: var(--kiosk-bg);
+  color: var(--kiosk-text-primary);
+  font-family: 'Aptos', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Glassmorphic Card Base */
+.kiosk-card,
+.widget-card {
+  background: var(--kiosk-card-bg);
+  border: 1px solid var(--kiosk-card-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kiosk-card:hover,
+.widget-card:hover {
+  border-color: rgba(100, 255, 255, 0.5);
+  box-shadow: 0 12px 24px rgba(0, 255, 255, 0.2);
+  transform: translateY(-3px);
+}
+
+/* Widget Header Styling */
+.widget-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.widget-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--kiosk-accent-cyan);
+  opacity: 0.8;
+}
+
+.widget-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kiosk-text-secondary);
+}
+
+/* Not Connected State */
+.not-connected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.not-connected-text {
+  font-size: 0.95rem;
+  color: var(--kiosk-text-secondary);
+  opacity: 0.6;
+}
+
+/* Glow Animations */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+  }
+}
+
+@keyframes glow-pulse-purple {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+  }
+}
+
+/* Neon Border Animation */
+@keyframes neon-border {
+  0%, 100% {
+    border-color: rgba(0, 255, 255, 0.3);
+  }
+  50% {
+    border-color: rgba(168, 85, 247, 0.5);
+  }
+}
+
+/* Apply glow to interactive elements */
+.kiosk-control-btn,
+.manual-wake-btn {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Gradient Text Effect */
+.gradient-text {
+  background: linear-gradient(135deg, var(--kiosk-accent-cyan), var(--kiosk-accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Transcript Styling - Removed, handled in component */
+
+/* Fade In Animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+/* Slide Up Animation */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Responsive Typography */
+@media (max-width: 1280px) {
+  .kiosk-container {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .kiosk-container {
+    font-size: 18px;
+  }
+}
+
+/* High DPI / 4K Adjustments */
+@media (min-resolution: 2dppx) {
+  .widget-card {
+    border-width: 0.5px;
+  }
+}

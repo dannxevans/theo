@@ -3,6 +3,9 @@
    App Layout, Typography Defaults
    ============================= */
 
+/* Import Component Styles */
+@import './components/kiosk-dashboard.css';
+
 html, body {
   height: 100%;
   margin: 0;
