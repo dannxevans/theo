@@ -1268,6 +1268,21 @@ export async function checkKioskAccess() {
   return response.json();
 }
 
+export async function fetchKioskDashboard() {
+  const response = await fetch(`${API_BASE}/api/kiosk/dashboard-data`, {
+    headers: {
+      ...getAuthHeaders()
+    }
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Failed to fetch dashboard data");
+  }
+
+  return response.json();
+}
+
 // =============================
 // M365 Integration
 // =============================
